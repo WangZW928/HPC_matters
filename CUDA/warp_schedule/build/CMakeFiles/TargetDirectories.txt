@@ -1,0 +1,3 @@
+/home/wangz/MyProject/HPC_matters/CUDA/warp_schedule/build/CMakeFiles/warp_bench.dir
+/home/wangz/MyProject/HPC_matters/CUDA/warp_schedule/build/CMakeFiles/edit_cache.dir
+/home/wangz/MyProject/HPC_matters/CUDA/warp_schedule/build/CMakeFiles/rebuild_cache.dir
