@@ -1,0 +1,1 @@
+device_name,sm_count,kernel,high_reg_tmp_size,threads_per_block,blocks,elements,repeats,warmup,iters,regs_per_thread,shmem_static_bytes,max_active_blocks_per_sm,active_warps_per_sm,max_warps_per_sm,theoretical_occupancy,avg_ms,std_ms,elems_per_ms

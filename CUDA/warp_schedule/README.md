@@ -161,6 +161,37 @@ CUDA C++ kernel
 - 语义：你写的是 thread 程序（每线程逻辑）
 - 执行：硬件按 warp 发射（32 线程同指令）
 - 调度：资源按 block 分配（同步和 shared memory 边界）
+
+### 5.8 一张总图（Grid -> Block -> Warp -> SM）
+
+```text
+你写 kernel（每线程语义）
+        |
+        v
+Launch: <<<gridDim, blockDim>>>
+        |
+        v
+Grid（很多 Blocks）
++---------------------------------------+
+| Block0  Block1  Block2  ...  BlockK   |
++---------------------------------------+
+        |
+        |  Block 作为整体分配到 SM（不会跨 SM）
+        v
+GPU: 多个 SM 并行承接 Blocks
++--------+--------+--------+--------+
+|  SM0   |  SM1   |  SM2   |  SM3   | ...
++--------+--------+--------+--------+
+        |
+        |  每个 Block 内线程按 32 打包成 warp
+        v
+SM 内 resident warps + warp scheduler
+        |
+        |  以 warp 为粒度发射同一条指令（SIMT）
+        v
+32 lanes 同指令、不同数据；分支靠 active mask 处理
+```
+
 ## 6. 实验结论与注意事项
 
 - 吞吐量（例如本项目的 `total_warps / ms`）可以作为 CUDA 程序是否较好利用 GPU 的一个核心指标，但它不是唯一指标。还需要结合 kernel 的性质（compute-bound 还是 memory-bound）、功耗、访存效率等一起判断。
@@ -172,6 +203,7 @@ CUDA C++ kernel
 - 把 kernel 改成 memory-bound（加入更多全局内存访问）
 - 使用 `cudaOccupancyMaxActiveBlocksPerMultiprocessor` 估计理论 occupancy
 - 同时记录 `nsight compute` 指标（例如 achieved occupancy、warp stall 原因）
+
 
 
 
