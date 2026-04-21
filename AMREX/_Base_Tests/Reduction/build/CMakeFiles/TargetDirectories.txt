@@ -1,0 +1,3 @@
+/home/wangz/MyProject/amrex/Src/Base/_Base_Tests/Reduction/build/CMakeFiles/reduction_cpu.dir
+/home/wangz/MyProject/amrex/Src/Base/_Base_Tests/Reduction/build/CMakeFiles/edit_cache.dir
+/home/wangz/MyProject/amrex/Src/Base/_Base_Tests/Reduction/build/CMakeFiles/rebuild_cache.dir

@@ -1,0 +1,4 @@
+/home/wangz/MyProject/amrex/Src/Base/_Base_Tests/ParallelFor/build/CMakeFiles/parallelfor2d_cpu.dir
+/home/wangz/MyProject/amrex/Src/Base/_Base_Tests/ParallelFor/build/CMakeFiles/parallelfor2d_gpu.dir
+/home/wangz/MyProject/amrex/Src/Base/_Base_Tests/ParallelFor/build/CMakeFiles/edit_cache.dir
+/home/wangz/MyProject/amrex/Src/Base/_Base_Tests/ParallelFor/build/CMakeFiles/rebuild_cache.dir

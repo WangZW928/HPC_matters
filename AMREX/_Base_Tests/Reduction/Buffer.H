@@ -1,0 +1,137 @@
+﻿#ifndef BASE_TESTS_REDUCTION_BUFFER_H_
+#define BASE_TESTS_REDUCTION_BUFFER_H_
+
+#include "Backend.H"
+
+#include <cstddef>
+#include <stdexcept>
+#include <utility>
+#include <vector>
+
+enum class MemorySpace {
+    Host,
+    Device
+};
+
+inline constexpr MemorySpace defaultMemorySpace () noexcept
+{
+#if defined(__CUDACC__)
+    return MemorySpace::Device;
+#else
+    return MemorySpace::Host;
+#endif
+}
+
+template <class T>
+class Buffer
+{
+public:
+    Buffer () = default;
+
+    Buffer (int an, MemorySpace aspace)
+        : m_n(an), m_space(aspace)
+    {
+        allocate();
+    }
+
+    ~Buffer () { release(); }
+
+    Buffer (Buffer const&) = delete;
+    Buffer& operator= (Buffer const&) = delete;
+
+    Buffer (Buffer&& rhs) noexcept
+        : m_ptr(rhs.m_ptr), m_n(rhs.m_n), m_space(rhs.m_space)
+    {
+        rhs.m_ptr = nullptr;
+        rhs.m_n = 0;
+        rhs.m_space = MemorySpace::Host;
+    }
+
+    Buffer& operator= (Buffer&& rhs) noexcept
+    {
+        if (this != &rhs) {
+            release();
+            m_ptr = rhs.m_ptr;
+            m_n = rhs.m_n;
+            m_space = rhs.m_space;
+            rhs.m_ptr = nullptr;
+            rhs.m_n = 0;
+            rhs.m_space = MemorySpace::Host;
+        }
+        return *this;
+    }
+
+    T* data () noexcept { return m_ptr; }
+    T const* data () const noexcept { return m_ptr; }
+    int size () const noexcept { return m_n; }
+
+    void copyFromHostVector (std::vector<T> const& host)
+    {
+        if (static_cast<int>(host.size()) != m_n) {
+            throw std::runtime_error("copyFromHostVector size mismatch");
+        }
+#if defined(__CUDACC__)
+        if (m_space == MemorySpace::Device) {
+            cudaMemcpy(m_ptr, host.data(), static_cast<std::size_t>(m_n) * sizeof(T), cudaMemcpyHostToDevice);
+            return;
+        }
+#endif
+        for (int i = 0; i < m_n; ++i) {
+            m_ptr[i] = host[static_cast<std::size_t>(i)];
+        }
+    }
+
+    std::vector<T> copyToHostVector () const
+    {
+        std::vector<T> host(static_cast<std::size_t>(m_n));
+#if defined(__CUDACC__)
+        if (m_space == MemorySpace::Device) {
+            cudaMemcpy(host.data(), m_ptr, static_cast<std::size_t>(m_n) * sizeof(T), cudaMemcpyDeviceToHost);
+            return host;
+        }
+#endif
+        for (int i = 0; i < m_n; ++i) {
+            host[static_cast<std::size_t>(i)] = m_ptr[i];
+        }
+        return host;
+    }
+
+private:
+    void allocate ()
+    {
+        if (m_n <= 0) { return; }
+#if defined(__CUDACC__)
+        if (m_space == MemorySpace::Device) {
+            cudaMalloc(&m_ptr, static_cast<std::size_t>(m_n) * sizeof(T));
+            return;
+        }
+#else
+        if (m_space == MemorySpace::Device) {
+            throw std::runtime_error("Device memory requires CUDA compilation");
+        }
+#endif
+        m_ptr = new T[static_cast<std::size_t>(m_n)];
+    }
+
+    void release ()
+    {
+        if (!m_ptr) { return; }
+#if defined(__CUDACC__)
+        if (m_space == MemorySpace::Device) {
+            cudaFree(m_ptr);
+        } else {
+            delete[] m_ptr;
+        }
+#else
+        delete[] m_ptr;
+#endif
+        m_ptr = nullptr;
+        m_n = 0;
+    }
+
+    T* m_ptr = nullptr;
+    int m_n = 0;
+    MemorySpace m_space = MemorySpace::Host;
+};
+
+#endif

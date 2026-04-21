@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/heat2d_cpu.dir/main.cpp.o -o heat2d_cpu  /usr/lib/gcc/x86_64-linux-gnu/13/libgomp.so /usr/lib/x86_64-linux-gnu/libpthread.a 
