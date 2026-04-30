@@ -1,1 +1,0 @@
-/usr/bin/g++ @CMakeFiles/parallelfor2d_gpu.dir/objects1.rsp CMakeFiles/parallelfor2d_gpu.dir/cmake_device_link.o -o parallelfor2d_gpu @CMakeFiles/parallelfor2d_gpu.dir/linkLibs.rsp -L"/usr/local/cuda-12.6/targets/x86_64-linux/lib/stubs" -L"/usr/local/cuda-12.6/targets/x86_64-linux/lib"

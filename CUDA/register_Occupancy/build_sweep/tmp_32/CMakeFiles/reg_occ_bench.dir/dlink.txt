@@ -1,0 +1,1 @@
+/usr/local/cuda-12.6/bin/nvcc -forward-unknown-to-host-compiler -DHIGH_REG_TMP_SIZE=32 -arch=native -Xcompiler=-fPIC -Wno-deprecated-gpu-targets -shared -dlink --options-file CMakeFiles/reg_occ_bench.dir/deviceObjects1.rsp -o CMakeFiles/reg_occ_bench.dir/cmake_device_link.o --options-file CMakeFiles/reg_occ_bench.dir/deviceLinkLibs.rsp

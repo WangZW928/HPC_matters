@@ -1,0 +1,3 @@
+/home/wangz/MyProject/HPC_matters/CUDA/cuda_graph_intro/build/CMakeFiles/graph_bench.dir
+/home/wangz/MyProject/HPC_matters/CUDA/cuda_graph_intro/build/CMakeFiles/edit_cache.dir
+/home/wangz/MyProject/HPC_matters/CUDA/cuda_graph_intro/build/CMakeFiles/rebuild_cache.dir

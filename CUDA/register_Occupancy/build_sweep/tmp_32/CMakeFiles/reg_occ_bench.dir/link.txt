@@ -1,0 +1,1 @@
+/usr/bin/g++ @CMakeFiles/reg_occ_bench.dir/objects1.rsp CMakeFiles/reg_occ_bench.dir/cmake_device_link.o -o reg_occ_bench @CMakeFiles/reg_occ_bench.dir/linkLibs.rsp -L"/usr/local/cuda-12.6/targets/x86_64-linux/lib/stubs" -L"/usr/local/cuda-12.6/targets/x86_64-linux/lib"

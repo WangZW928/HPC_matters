@@ -36,6 +36,28 @@ for (int k = 0; k < HIGH_REG_TMP_SIZE; k++) tmp[k] = x;
 - `theoretical_occupancy`（理论 occupancy）
 - `avg_ms` / `std_ms`（kernel 平均时间与波动）
 
+
+## 2.1 Stat 字段说明
+
+`src/reg_occ_bench.cu` 里的 `Stat` 结构体用于记录一次实验结果。字段含义如下：
+
+- `kernel`：kernel 名称（`low_reg` / `high_reg`）
+- `high_reg_tmp_size`：高寄存器版本临时数组长度（`HIGH_REG_TMP_SIZE`）
+- `threads_per_block`：每个 block 的线程数（`blockDim.x`）
+- `blocks`：grid 的 block 数（`gridDim.x`）
+- `elements`：本次处理元素总数（通常是 `blocks * threads_per_block`）
+- `repeats`：正式计时重复次数
+- `warmup`：预热轮数（不计入统计）
+- `iters`：kernel 内部循环次数（控制计算强度）
+- `regs_per_thread`：每线程寄存器数（编译器分配结果）
+- `shmem_static_bytes`：静态 shared memory 大小（字节）
+- `max_active_blocks_per_sm`：每个 SM 理论最多可驻留 block 数
+- `active_warps_per_sm`：每个 SM 当前活跃 warp 数
+- `max_warps_per_sm`：硬件每个 SM 的 warp 上限
+- `theoretical_occupancy`：理论占有率（`active_warps_per_sm / max_warps_per_sm`）
+- `avg_ms`：平均执行时间（毫秒）
+- `std_ms`：执行时间标准差（毫秒）
+- `elems_per_ms`：吞吐量（每毫秒处理元素数，`elements / avg_ms`）
 ## 3. 项目结构
 
 ```text
@@ -131,3 +153,4 @@ TMP_SIZES="8 16 24 32 48 64 80 96 128" REPEATS=20 WARMUP=5 ITERS=256 bash script
 - 汇总表：`results/sweep_summary.csv`
 
 说明：趋势图默认使用 `high_reg` 行，横轴是 `regs_per_thread`，更直接反映“寄存器压力 -> occupancy/性能”的关系。
+

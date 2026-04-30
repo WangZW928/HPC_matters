@@ -1,1 +1,0 @@
-/usr/bin/c++ CMakeFiles/parallelfor2d_cpu.dir/main.cpp.o -o parallelfor2d_cpu  /usr/lib/gcc/x86_64-linux-gnu/13/libgomp.so /usr/lib/x86_64-linux-gnu/libpthread.a 
