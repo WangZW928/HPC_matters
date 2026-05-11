@@ -1,0 +1,3 @@
+/home/wangz/MyProject/HPC_matters/C++/alignment_demo/build/CMakeFiles/alignment_demo.dir
+/home/wangz/MyProject/HPC_matters/C++/alignment_demo/build/CMakeFiles/edit_cache.dir
+/home/wangz/MyProject/HPC_matters/C++/alignment_demo/build/CMakeFiles/rebuild_cache.dir
