@@ -94,6 +94,7 @@ int main(int argc, char** argv) {
 
     // Graph path: capture once, replay many times
     reset_input();
+    
     cudaStream_t s;
     CUDA_CHECK(cudaStreamCreate(&s));
 
