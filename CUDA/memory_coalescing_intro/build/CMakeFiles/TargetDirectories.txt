@@ -1,0 +1,3 @@
+/home/wangz/MyProject/HPC_matters/CUDA/memory_coalescing_intro/build/CMakeFiles/mem_coalescing_bench.dir
+/home/wangz/MyProject/HPC_matters/CUDA/memory_coalescing_intro/build/CMakeFiles/edit_cache.dir
+/home/wangz/MyProject/HPC_matters/CUDA/memory_coalescing_intro/build/CMakeFiles/rebuild_cache.dir
