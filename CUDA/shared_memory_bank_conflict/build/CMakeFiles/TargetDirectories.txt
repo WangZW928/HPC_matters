@@ -1,0 +1,3 @@
+/home/wangz/MyProject/HPC_matters/CUDA/shared_memory_bank_conflict/build/CMakeFiles/bank_conflict_bench.dir
+/home/wangz/MyProject/HPC_matters/CUDA/shared_memory_bank_conflict/build/CMakeFiles/edit_cache.dir
+/home/wangz/MyProject/HPC_matters/CUDA/shared_memory_bank_conflict/build/CMakeFiles/rebuild_cache.dir
