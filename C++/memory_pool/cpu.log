@@ -1,0 +1,33 @@
+=== RAII ObjectPool<T> Demo ===
+block size = 16 bytes
+alignment  = 8 bytes
+capacity   = 4 blocks
+used       = 0 blocks
+
+after creating two RAII handles:
+p1 address = 0x55e309c8c2e0, id = 101
+p2 address = 0x55e309c8c2d0, id = 102
+used       = 2 blocks
+
+after p1.reset():
+used       = 1 blocks
+
+after creating p3:
+p1 old address = 0x55e309c8c2e0
+p3 address     = 0x55e309c8c2e0, id = 103
+notice: p3 often reuses p1's old address.
+
+leaving this function will automatically destroy p2 and p3.
+
+=== PoolVector<T> Demo ===
+vector values: 0 1 4 9 16 25 36 49 64 81
+vector data address = 0x55e309c8d340
+pool capacity       = 1024 bytes
+pool used           = 64 bytes
+
+=== Optional GPU Allocator Notes ===
+include/memory_pool/gpu_allocator.hpp provides optional CUDA helpers.
+They are compiled only when MEMORY_POOL_ENABLE_CUDA is defined.
+Device memory is not ordinary host memory, so do not use cudaMalloc memory
+as a normal std::vector backing store. Use CudaManagedVector<T> only with
+CUDA unified memory, or use CudaDeviceBuffer<T> for kernel-facing buffers.

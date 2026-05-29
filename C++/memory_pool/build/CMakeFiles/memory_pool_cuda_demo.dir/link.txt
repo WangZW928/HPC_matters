@@ -1,0 +1,1 @@
+/usr/bin/g++ @CMakeFiles/memory_pool_cuda_demo.dir/objects1.rsp CMakeFiles/memory_pool_cuda_demo.dir/cmake_device_link.o -o memory_pool_cuda_demo @CMakeFiles/memory_pool_cuda_demo.dir/linkLibs.rsp -L"/usr/local/cuda/targets/x86_64-linux/lib/stubs" -L"/usr/local/cuda/targets/x86_64-linux/lib"

@@ -1,0 +1,4 @@
+/home/wangz/MyProject/HPC_matters/C++/memory_pool/build/CMakeFiles/memory_pool_demo.dir
+/home/wangz/MyProject/HPC_matters/C++/memory_pool/build/CMakeFiles/memory_pool_cuda_demo.dir
+/home/wangz/MyProject/HPC_matters/C++/memory_pool/build/CMakeFiles/edit_cache.dir
+/home/wangz/MyProject/HPC_matters/C++/memory_pool/build/CMakeFiles/rebuild_cache.dir
