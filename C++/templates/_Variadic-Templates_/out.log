@@ -1,0 +1,19 @@
+=== Recursive Pack Expansion ===
+10 -> 2.5 -> hello -> template -> (end)
+
+=== Fold Expression ===
+values: 1 2 3 4 
+sum_all(1, 2, 3, 4) = 10
+sum_all(1.5, 2.5, 3.0) = 7
+
+=== sizeof... ===
+count_types<>(): 0
+count_types<int, double, std::string>(): 3
+
+=== Type Trait on Parameter Pack ===
+AllIntegral<int, short, long>::value = true
+AllIntegral<int, double, long>::value = false
+
+=== Variadic Helper Function ===
+make_vector<int>(1, 2, 3, 4, 5): 1 2 3 4 5 
+
