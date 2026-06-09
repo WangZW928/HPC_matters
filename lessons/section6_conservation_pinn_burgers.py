@@ -44,6 +44,7 @@ class Config:
     print_every: int = 100
     ref_nx: int = 256
     ref_dt: float = 5e-4
+    device: str = "auto"
     output_dir: str = "results/section6_burgers"
 
 
@@ -53,6 +54,24 @@ def set_seed(seed: int) -> None:
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+
+
+def select_device(preference: str = "auto") -> torch.device:
+    """Resolve auto/mps/cuda/cpu while giving useful availability errors."""
+    preference = preference.lower()
+    if preference not in {"auto", "mps", "cuda", "cpu"}:
+        raise ValueError("device must be one of: auto, mps, cuda, cpu")
+    if preference == "mps" and not torch.backends.mps.is_available():
+        raise RuntimeError("MPS was requested but is not available in this PyTorch build")
+    if preference == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("CUDA was requested but is not available")
+    if preference != "auto":
+        return torch.device(preference)
+    if torch.backends.mps.is_available():
+        return torch.device("mps")
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    return torch.device("cpu")
 
 
 def initial_condition(x):
@@ -194,7 +213,13 @@ def train_model(
         loss_pde = torch.mean(residual**2)
 
         t_cons = config.train_t_max * torch.rand(config.n_cons_t, 1, device=device)
-        loss_cons = conservation_loss(model, t_cons, config.n_cons_x)
+        if lambda_cons > 0.0:
+            loss_cons = conservation_loss(model, t_cons, config.n_cons_x)
+        else:
+            # Keep a diagnostic value for the baseline without building its
+            # conservation-loss graph into backpropagation.
+            with torch.no_grad():
+                loss_cons = conservation_loss(model, t_cons, config.n_cons_x)
 
         loss = (
             config.lambda_ic * loss_ic
@@ -346,7 +371,7 @@ def plot_time_slices(
 # %% Complete experiment
 def run_experiment(config: Config) -> None:
     set_seed(config.seed)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = select_device(config.device)
     output_dir = Path(__file__).resolve().parent / config.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"device: {device}")
@@ -386,13 +411,14 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--epochs", type=int, default=None, help="training epochs per model")
     parser.add_argument("--lambda-cons", type=float, default=1.0)
+    parser.add_argument("--device", choices=["auto", "mps", "cuda", "cpu"], default="auto")
     parser.add_argument("--quick", action="store_true", help="small CPU smoke-test experiment")
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
-    cfg = Config(lambda_cons=args.lambda_cons)
+    cfg = Config(lambda_cons=args.lambda_cons, device=args.device)
     if args.lambda_cons != 1.0:
         label = str(args.lambda_cons).replace(".", "p")
         cfg.output_dir = f"results/section6_burgers_lambda_{label}"

@@ -18,8 +18,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-torch.set_default_dtype(torch.float64)
-
 
 @dataclass
 class Parameters:
@@ -65,7 +63,9 @@ def hamiltonian_rhs(
     params: Parameters,
 ) -> np.ndarray:
     """Return (d coordinates/dt, d momenta/dt) using automatic differentiation."""
-    z = torch.tensor(state, requires_grad=True)
+    # Keep this calculation on CPU: MPS does not support float64, while the
+    # small Hamiltonian drift measured in this lesson benefits from precision.
+    z = torch.tensor(state, dtype=torch.float64, device="cpu", requires_grad=True)
     energy = energy_function(z, params)
     grad_h = torch.autograd.grad(energy, z)[0]
     dzdt = torch.cat((grad_h[2:], -grad_h[:2]))
@@ -136,7 +136,8 @@ def integrate_rk4(
 # %% Evaluation and plotting
 def energy_history(states: np.ndarray, params: Parameters) -> np.ndarray:
     with torch.no_grad():
-        return hamiltonian(torch.tensor(states), params).numpy()
+        tensor = torch.tensor(states, dtype=torch.float64, device="cpu")
+        return hamiltonian(tensor, params).numpy()
 
 
 def cartesian_positions(states: np.ndarray, params: Parameters) -> tuple[np.ndarray, ...]:
