@@ -632,6 +632,39 @@ f = u_t + u * u_x - nu * u_xx
 
 # 15. 课后任务
 
+## 配套实验代码
+
+本节配套代码为：
+
+```text
+section6_conservation_pinn_burgers.py
+```
+
+该文件使用 `# %%` 分隔教学单元，可在 VS Code 中像 Notebook 一样逐单元运行，也可在终端完整运行：
+
+```bash
+cd lessons
+python -m pip install -r requirements.txt
+
+# 小规模冒烟测试，确认环境和流程正确
+python section6_conservation_pinn_burgers.py --quick
+
+# 正式对比实验，每个模型训练 3000 轮
+python section6_conservation_pinn_burgers.py --epochs 3000 --lambda-cons 1
+```
+
+实验结果保存在 `results/section6_burgers/`，包括训练曲线、解场与误差图、质量漂移曲线、长时间外推切片、定量指标 CSV 和模型权重。
+
+做守恒权重敏感性实验时，可分别运行：
+
+```bash
+python section6_conservation_pinn_burgers.py --epochs 3000 --lambda-cons 0.1
+python section6_conservation_pinn_burgers.py --epochs 3000 --lambda-cons 1
+python section6_conservation_pinn_burgers.py --epochs 3000 --lambda-cons 10
+```
+
+不同权重的结果会自动保存到不同的 `results/section6_burgers_lambda_*/` 目录，避免相互覆盖。
+
 ## 必做
 
 1. 复制第五节 Notebook，命名为 `section6_conservation_pinn_burgers.ipynb`。
