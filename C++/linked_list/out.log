@@ -1,0 +1,76 @@
+╔══════════════════════════════════════════════╗
+║   链表（Linked List）— 现代 C++ 实现与对比  ║
+╚══════════════════════════════════════════════╝
+
+══════ 1. 单向链表 (Singly Linked List) ══════
+
+空链表: []  (size=0)
+push_back 三次: [Apple -> Banana -> Cherry]  (size=3)
+push_front("ZERO"): [ZERO -> Apple -> Banana -> Cherry]  (size=4)
+front() = ZERO
+back()  = Cherry
+remove("Banana"): [ZERO -> Apple -> Cherry]  (size=3)
+pop_front(): [Apple -> Cherry]  (size=2)
+使用 range-for 遍历: Apple Cherry 
+
+移动后 sl  (应为空): []  (size=0)
+移动后 sl2: [Apple -> Cherry]  (size=2)
+
+══════ 2. 双向链表 (Doubly Linked List) ══════
+
+forward: [10 ⇄ 20 ⇄ 30 ⇄ 40 ⇄ 50]  (size=5)
+backward: [50 ⇄ 40 ⇄ 30 ⇄ 20 ⇄ 10]  (size=5)
+front() = 10, back() = 50
+
+删除 *it = 30 (O(1) 删除任意位置)
+forward: [10 ⇄ 20 ⇄ 40 ⇄ 50]  (size=4)
+backward: [50 ⇄ 40 ⇄ 20 ⇄ 10]  (size=4)
+
+pop_front() 后:
+forward: [20 ⇄ 40 ⇄ 50]  (size=3)
+
+pop_back() 后:
+forward: [20 ⇄ 40]  (size=2)
+
+══════ 3. 标准库 std::forward_list vs std::list ══════
+
+std::forward_list: 1 2 3 4 5 
+insert_after(begin, 99): 1 99 2 3 4 5 
+erase_after(begin):     1 2 3 4 5 
+
+std::list:
+  push_front(5) + push_back(55): 5 10 20 30 40 50 55 
+  insert(第4位, 999):           5 10 20 999 30 40 50 55 
+  反向遍历: 55 50 40 30 999 20 10 5 
+
+══════ 4. 性能基准测试 ══════
+
+--- 头部插入 10000 个元素 ---
+  std::vector          : 2.81259 ms  (O(n) per insert, total O(n^2))
+  std::forward_list    : 0.282812 ms  (O(1) per insert)
+  std::list            : 0.293767 ms  (O(1) per insert)
+  我的 SinglyLinkedList: 0.287778 ms
+  我的 DoublyLinkedList: 0.307152 ms
+
+--- 随机访问 5000 个元素 ---
+  std::vector (下标)   : 0.018605 ms  (O(1) per access)
+  std::list (advance)  : 27.1196 ms  (O(n) per access, total O(n^2))
+
+══════ 总结 ══════
+
+链表的核心优势:
+  ✓ 头部/中间插入删除 O(1)（已知位置）
+  ✓ 迭代器在插入删除后保持稳定
+  ✓ 不需要连续内存，无 reallocate 开销
+
+链表的劣势:
+  ✗ 不支持随机访问 O(1)
+  ✗ 缓存局部性差（节点散布内存各处）
+  ✗ 每个节点额外开销（至少一个指针）
+  ✗ unique_ptr 递归析构需特别处理
+
+工程建议:
+  - 默认用 std::vector，需要频繁头部/中间插入时考虑 list
+  - HPC / 数值计算中 vector 几乎总是更好的选择
+  - 实现自己的链表是理解指针 & 所有权语义的绝佳练习
+  - 工业代码优先用 std::forward_list / std::list
