@@ -1,0 +1,74 @@
+=== 字符串 key 的哈希表示例 ===
+插入 4 个学生后：
+bucket[0]: (Bob, 88) (Charlie, 91) 
+bucket[1]: (Alice, 95) 
+bucket[2]: (empty)
+bucket[3]: (empty)
+bucket[4]: (empty)
+bucket[5]: (empty)
+bucket[6]: (empty)
+bucket[7]: (Diana, 86) 
+size = 4
+bucket_count = 8
+load_factor = 0.5
+
+查找 Alice：95
+更新 Alice 的分数为 99
+Alice = 99
+
+删除 Bob：success
+删除后：
+bucket[0]: (Charlie, 91) 
+bucket[1]: (Alice, 99) 
+bucket[2]: (empty)
+bucket[3]: (empty)
+bucket[4]: (empty)
+bucket[5]: (empty)
+bucket[6]: (empty)
+bucket[7]: (Diana, 86) 
+size = 3
+
+继续插入更多元素，观察自动 rehash：
+bucket[0]: (Charlie, 91) (Ivan, 81) 
+bucket[1]: (empty)
+bucket[2]: (Judy, 94) 
+bucket[3]: (empty)
+bucket[4]: (Eve, 77) 
+bucket[5]: (empty)
+bucket[6]: (empty)
+bucket[7]: (Diana, 86) (Frank, 83) 
+bucket[8]: (empty)
+bucket[9]: (Alice, 99) (Grace, 92) 
+bucket[10]: (empty)
+bucket[11]: (Heidi, 89) 
+bucket[12]: (empty)
+bucket[13]: (empty)
+bucket[14]: (empty)
+bucket[15]: (empty)
+size = 9
+bucket_count = 16
+load_factor = 0.5625
+
+=== 整数 key 的哈希表示例 ===
+bucket[0]: (empty)
+bucket[1]: (1001, Zhang San) 
+bucket[2]: (1002, Li Si) 
+bucket[3]: (1003, Wang Wu) 
+id 1002 -> Li Si
+手动 rehash 到 16 个桶
+bucket[0]: (empty)
+bucket[1]: (empty)
+bucket[2]: (empty)
+bucket[3]: (empty)
+bucket[4]: (empty)
+bucket[5]: (empty)
+bucket[6]: (empty)
+bucket[7]: (empty)
+bucket[8]: (empty)
+bucket[9]: (1001, Zhang San) 
+bucket[10]: (1002, Li Si) 
+bucket[11]: (1003, Wang Wu) 
+bucket[12]: (empty)
+bucket[13]: (empty)
+bucket[14]: (empty)
+bucket[15]: (empty)
