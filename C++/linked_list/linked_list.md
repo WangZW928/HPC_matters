@@ -75,6 +75,8 @@ head ⇄ [A] ⇄ [B] ⇄ [C] ⇄ tail
 现代 C++ 实现要点：
 - `prev` 用裸指针（没有所有权），`next` 用 `unique_ptr`（拥有权）
 - 或者全部用 `unique_ptr` + 手动处理 `prev` 的原始指针
+- 拷贝时必须深拷贝节点，不能复制 `unique_ptr`
+- 移动时可以直接转移 `head` / `tail` / `size`，但被覆盖的旧链表仍应迭代销毁，避免长链递归析构
 
 ## 4. 关键操作的时间复杂度
 
@@ -110,8 +112,79 @@ for (auto& value : list) {
 - `operator*` — 解引用
 - `operator++` — 前进
 - `operator!=` — 比较
+- iterator traits — 例如 `std::forward_iterator_tag` / `std::bidirectional_iterator_tag`
+- `const_iterator` — 让 `const SinglyLinkedList<T>&` 也能安全遍历
 
-## 6. C++ 标准库的链表
+本示例中：
+
+- `SinglyLinkedList<T>` 提供前向迭代器和 `ConstIterator`
+- `DoublyLinkedList<T>` 提供双向迭代器、`ConstIterator`，并能通过 `std::reverse_iterator` 反向遍历
+- `front()` / `back()` 同时提供 const 与非 const 版本
+
+## 6. 拷贝、移动与异常安全
+
+`std::unique_ptr` 让节点所有权非常清晰，但它也意味着默认拷贝被禁用。容器如果要支持拷贝，必须自己写：
+
+- copy constructor：遍历源链表，对每个元素创建新节点
+- copy assignment：先拷贝到临时对象，再 `swap`，这样如果中途分配失败，原链表不变
+- move constructor / move assignment：转移所有权后，把源链表置空
+- `clear()`：迭代销毁节点，避免很长的链表通过 `unique_ptr` 递归析构导致栈溢出
+
+示例代码里还用 `static_assert(std::is_copy_constructible<T>::value, ...)` 提醒：只有元素类型 `T` 可拷贝时，链表深拷贝才成立。C++20 可以进一步用 concepts 写成 `requires std::copy_constructible<T>`，但本项目按 C++17 编译。
+
+## 7. 经典链表练习：reverse 与 merge
+
+### reverse()
+
+单向链表反转是理解指针所有权转移的好练习。核心思想是维护三段：
+
+- `previous`：已经反转好的前缀
+- `head_`：当前节点
+- `next`：临时保存原来的后继节点
+
+每一步把当前节点的 `next` 指向 `previous`，再整体向前推进。整个过程 O(n)，不分配新节点。
+
+### merge_sorted()
+
+合并两个有序单向链表也是 O(n) 操作。本示例的 `merge_sorted(left, right)` 接收两个链表值参数，然后移动节点到结果链表中：
+
+- 不拷贝元素值
+- 不重新分配节点
+- 保持稳定排序：相等时优先取左侧链表
+
+这和 `std::forward_list::merge` / `std::list::merge` 的思想接近：链表的强项之一就是可以通过改指针来拼接节点。
+
+## 8. Intrusive List（侵入式链表）
+
+普通容器式链表会为每个元素额外分配一个节点：
+
+```cpp
+[node: data + next] -> [node: data + next]
+```
+
+侵入式链表把 `next` 指针直接放进业务对象里：
+
+```cpp
+struct Particle {
+    int id;
+    double energy_mev;
+    Particle* next;
+};
+```
+
+优点：
+
+- 不需要额外节点分配
+- 对象地址稳定时，插入/删除只改指针
+- 常见于内核、游戏引擎、内存池、任务队列等低层系统
+
+代价：
+
+- 链表不拥有对象生命周期，调用者必须保证对象仍然活着
+- 一个对象如果要同时进入多个链表，需要多个 hook 指针
+- 接口不如标准容器通用，容易误用
+
+## 9. C++ 标准库的链表
 
 ### std::forward_list（C++11）
 - 单向链表，最小内存开销
@@ -124,20 +197,38 @@ for (auto& value : list) {
 - 迭代器在插入/删除时不会失效
 - 额外开销：每个节点两个指针
 
-## 7. 性能注意事项
+## 10. 性能注意事项
 
 1. **不要用链表替代 vector 做随机访问** — 每次 `list[i]` 都是 O(n) 遍历
 2. **考虑内存碎片** — 大量小节点分配可能导致碎片化
 3. **递归析构危险** — `unique_ptr` 链过长时析构会爆栈
 4. **HPC 场景优先 vector** — 除非确实需要频繁的中间插入/删除且迭代器稳定
+5. **节点池 / allocator** — 如果大量创建销毁节点，可以考虑 `std::pmr`、对象池或自定义 allocator，减少小对象分配开销
+6. **批量操作** — `merge`、`splice`、整链拼接这类操作通常比逐元素拷贝更符合链表优势
+7. **内存布局** — 链表节点散布在堆上，CPU cache miss 往往比算法复杂度更影响真实性能
 
-## 8. 本示例程序
+## 11. 线程安全说明
+
+本教程代码没有实现内部加锁。一般规则：
+
+- 多个线程只读同一个链表：通常可以，但前提是没有线程同时修改它
+- 一个线程写、其他线程读：需要外部同步，例如 `std::mutex`
+- 多个线程同时写：需要外部同步，或改用专门设计的并发数据结构
+- 迭代器稳定不等于线程安全；节点不搬家，但并发删除仍可能让另一个线程持有悬空迭代器
+
+教学代码刻意不加入锁，因为锁会掩盖链表本身的所有权和指针逻辑。工业代码应在更高层明确同步策略。
+
+## 12. 本示例程序
 
 `linked_list.cpp` 演示了：
 
 - 用 `std::unique_ptr` 实现单/双向链表
-- 迭代器接口
-- 常见操作（push_front, push_back, pop_front, erase）
+- 深拷贝、移动语义、迭代销毁
+- 非 const / const 迭代器接口
+- 常见操作（push_front, push_back, emplace_front, emplace_back, pop_front, erase）
+- 单向链表 `reverse()` 和两个有序链表的 `merge_sorted()`
+- 双向链表的反向遍历
+- 一个简单 intrusive list 示例
 - 与 `std::forward_list` / `std::list` 的对比
 - 性能基准：vector vs list 的随机插入
 

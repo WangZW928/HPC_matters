@@ -1,11 +1,14 @@
 #include <chrono>
 #include <cstddef>
 #include <forward_list>
+#include <functional>
 #include <iostream>
+#include <iterator>
 #include <list>
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -22,7 +25,9 @@ private:
         T data;
         std::unique_ptr<Node> next;
 
-        explicit Node(T value) : data(std::move(value)), next(nullptr) {}
+        template <typename... Args>
+        explicit Node(Args&&... args)
+            : data(std::forward<Args>(args)...), next(nullptr) {}
     };
 
     std::unique_ptr<Node> head_;
@@ -30,24 +35,74 @@ private:
     std::size_t size_ = 0;
 
     // 迭代销毁，避免 unique_ptr 递归析构爆栈
-    void destroy_chain(std::unique_ptr<Node> node) {
+    static void destroy_chain(std::unique_ptr<Node> node) {
         while (node) {
             auto next = std::move(node->next);
             node = std::move(next);  // node 析构时 next 已被移走，不再递归
         }
     }
 
+    void copy_from(const SinglyLinkedList& other) {
+        static_assert(std::is_copy_constructible<T>::value,
+                      "SinglyLinkedList<T> copy requires copy-constructible T");
+        for (const auto& value : other) {
+            push_back(value);
+        }
+    }
+
+    std::unique_ptr<Node> detach_front_node() {
+        auto node = std::move(head_);
+        head_ = std::move(node->next);
+        node->next = nullptr;
+        if (!head_) tail_ = nullptr;
+        --size_;
+        return node;
+    }
+
+    void append_node(std::unique_ptr<Node> node) {
+        Node* raw = node.get();
+        if (tail_) {
+            tail_->next = std::move(node);
+        } else {
+            head_ = std::move(node);
+        }
+        tail_ = raw;
+        ++size_;
+    }
+
+    void append_chain_from(SinglyLinkedList& other) {
+        if (other.empty()) return;
+        if (empty()) {
+            head_ = std::move(other.head_);
+            tail_ = other.tail_;
+            size_ = other.size_;
+        } else {
+            tail_->next = std::move(other.head_);
+            tail_ = other.tail_;
+            size_ += other.size_;
+        }
+        other.tail_ = nullptr;
+        other.size_ = 0;
+    }
+
 public:
     SinglyLinkedList() = default;
 
     ~SinglyLinkedList() {
-        if (head_) {
-            destroy_chain(std::move(head_));
-        }
+        clear();
     }
 
-    SinglyLinkedList(const SinglyLinkedList&) = delete;
-    SinglyLinkedList& operator=(const SinglyLinkedList&) = delete;
+    SinglyLinkedList(const SinglyLinkedList& other) {
+        copy_from(other);
+    }
+
+    SinglyLinkedList& operator=(const SinglyLinkedList& other) {
+        if (this != &other) {
+            SinglyLinkedList tmp(other);
+            swap(tmp);
+        }
+        return *this;
+    }
 
     // 移动构造
     SinglyLinkedList(SinglyLinkedList&& other) noexcept
@@ -61,6 +116,7 @@ public:
 
     SinglyLinkedList& operator=(SinglyLinkedList&& other) noexcept {
         if (this != &other) {
+            clear();
             head_ = std::move(other.head_);
             tail_ = other.tail_;
             size_ = other.size_;
@@ -75,7 +131,14 @@ public:
     class Iterator {
     private:
         Node* current_;
+        friend class ConstIterator;
     public:
+        using iterator_category = std::forward_iterator_tag;
+        using value_type = T;
+        using difference_type = std::ptrdiff_t;
+        using pointer = T*;
+        using reference = T&;
+
         explicit Iterator(Node* node) : current_(node) {}
 
         T& operator*() const { return current_->data; }
@@ -100,29 +163,80 @@ public:
         }
     };
 
+    class ConstIterator {
+    private:
+        const Node* current_;
+    public:
+        using iterator_category = std::forward_iterator_tag;
+        using value_type = T;
+        using difference_type = std::ptrdiff_t;
+        using pointer = const T*;
+        using reference = const T&;
+
+        explicit ConstIterator(const Node* node) : current_(node) {}
+        ConstIterator(const Iterator& it) : current_(it.current_) {}
+
+        const T& operator*() const { return current_->data; }
+        const T* operator->() const { return &current_->data; }
+
+        ConstIterator& operator++() {
+            if (current_) current_ = current_->next.get();
+            return *this;
+        }
+
+        ConstIterator operator++(int) {
+            ConstIterator tmp = *this;
+            ++(*this);
+            return tmp;
+        }
+
+        bool operator==(const ConstIterator& other) const {
+            return current_ == other.current_;
+        }
+        bool operator!=(const ConstIterator& other) const {
+            return !(*this == other);
+        }
+    };
+
     Iterator begin() { return Iterator(head_.get()); }
     Iterator end()   { return Iterator(nullptr); }
+    ConstIterator begin() const { return ConstIterator(head_.get()); }
+    ConstIterator end()   const { return ConstIterator(nullptr); }
+    ConstIterator cbegin() const { return begin(); }
+    ConstIterator cend()   const { return end(); }
 
     // ---------- 操作 ----------
 
     void push_front(const T& value) {
-        auto new_node = std::make_unique<Node>(value);
-        new_node->next = std::move(head_);
-        head_ = std::move(new_node);
-        if (!tail_) tail_ = head_.get();
-        ++size_;
+        emplace_front(value);
     }
 
     void push_front(T&& value) {
-        auto new_node = std::make_unique<Node>(std::move(value));
+        emplace_front(std::move(value));
+    }
+
+    template <typename... Args>
+    T& emplace_front(Args&&... args) {
+        auto new_node = std::make_unique<Node>(std::forward<Args>(args)...);
+        Node* raw = new_node.get();
         new_node->next = std::move(head_);
         head_ = std::move(new_node);
         if (!tail_) tail_ = head_.get();
         ++size_;
+        return raw->data;
     }
 
     void push_back(const T& value) {
-        auto new_node = std::make_unique<Node>(value);
+        emplace_back(value);
+    }
+
+    void push_back(T&& value) {
+        emplace_back(std::move(value));
+    }
+
+    template <typename... Args>
+    T& emplace_back(Args&&... args) {
+        auto new_node = std::make_unique<Node>(std::forward<Args>(args)...);
         Node* raw = new_node.get();
         if (tail_) {
             tail_->next = std::move(new_node);
@@ -131,6 +245,20 @@ public:
         }
         tail_ = raw;
         ++size_;
+        return raw->data;
+    }
+
+    void clear() noexcept {
+        if (head_) destroy_chain(std::move(head_));
+        tail_ = nullptr;
+        size_ = 0;
+    }
+
+    void swap(SinglyLinkedList& other) noexcept {
+        using std::swap;
+        swap(head_, other.head_);
+        swap(tail_, other.tail_);
+        swap(size_, other.size_);
     }
 
     void pop_front() {
@@ -164,12 +292,52 @@ public:
         return false;
     }
 
+    void reverse() noexcept {
+        tail_ = head_.get();
+        std::unique_ptr<Node> previous;
+        while (head_) {
+            auto next = std::move(head_->next);
+            head_->next = std::move(previous);
+            previous = std::move(head_);
+            head_ = std::move(next);
+        }
+        head_ = std::move(previous);
+    }
+
+    template <typename Compare = std::less<T>>
+    static SinglyLinkedList merge_sorted(SinglyLinkedList left,
+                                         SinglyLinkedList right,
+                                         Compare comp = Compare{}) {
+        SinglyLinkedList result;
+
+        while (!left.empty() && !right.empty()) {
+            if (comp(right.front(), left.front())) {
+                result.append_node(right.detach_front_node());
+            } else {
+                result.append_node(left.detach_front_node());
+            }
+        }
+        result.append_chain_from(left);
+        result.append_chain_from(right);
+        return result;
+    }
+
     T& front() {
         if (!head_) throw std::runtime_error("front on empty list");
         return head_->data;
     }
 
+    const T& front() const {
+        if (!head_) throw std::runtime_error("front on empty list");
+        return head_->data;
+    }
+
     T& back() {
+        if (!tail_) throw std::runtime_error("back on empty list");
+        return tail_->data;
+    }
+
+    const T& back() const {
         if (!tail_) throw std::runtime_error("back on empty list");
         return tail_->data;
     }
@@ -202,18 +370,27 @@ private:
         std::unique_ptr<Node> next;
         Node* prev = nullptr;
 
-        explicit Node(T value)
-            : data(std::move(value)), next(nullptr), prev(nullptr) {}
+        template <typename... Args>
+        explicit Node(Args&&... args)
+            : data(std::forward<Args>(args)...), next(nullptr), prev(nullptr) {}
     };
 
     std::unique_ptr<Node> head_;
     Node* tail_ = nullptr;
     std::size_t size_ = 0;
 
-    void destroy_chain(std::unique_ptr<Node> node) {
+    static void destroy_chain(std::unique_ptr<Node> node) {
         while (node) {
             auto next = std::move(node->next);
             node = std::move(next);
+        }
+    }
+
+    void copy_from(const DoublyLinkedList& other) {
+        static_assert(std::is_copy_constructible<T>::value,
+                      "DoublyLinkedList<T> copy requires copy-constructible T");
+        for (const auto& value : other) {
+            push_back(value);
         }
     }
 
@@ -221,11 +398,20 @@ public:
     DoublyLinkedList() = default;
 
     ~DoublyLinkedList() {
-        if (head_) destroy_chain(std::move(head_));
+        clear();
     }
 
-    DoublyLinkedList(const DoublyLinkedList&) = delete;
-    DoublyLinkedList& operator=(const DoublyLinkedList&) = delete;
+    DoublyLinkedList(const DoublyLinkedList& other) {
+        copy_from(other);
+    }
+
+    DoublyLinkedList& operator=(const DoublyLinkedList& other) {
+        if (this != &other) {
+            DoublyLinkedList tmp(other);
+            swap(tmp);
+        }
+        return *this;
+    }
 
     DoublyLinkedList(DoublyLinkedList&& other) noexcept
         : head_(std::move(other.head_))
@@ -238,6 +424,7 @@ public:
 
     DoublyLinkedList& operator=(DoublyLinkedList&& other) noexcept {
         if (this != &other) {
+            clear();
             head_ = std::move(other.head_);
             tail_ = other.tail_;
             size_ = other.size_;
@@ -252,9 +439,17 @@ public:
     class Iterator {
     private:
         Node* current_;
+        Node* tail_;
         friend class DoublyLinkedList;
+        friend class ConstIterator;
     public:
-        explicit Iterator(Node* node) : current_(node) {}
+        using iterator_category = std::bidirectional_iterator_tag;
+        using value_type = T;
+        using difference_type = std::ptrdiff_t;
+        using pointer = T*;
+        using reference = T&;
+
+        Iterator(Node* node, Node* tail) : current_(node), tail_(tail) {}
 
         T& operator*() const { return current_->data; }
         T* operator->() const { return &current_->data; }
@@ -271,7 +466,7 @@ public:
         }
 
         Iterator& operator--() {
-            if (current_) current_ = current_->prev;
+            current_ = current_ ? current_->prev : tail_;
             return *this;
         }
 
@@ -289,13 +484,84 @@ public:
         }
     };
 
-    Iterator begin() { return Iterator(head_.get()); }
-    Iterator end()   { return Iterator(nullptr); }
+    class ConstIterator {
+    private:
+        const Node* current_;
+        const Node* tail_;
+    public:
+        using iterator_category = std::bidirectional_iterator_tag;
+        using value_type = T;
+        using difference_type = std::ptrdiff_t;
+        using pointer = const T*;
+        using reference = const T&;
+
+        ConstIterator(const Node* node, const Node* tail)
+            : current_(node), tail_(tail) {}
+        ConstIterator(const Iterator& it)
+            : current_(it.current_), tail_(it.tail_) {}
+
+        const T& operator*() const { return current_->data; }
+        const T* operator->() const { return &current_->data; }
+
+        ConstIterator& operator++() {
+            if (current_) current_ = current_->next.get();
+            return *this;
+        }
+
+        ConstIterator operator++(int) {
+            ConstIterator tmp = *this;
+            ++(*this);
+            return tmp;
+        }
+
+        ConstIterator& operator--() {
+            current_ = current_ ? current_->prev : tail_;
+            return *this;
+        }
+
+        ConstIterator operator--(int) {
+            ConstIterator tmp = *this;
+            --(*this);
+            return tmp;
+        }
+
+        bool operator==(const ConstIterator& other) const {
+            return current_ == other.current_;
+        }
+        bool operator!=(const ConstIterator& other) const {
+            return !(*this == other);
+        }
+    };
+
+    using ReverseIterator = std::reverse_iterator<Iterator>;
+    using ConstReverseIterator = std::reverse_iterator<ConstIterator>;
+
+    Iterator begin() { return Iterator(head_.get(), tail_); }
+    Iterator end()   { return Iterator(nullptr, tail_); }
+    ConstIterator begin() const { return ConstIterator(head_.get(), tail_); }
+    ConstIterator end()   const { return ConstIterator(nullptr, tail_); }
+    ConstIterator cbegin() const { return begin(); }
+    ConstIterator cend()   const { return end(); }
+    ReverseIterator rbegin() { return ReverseIterator(end()); }
+    ReverseIterator rend() { return ReverseIterator(begin()); }
+    ConstReverseIterator rbegin() const { return ConstReverseIterator(end()); }
+    ConstReverseIterator rend() const { return ConstReverseIterator(begin()); }
+    ConstReverseIterator crbegin() const { return rbegin(); }
+    ConstReverseIterator crend() const { return rend(); }
 
     // ---------- 操作 ----------
 
     void push_front(const T& value) {
-        auto node = std::make_unique<Node>(value);
+        emplace_front(value);
+    }
+
+    void push_front(T&& value) {
+        emplace_front(std::move(value));
+    }
+
+    template <typename... Args>
+    T& emplace_front(Args&&... args) {
+        auto node = std::make_unique<Node>(std::forward<Args>(args)...);
         Node* raw = node.get();
         if (head_) {
             head_->prev = raw;
@@ -305,10 +571,20 @@ public:
         }
         head_ = std::move(node);
         ++size_;
+        return raw->data;
     }
 
     void push_back(const T& value) {
-        auto node = std::make_unique<Node>(value);
+        emplace_back(value);
+    }
+
+    void push_back(T&& value) {
+        emplace_back(std::move(value));
+    }
+
+    template <typename... Args>
+    T& emplace_back(Args&&... args) {
+        auto node = std::make_unique<Node>(std::forward<Args>(args)...);
         Node* raw = node.get();
         if (tail_) {
             tail_->next = std::move(node);
@@ -318,6 +594,20 @@ public:
         }
         tail_ = raw;
         ++size_;
+        return raw->data;
+    }
+
+    void clear() noexcept {
+        if (head_) destroy_chain(std::move(head_));
+        tail_ = nullptr;
+        size_ = 0;
+    }
+
+    void swap(DoublyLinkedList& other) noexcept {
+        using std::swap;
+        swap(head_, other.head_);
+        swap(tail_, other.tail_);
+        swap(size_, other.size_);
     }
 
     void pop_front() {
@@ -380,7 +670,17 @@ public:
         return head_->data;
     }
 
+    const T& front() const {
+        if (!head_) throw std::runtime_error("front on empty list");
+        return head_->data;
+    }
+
     T& back() {
+        if (!tail_) throw std::runtime_error("back on empty list");
+        return tail_->data;
+    }
+
+    const T& back() const {
         if (!tail_) throw std::runtime_error("back on empty list");
         return tail_->data;
     }
@@ -390,7 +690,7 @@ public:
 
     void print_forward() const {
         std::cout << "forward: [";
-        Node* p = head_.get();
+        const Node* p = head_.get();
         while (p) {
             std::cout << p->data;
             p = p->next.get();
@@ -401,7 +701,7 @@ public:
 
     void print_backward() const {
         std::cout << "backward: [";
-        Node* p = tail_;
+        const Node* p = tail_;
         while (p) {
             std::cout << p->data;
             p = p->prev;
@@ -413,7 +713,40 @@ public:
 
 
 // ============================================================
-// 3. 标准库链表对比 & 性能基准
+// 3. Intrusive list：节点不拥有数据，只把已有对象串起来
+// ============================================================
+
+struct Particle {
+    int id;
+    double energy_mev;
+    Particle* next = nullptr;  // intrusive hook：对象自己携带链表指针
+};
+
+class IntrusiveParticleList {
+private:
+    Particle* head_ = nullptr;  // 不拥有 Particle 的生命周期
+
+public:
+    void push_front(Particle& particle) noexcept {
+        particle.next = head_;
+        head_ = &particle;
+    }
+
+    void print() const {
+        std::cout << "[";
+        const Particle* p = head_;
+        while (p) {
+            std::cout << "id=" << p->id << ", E=" << p->energy_mev << "MeV";
+            p = p->next;
+            if (p) std::cout << " -> ";
+        }
+        std::cout << "]\n";
+    }
+};
+
+
+// ============================================================
+// 4. 标准库链表对比 & 性能基准
 // ============================================================
 
 // 简单的计时辅助
@@ -521,6 +854,11 @@ void benchmark_random_access(int n) {
 // ============================================================
 
 int main() {
+    static_assert(std::is_copy_constructible<SinglyLinkedList<int>>::value,
+                  "tutorial list should support deep copy");
+    static_assert(std::is_copy_constructible<DoublyLinkedList<int>>::value,
+                  "tutorial list should support deep copy");
+
     std::cout << "╔══════════════════════════════════════════════╗\n";
     std::cout << "║   链表（Linked List）— 现代 C++ 实现与对比  ║\n";
     std::cout << "╚══════════════════════════════════════════════╝\n\n";
@@ -554,6 +892,34 @@ int main() {
     }
     std::cout << "\n\n";
 
+    const auto& const_sl = sl;
+    std::cout << "const_iterator 遍历: ";
+    for (auto it_const = const_sl.cbegin(); it_const != const_sl.cend(); ++it_const) {
+        std::cout << *it_const << " ";
+    }
+    std::cout << "\n";
+
+    SinglyLinkedList<std::string> sl_copy = sl;  // 深拷贝：节点重新分配，值相同
+    sl_copy.push_back("Durian");
+    std::cout << "深拷贝后修改副本，原链表: "; sl.print();
+    std::cout << "深拷贝后修改副本，副本:   "; sl_copy.print();
+
+    sl.reverse();
+    std::cout << "reverse() 后: "; sl.print();
+
+    SinglyLinkedList<int> odd;
+    odd.push_back(1);
+    odd.push_back(3);
+    odd.push_back(5);
+    SinglyLinkedList<int> even;
+    even.push_back(2);
+    even.push_back(4);
+    even.push_back(6);
+    auto merged = SinglyLinkedList<int>::merge_sorted(std::move(odd), std::move(even));
+    std::cout << "merge_sorted([1,3,5], [2,4,6]): ";
+    merged.print();
+    std::cout << '\n';
+
     // 移动语义验证
     SinglyLinkedList<std::string> sl2 = std::move(sl);
     std::cout << "移动后 sl  (应为空): "; sl.print();
@@ -574,6 +940,18 @@ int main() {
     dl.print_backward();
     std::cout << "front() = " << dl.front() << ", back() = " << dl.back() << '\n';
 
+    DoublyLinkedList<int> dl_copy = dl;
+    dl_copy.pop_front();
+    dl_copy.push_back(60);
+    std::cout << "深拷贝副本改动后: ";
+    dl_copy.print_forward();
+
+    std::cout << "std::reverse_iterator 反向遍历: ";
+    for (auto rit = dl.rbegin(); rit != dl.rend(); ++rit) {
+        std::cout << *rit << " ";
+    }
+    std::cout << "\n";
+
     // 删除中间元素
     auto it = dl.begin();
     ++it; ++it;  // 指向 30
@@ -593,8 +971,22 @@ int main() {
     dl.print_forward();
     std::cout << '\n';
 
+    // ---------- intrusive list 对比 ----------
+    std::cout << "══════ 3. Intrusive List（非拥有式链表） ══════\n\n";
+
+    Particle p1{1, 2.7, nullptr};
+    Particle p2{2, 4.1, nullptr};
+    Particle p3{3, 8.6, nullptr};
+    IntrusiveParticleList particles;
+    particles.push_front(p1);
+    particles.push_front(p2);
+    particles.push_front(p3);
+    std::cout << "Particle 对象由外部拥有，链表只保存 next hook:\n";
+    particles.print();
+    std::cout << "适合对象生命周期已由别处管理、且要避免额外节点分配的场景。\n\n";
+
     // ---------- 标准库对比 ----------
-    std::cout << "══════ 3. 标准库 std::forward_list vs std::list ══════\n\n";
+    std::cout << "══════ 4. 标准库 std::forward_list vs std::list ══════\n\n";
 
     std::forward_list<int> fl = {1, 2, 3, 4, 5};
     std::cout << "std::forward_list: ";
@@ -637,7 +1029,7 @@ int main() {
     std::cout << "\n\n";
 
     // ---------- 性能基准 ----------
-    std::cout << "══════ 4. 性能基准测试 ══════\n\n";
+    std::cout << "══════ 5. 性能基准测试 ══════\n\n";
 
     benchmark_insert_front(10000);
     benchmark_random_access(5000);
