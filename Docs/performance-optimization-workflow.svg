@@ -1,0 +1,172 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 1150" font-family="SF Mono, Menlo, Monaco, monospace">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#555"/>
+    </marker>
+    <marker id="arrowReturn" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#f0883e"/>
+    </marker>
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="100%" style="stop-color:#16213e"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="960" height="1150" fill="#0d1117" rx="8"/>
+
+  <!-- Title -->
+  <rect x="0" y="0" width="960" height="60" fill="url(#headerGrad)" rx="8"/>
+  <rect x="0" y="30" width="960" height="30" fill="url(#headerGrad)"/>
+  <text x="480" y="40" text-anchor="middle" fill="#58a6ff" font-size="20" font-weight="bold">Jeff Dean &amp; Sanjay Ghemawat — Performance Optimization Workflow</text>
+
+  <!-- Phase 1: Think -->
+  <rect x="50" y="90" width="860" height="170" rx="6" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+  <rect x="50" y="90" width="860" height="34" rx="6" fill="#1f6feb22"/>
+  <rect x="50" y="110" width="860" height="14" fill="#1f6feb22"/>
+  <text x="70" y="114" fill="#58a6ff" font-size="14" font-weight="bold">🔍 Phase 1: Estimation (Back-of-the-envelope)</text>
+
+  <text x="70" y="148" fill="#c9d1d9" font-size="13">• 是测试代码？ → 只关心渐进复杂度</text>
+  <text x="70" y="170" fill="#c9d1d9" font-size="13">• 应用代码？ → 判断是否热路径（初始化 vs 每个请求）</text>
+  <text x="70" y="192" fill="#c9d1d9" font-size="13">• 库代码？ → 默认用高性能选择（InlinedVector, flat_hash_map...），你不知道调用方是不是热路径</text>
+  <text x="70" y="214" fill="#c9d1d9" font-size="13">• 不确定时做封底计算：操作数 × 每次成本 = 总成本</text>
+  <text x="70" y="240" fill="#8b949e" font-size="12" font-style="italic">Key: 写的时候就选更快的方案，如果对可读性影响不大的话</text>
+
+  <!-- Arrow -->
+  <line x1="480" y1="260" x2="480" y2="290" stroke="#30363d" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Phase 2: Measure -->
+  <rect x="50" y="295" width="860" height="175" rx="6" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+  <rect x="50" y="295" width="860" height="34" rx="6" fill="#23863622"/>
+  <rect x="50" y="315" width="860" height="14" fill="#23863622"/>
+  <text x="70" y="319" fill="#3fb950" font-size="14" font-weight="bold">📊 Phase 2: Measurement (Profile First!)</text>
+
+  <text x="70" y="353" fill="#c9d1d9" font-size="13">Primary tools:</text>
+  <rect x="210" y="340" width="160" height="24" rx="4" fill="#1f6feb22"/>
+  <text x="290" y="357" text-anchor="middle" fill="#58a6ff" font-size="12">pprof (高层概览)</text>
+  <rect x="380" y="340" width="140" height="24" rx="4" fill="#1f6feb22"/>
+  <text x="450" y="357" text-anchor="middle" fill="#58a6ff" font-size="12">perf (底层细节)</text>
+  <rect x="530" y="340" width="200" height="24" rx="4" fill="#1f6feb22"/>
+  <text x="630" y="357" text-anchor="middle" fill="#58a6ff" font-size="12">microbenchmark (验证&amp;回归)</text>
+  <rect x="740" y="340" width="150" height="24" rx="4" fill="#1f6feb22"/>
+  <text x="815" y="357" text-anchor="middle" fill="#58a6ff" font-size="12">火焰图 + heapprofile</text>
+
+  <text x="70" y="386" fill="#c9d1d9" font-size="13">• 编译：-O2（或 -O3）+ debug info</text>
+  <text x="70" y="408" fill="#c9d1d9" font-size="13">• 写 microbenchmark 覆盖目标代码，防止回归（⚠ microbenchmark 可能有陷阱，不完全代表全系统性能）</text>
+  <text x="70" y="430" fill="#c9d1d9" font-size="13">• 关注锁竞争（可能压低 CPU 利用率）；ML 性能用专门的 ML profiler</text>
+  <text x="70" y="452" fill="#f0883e" font-size="12">⚠ 如果 profile 平坦（无热点）→ ↓</text>
+
+  <!-- Arrow -->
+  <line x1="480" y1="470" x2="480" y2="500" stroke="#30363d" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Phase 3: Flat Profile Strategy -->
+  <rect x="50" y="505" width="860" height="80" rx="6" fill="#0d1117" stroke="#f0883e" stroke-width="1"/>
+  <rect x="50" y="505" width="860" height="28" rx="6" fill="#f0883e22"/>
+  <rect x="50" y="520" width="860" height="13" fill="#f0883e22"/>
+  <text x="70" y="525" fill="#f0883e" font-size="13" font-weight="bold">⚠ Phase 3: Flat Profile → Strategy</text>
+  <text x="70" y="552" fill="#c9d1d9" font-size="12">① 二十个 1% = 20% — 别低估小优化的累积 ② 找调用栈顶部的循环（火焰图），可能可以整体重构</text>
+  <text x="70" y="572" fill="#c9d1d9" font-size="12">③ 结构性重写而非微优化（算法改进） ④ 减少分配（拿 allocation profile 逐个消灭） ⑤ 硬件性能计数器找 cache miss 高的函数</text>
+
+  <!-- Arrow -->
+  <line x1="480" y1="585" x2="480" y2="615" stroke="#30363d" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Phase 4: Optimize - Techniques Grid -->
+  <rect x="50" y="620" width="860" height="365" rx="6" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+  <rect x="50" y="620" width="860" height="34" rx="6" fill="#8b949e22"/>
+  <rect x="50" y="640" width="860" height="14" fill="#8b949e22"/>
+  <text x="70" y="644" fill="#8b949e" font-size="14" font-weight="bold">⚡ Phase 4: Optimization Techniques</text>
+
+  <!-- Row 1: 4 boxes -->
+  <rect x="65" y="662" width="205" height="75" rx="4" fill="#1f6feb11" stroke="#1f6feb33"/>
+  <text x="167" y="682" text-anchor="middle" fill="#58a6ff" font-size="12" font-weight="bold">大数据结构</text>
+  <text x="78" y="700" fill="#c9d1d9" font-size="11">• 紧凑表示 / 字段重排</text>
+  <text x="78" y="716" fill="#c9d1d9" font-size="11">• 32-bit 索引替代 64-bit 指针</text>
+  <text x="78" y="732" fill="#c9d1d9" font-size="11">• chunked/flat 存储</text>
+
+  <rect x="282" y="662" width="205" height="75" rx="4" fill="#1f6feb11" stroke="#1f6feb33"/>
+  <text x="384" y="682" text-anchor="middle" fill="#58a6ff" font-size="12" font-weight="bold">避免不必要工作</text>
+  <text x="295" y="700" fill="#c9d1d9" font-size="11">• Fast path 覆盖常见情况</text>
+  <text x="295" y="716" fill="#c9d1d9" font-size="11">• 预计算 / 推迟 / 缓存</text>
+  <text x="295" y="732" fill="#c9d1d9" font-size="11">• 移除热路径上的日志/统计</text>
+
+  <rect x="499" y="662" width="205" height="75" rx="4" fill="#1f6feb11" stroke="#1f6feb33"/>
+  <text x="601" y="682" text-anchor="middle" fill="#58a6ff" font-size="12" font-weight="bold">减少内存分配</text>
+  <text x="512" y="700" fill="#c9d1d9" font-size="11">• 栈分配 / resize / reserve</text>
+  <text x="512" y="716" fill="#c9d1d9" font-size="11">• 循环外声明临时对象</text>
+  <text x="512" y="732" fill="#c9d1d9" font-size="11">• Arena / 移动语义</text>
+
+  <rect x="716" y="662" width="180" height="75" rx="4" fill="#23863611" stroke="#23863633"/>
+  <text x="806" y="682" text-anchor="middle" fill="#3fb950" font-size="12" font-weight="bold">算法改进 ⭐</text>
+  <text x="729" y="700" fill="#c9d1d9" font-size="11">• O(N²)→O(N) 转换</text>
+  <text x="729" y="716" fill="#c9d1d9" font-size="11">• 排序交集→Hash查找</text>
+  <text x="729" y="732" fill="#c9d1d9" font-size="11">• 最优构建 heap</text>
+
+  <!-- Row 2: 4 boxes -->
+  <rect x="65" y="747" width="205" height="80" rx="4" fill="#23863611" stroke="#23863633"/>
+  <text x="167" y="767" text-anchor="middle" fill="#3fb950" font-size="12" font-weight="bold">API 设计</text>
+  <text x="78" y="785" fill="#c9d1d9" font-size="11">• Bulk API (摊薄边界开销)</text>
+  <text x="78" y="801" fill="#c9d1d9" font-size="11">• View 类型 (absl::Span...)</text>
+  <text x="78" y="817" fill="#c9d1d9" font-size="11">• Thread-compatible &gt; safe</text>
+
+  <rect x="282" y="747" width="205" height="80" rx="4" fill="#23863611" stroke="#23863633"/>
+  <text x="384" y="767" text-anchor="middle" fill="#3fb950" font-size="12" font-weight="bold">并发优化</text>
+  <text x="295" y="785" fill="#c9d1d9" font-size="11">• 并行化 / 任务分片</text>
+  <text x="295" y="801" fill="#c9d1d9" font-size="11">• 摊薄锁 / 缩短临界区</text>
+  <text x="295" y="817" fill="#c9d1d9" font-size="11">• Sharding / Lock-free</text>
+
+  <rect x="499" y="747" width="205" height="80" rx="4" fill="#23863611" stroke="#23863633"/>
+  <text x="601" y="767" text-anchor="middle" fill="#3fb950" font-size="12" font-weight="bold">编译器 &amp; SIMD</text>
+  <text x="512" y="785" fill="#c9d1d9" font-size="11">• 手展开热循环 / 消除aliasing</text>
+  <text x="512" y="801" fill="#c9d1d9" font-size="11">• SIMD (SSE/AVX/NEON)</text>
+  <text x="512" y="817" fill="#c9d1d9" font-size="11">• 减少模板/inline，看汇编验证</text>
+
+  <rect x="716" y="747" width="180" height="80" rx="4" fill="#f0883e11" stroke="#f0883e33"/>
+  <text x="806" y="767" text-anchor="middle" fill="#f0883e" font-size="12" font-weight="bold">C++ 容器</text>
+  <text x="729" y="785" fill="#c9d1d9" font-size="11">• flat_hash_map &gt; unordered_map</text>
+  <text x="729" y="801" fill="#c9d1d9" font-size="11">• btree &gt; std::map</text>
+  <text x="729" y="817" fill="#c9d1d9" font-size="11">• InlinedVector / small_map</text>
+
+  <!-- Row 3: 2 wide boxes -->
+  <rect x="65" y="837" width="422" height="68" rx="4" fill="#f0883e11" stroke="#f0883e33"/>
+  <text x="276" y="857" text-anchor="middle" fill="#f0883e" font-size="12" font-weight="bold">Protobuf 建议 (可慢 20×)</text>
+  <text x="78" y="877" fill="#c9d1d9" font-size="11">• 不序列化就别用 | 扁平化 message | 1-15 field # | bytes &gt; string | [ctype=CORD] / [lazy] / Arena</text>
+  <text x="78" y="897" fill="#c9d1d9" font-size="11">• 存序列化形式 (5× 内存节省) | 选好字段类型 | 避免 map 字段 | 控制 .proto 文件大小</text>
+
+  <rect x="499" y="837" width="397" height="68" rx="4" fill="#f0883e11" stroke="#f0883e33"/>
+  <text x="697" y="857" text-anchor="middle" fill="#f0883e" font-size="12" font-weight="bold">代码体积</text>
+  <text x="512" y="877" fill="#c9d1d9" font-size="11">• 削减过度 inlining (某 TF −12.2%) | 慢路径移出 inline (更小且更快)</text>
+  <text x="512" y="897" fill="#c9d1d9" font-size="11">• 减少模板实例化 (287→143) | RETURN_IF_ERROR 瘦身 (−79B/调用) | 停止维护不必要统计</text>
+
+  <!-- Iterative feedback arrow (right side) -->
+  <path d="M 920 730 Q 940 730 940 500 Q 940 470 920 470" fill="none" stroke="#f0883e" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrowReturn)"/>
+  <text x="942" y="595" fill="#f0883e" font-size="10" transform="rotate(90, 942, 595)">Iterate: 优化后重新测量!</text>
+
+  <!-- Famous latency table at bottom -->
+  <rect x="50" y="920" width="860" height="155" rx="6" fill="#0d1117" stroke="#d2a8ff" stroke-width="1"/>
+  <rect x="50" y="920" width="860" height="28" rx="6" fill="#d2a8ff22"/>
+  <rect x="50" y="935" width="860" height="13" fill="#d2a8ff22"/>
+  <text x="70" y="940" fill="#d2a8ff" font-size="13" font-weight="bold">📐 Latency Numbers Every Programmer Should Know (2025 edition)</text>
+
+  <text x="70" y="968" fill="#c9d1d9" font-size="11">
+    <tspan fill="#58a6ff">L1 cache</tspan> 0.5 ns |
+    <tspan fill="#58a6ff">L2 cache</tspan> 3 ns |
+    <tspan fill="#58a6ff">Branch mispredict</tspan> 5 ns |
+    <tspan fill="#58a6ff">Mutex (uncontended)</tspan> 15 ns |
+    <tspan fill="#58a6ff">Main memory</tspan> 50 ns
+  </text>
+  <text x="70" y="990" fill="#c9d1d9" font-size="11">
+    <tspan fill="#3fb950">Snappy 1KB</tspan> 1,000 ns |
+    <tspan fill="#3fb950">SSD 4KB read</tspan> 20,000 ns |
+    <tspan fill="#3fb950">DC round-trip</tspan> 50,000 ns |
+    <tspan fill="#3fb950">Mem 1MB seq</tspan> 64,000 ns |
+    <tspan fill="#3fb950">100Gbps 1MB</tspan> 100,000 ns
+  </text>
+  <text x="70" y="1012" fill="#c9d1d9" font-size="11">
+    <tspan fill="#f0883e">SSD 1MB read</tspan> 1,000,000 ns |
+    <tspan fill="#f0883e">Disk seek</tspan> 5,000,000 ns |
+    <tspan fill="#f0883e">Disk 1MB seq</tspan> 10,000,000 ns
+  </text>
+  <text x="70" y="1038" fill="#d2a8ff" font-size="11" font-weight="bold">CA → Netherlands → CA: 150,000,000 ns = 150 ms</text>
+
+  <text x="480" y="1065" text-anchor="middle" fill="#484f58" font-size="10">Source: abseil.io/fast/hints.html · Authors: Jeff Dean &amp; Sanjay Ghemawat · Original: 2023/07/27, Updated: 2025/12/16</text>
+</svg>
