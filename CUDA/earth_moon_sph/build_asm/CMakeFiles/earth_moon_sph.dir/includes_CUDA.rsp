@@ -1,0 +1,1 @@
+-I"/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/earth_moon_sph" -isystem "/usr/local/cuda-12.6/targets/x86_64-linux/include"

@@ -1,3 +1,0 @@
-/home/wangz/MyProject/HPC_matters/CUDA/register_Occupancy/build/CMakeFiles/reg_occ_bench.dir
-/home/wangz/MyProject/HPC_matters/CUDA/register_Occupancy/build/CMakeFiles/edit_cache.dir
-/home/wangz/MyProject/HPC_matters/CUDA/register_Occupancy/build/CMakeFiles/rebuild_cache.dir

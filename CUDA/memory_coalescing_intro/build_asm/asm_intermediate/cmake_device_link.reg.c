@@ -1,0 +1,2 @@
+#define NUM_PRELINKED_OBJECTS 1
+DEFINE_REGISTER_FUNC(_64891681_23_mem_coalescing_bench_cu_778ef60a)

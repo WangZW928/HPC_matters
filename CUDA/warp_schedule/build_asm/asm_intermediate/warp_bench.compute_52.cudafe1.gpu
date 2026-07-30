@@ -1,0 +1,1842 @@
+typedef char __nv_bool;
+struct __C1;struct __C2;struct __C3;struct __EDG_type_info;struct __C5;struct __C6;union __C7;struct __C8;
+# 27 "/usr/include/x86_64-linux-gnu/bits/types/__locale_t.h" 3
+struct __locale_struct;
+# 2896 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/driver_types.h"
+struct CUstream_st;
+# 2901 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/driver_types.h"
+struct CUevent_st;
+# 51 "/usr/include/x86_64-linux-gnu/bits/thread-shared-types.h" 3
+struct __pthread_internal_list;
+# 22 "/usr/include/x86_64-linux-gnu/bits/struct_mutex.h" 3
+struct __pthread_mutex_s;
+# 68 "/usr/include/x86_64-linux-gnu/bits/pthreadtypes.h" 3
+union pthread_mutex_t;
+# 17 "/usr/include/x86_64-linux-gnu/bits/types/__mbstate_t.h" 3
+union _ZN11__mbstate_tUt_E;
+# 14 "/usr/include/x86_64-linux-gnu/bits/types/__mbstate_t.h" 3
+struct __mbstate_t;
+# 49 "/usr/include/x86_64-linux-gnu/bits/types/struct_FILE.h" 3
+struct _IO_FILE;
+# 35 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+struct RunStat;
+# 236 "/usr/include/c++/13/bits/basic_string.tcc" 3
+struct _ZZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE12_M_constructIPKcEEvT_S8_St20forward_iterator_tagE6_Guard;
+# 181 "/usr/include/c++/13/bits/basic_string.h" 3
+struct _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE12_Alloc_hiderE;
+# 202 "/usr/include/c++/13/bits/basic_string.h" 3
+enum _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEUt_E {
+# 202 "/usr/include/c++/13/bits/basic_string.h" 3
+_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE17_S_local_capacityE = 15};
+# 205 "/usr/include/c++/13/bits/basic_string.h" 3
+union __C11;
+# 72 "/usr/include/c++/13/bits/stringfwd.h" 3
+struct _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE;
+# 202 "/usr/include/c++/13/bits/basic_string.h" 3
+enum _ZNSt7__cxx1112basic_stringIwSt11char_traitsIwESaIwEEUt_E {
+# 202 "/usr/include/c++/13/bits/basic_string.h" 3
+_ZNSt7__cxx1112basic_stringIwSt11char_traitsIwESaIwEE17_S_local_capacityE = 3};
+# 202 "/usr/include/c++/13/bits/basic_string.h" 3
+enum _ZNSt7__cxx1112basic_stringIDsSt11char_traitsIDsESaIDsEEUt_E {
+# 202 "/usr/include/c++/13/bits/basic_string.h" 3
+_ZNSt7__cxx1112basic_stringIDsSt11char_traitsIDsESaIDsEE17_S_local_capacityE = 7};
+# 202 "/usr/include/c++/13/bits/basic_string.h" 3
+enum _ZNSt7__cxx1112basic_stringIDiSt11char_traitsIDiESaIDiEEUt_E {
+# 202 "/usr/include/c++/13/bits/basic_string.h" 3
+_ZNSt7__cxx1112basic_stringIDiSt11char_traitsIDiESaIDiEE17_S_local_capacityE = 3};
+# 73 "/usr/include/c++/13/bits/cpp_type_traits.h" 3
+struct _ZSt11__true_type;
+# 74 "/usr/include/c++/13/bits/cpp_type_traits.h" 3
+struct _ZSt12__false_type;
+# 230 "/usr/include/c++/13/bits/cpp_type_traits.h" 3
+enum _ZNSt12__is_integerIlEUt_E {
+# 230 "/usr/include/c++/13/bits/cpp_type_traits.h" 3
+_ZNSt12__is_integerIlE7__valueE = 1};
+# 62 "/usr/include/c++/13/type_traits" 3
+struct _ZSt17integral_constantIbLb1EE;
+# 62 "/usr/include/c++/13/type_traits" 3
+struct _ZSt17integral_constantIbLb0EE;
+# 3048 "/usr/include/c++/13/type_traits" 3
+struct _ZSt10__nonesuch;
+# 93 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+struct _ZSt18input_iterator_tag;
+# 99 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+struct _ZSt20forward_iterator_tag;
+# 103 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+struct _ZSt26bidirectional_iterator_tag;
+# 107 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+struct _ZSt26random_access_iterator_tag;
+# 378 "/usr/include/c++/13/bits/stl_algobase.h" 3
+struct _ZSt11__copy_moveILb0ELb0ESt26random_access_iterator_tagE;
+# 168 "/usr/include/c++/13/bits/stl_construct.h" 3
+struct _ZSt12_Destroy_auxILb1EE;
+# 337 "/usr/include/c++/13/bits/char_traits.h" 3
+struct _ZSt11char_traitsIcE;
+# 63 "/usr/include/c++/13/bits/new_allocator.h" 3
+struct _ZSt15__new_allocatorIcE;
+# 65 "/usr/include/c++/13/bits/memoryfwd.h" 3
+struct _ZSaIcE;
+# 106 "/usr/include/c++/13/string_view" 3
+struct _ZSt17basic_string_viewIcSt11char_traitsIcEE;
+# 105 "/usr/include/c++/13/bits/alloc_traits.h" 3
+struct _ZSt16allocator_traitsISaIcEE;
+# 106 "/usr/include/c++/13/type_traits" 3
+struct _ZSt9enable_ifILb1ESaIcEE;
+# 56 "/usr/include/c++/13/bits/uses_allocator.h" 3
+struct _ZSt15allocator_arg_t;
+# 377 "/usr/include/c++/13/bits/locale_classes.h" 3
+struct _ZNSt6locale5facetE;
+# 377 "/usr/include/c++/13/bits/locale_classes.h" 3
+struct __SO__NSt6locale5facetE;
+# 532 "/usr/include/c++/13/bits/locale_classes.h" 3
+struct _ZNSt6locale5_ImplE;
+# 62 "/usr/include/c++/13/bits/locale_classes.h" 3
+struct _ZSt6locale;
+# 57 "/usr/include/c++/13/bits/ios_base.h" 3
+enum _ZSt13_Ios_Fmtflags {
+# 59 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt12_S_boolalpha = 1,
+# 60 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt6_S_dec,
+# 61 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt8_S_fixed = 4,
+# 62 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt6_S_hex = 8,
+# 63 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt11_S_internal = 16,
+# 64 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt7_S_left = 32,
+# 65 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt6_S_oct = 64,
+# 66 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt8_S_right = 128,
+# 67 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt13_S_scientific = 256,
+# 68 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt11_S_showbase = 512,
+# 69 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt12_S_showpoint = 1024,
+# 70 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt10_S_showpos = 2048,
+# 71 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt9_S_skipws = 4096,
+# 72 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt10_S_unitbuf = 8192,
+# 73 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt12_S_uppercase = 16384,
+# 74 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt14_S_adjustfield = 176,
+# 75 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt12_S_basefield = 74,
+# 76 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt13_S_floatfield = 260,
+# 77 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt19_S_ios_fmtflags_end = 65536,
+# 78 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt19_S_ios_fmtflags_max = 2147483647,
+# 79 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt19_S_ios_fmtflags_min = (-2147483647-1)};
+# 111 "/usr/include/c++/13/bits/ios_base.h" 3
+enum _ZSt13_Ios_Openmode {
+# 113 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt6_S_app = 1,
+# 114 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt6_S_ate,
+# 115 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt6_S_bin = 4,
+# 116 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt5_S_in = 8,
+# 117 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt6_S_out = 16,
+# 118 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt8_S_trunc = 32,
+# 119 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt12_S_noreplace = 64,
+# 120 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt19_S_ios_openmode_end = 65536,
+# 121 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt19_S_ios_openmode_max = 2147483647,
+# 122 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt19_S_ios_openmode_min = (-2147483647-1)};
+# 154 "/usr/include/c++/13/bits/ios_base.h" 3
+enum _ZSt12_Ios_Iostate {
+# 156 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt10_S_goodbit,
+# 157 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt9_S_badbit,
+# 158 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt9_S_eofbit,
+# 159 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt10_S_failbit = 4,
+# 160 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt18_S_ios_iostate_end = 65536,
+# 161 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt18_S_ios_iostate_max = 2147483647,
+# 162 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt18_S_ios_iostate_min = (-2147483647-1)};
+# 194 "/usr/include/c++/13/bits/ios_base.h" 3
+enum _ZSt12_Ios_Seekdir {
+# 196 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt6_S_beg,
+# 197 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt6_S_cur,
+# 198 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt6_S_end,
+# 199 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt18_S_ios_seekdir_end = 65536};
+# 566 "/usr/include/c++/13/bits/ios_base.h" 3
+struct _ZNSt8ios_base14_Callback_listE;
+# 605 "/usr/include/c++/13/bits/ios_base.h" 3
+struct _ZNSt8ios_base6_WordsE;
+# 617 "/usr/include/c++/13/bits/ios_base.h" 3
+enum _ZNSt8ios_baseUt_E {
+# 617 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZNSt8ios_base18_S_local_word_sizeE = 8};
+# 233 "/usr/include/c++/13/bits/ios_base.h" 3
+struct _ZSt8ios_base;
+# 461 "/usr/include/c++/13/bits/stl_algobase.h" 3
+struct _ZSt19istreambuf_iteratorIcSt11char_traitsIcEE;
+# 464 "/usr/include/c++/13/bits/stl_algobase.h" 3
+struct _ZSt19ostreambuf_iteratorIcSt11char_traitsIcEE;
+# 82 "/usr/include/c++/13/iosfwd" 3
+struct _ZSt15basic_streambufIcSt11char_traitsIcEE;
+# 41 "/usr/include/x86_64-linux-gnu/c++/13/bits/ctype_base.h" 3
+struct _ZSt10ctype_base;
+# 689 "/usr/include/c++/13/bits/locale_facets.h" 3
+struct _ZSt5ctypeIcE;
+# 1559 "/usr/include/c++/13/bits/locale_facets.h" 3
+enum _ZNSt10__num_baseUt_E {
+# 1560 "/usr/include/c++/13/bits/locale_facets.h" 3
+_ZNSt10__num_base9_S_ominusE,
+# 1561 "/usr/include/c++/13/bits/locale_facets.h" 3
+_ZNSt10__num_base8_S_oplusE,
+# 1562 "/usr/include/c++/13/bits/locale_facets.h" 3
+_ZNSt10__num_base5_S_oxE,
+# 1563 "/usr/include/c++/13/bits/locale_facets.h" 3
+_ZNSt10__num_base5_S_oXE,
+# 1564 "/usr/include/c++/13/bits/locale_facets.h" 3
+_ZNSt10__num_base10_S_odigitsE,
+# 1565 "/usr/include/c++/13/bits/locale_facets.h" 3
+_ZNSt10__num_base14_S_odigits_endE = 20,
+# 1566 "/usr/include/c++/13/bits/locale_facets.h" 3
+_ZNSt10__num_base11_S_oudigitsE = 20,
+# 1567 "/usr/include/c++/13/bits/locale_facets.h" 3
+_ZNSt10__num_base15_S_oudigits_endE = 36,
+# 1568 "/usr/include/c++/13/bits/locale_facets.h" 3
+_ZNSt10__num_base5_S_oeE = 18,
+# 1569 "/usr/include/c++/13/bits/locale_facets.h" 3
+_ZNSt10__num_base5_S_oEE = 34,
+# 1570 "/usr/include/c++/13/bits/locale_facets.h" 3
+_ZNSt10__num_base7_S_oendE = 36};
+# 1585 "/usr/include/c++/13/bits/locale_facets.h" 3
+enum _ZNSt10__num_baseUt0_E {
+# 1586 "/usr/include/c++/13/bits/locale_facets.h" 3
+_ZNSt10__num_base9_S_iminusE,
+# 1587 "/usr/include/c++/13/bits/locale_facets.h" 3
+_ZNSt10__num_base8_S_iplusE,
+# 1588 "/usr/include/c++/13/bits/locale_facets.h" 3
+_ZNSt10__num_base5_S_ixE,
+# 1589 "/usr/include/c++/13/bits/locale_facets.h" 3
+_ZNSt10__num_base5_S_iXE,
+# 1590 "/usr/include/c++/13/bits/locale_facets.h" 3
+_ZNSt10__num_base8_S_izeroE,
+# 1591 "/usr/include/c++/13/bits/locale_facets.h" 3
+_ZNSt10__num_base5_S_ieE = 18,
+# 1592 "/usr/include/c++/13/bits/locale_facets.h" 3
+_ZNSt10__num_base5_S_iEE = 24,
+# 1593 "/usr/include/c++/13/bits/locale_facets.h" 3
+_ZNSt10__num_base7_S_iendE = 26};
+# 1960 "/usr/include/c++/13/bits/locale_facets.h" 3
+struct _ZSt7num_getIcSt19istreambuf_iteratorIcSt11char_traitsIcEEE;
+# 2318 "/usr/include/c++/13/bits/locale_facets.h" 3
+struct _ZSt7num_putIcSt19ostreambuf_iteratorIcSt11char_traitsIcEEE;
+# 79 "/usr/include/c++/13/iosfwd" 3
+struct _ZSt9basic_iosIcSt11char_traitsIcEE;
+# 88 "/usr/include/c++/13/iosfwd" 3
+struct _ZSo;
+# 88 "/usr/include/c++/13/iosfwd" 3
+struct __SO__So;
+# 52 "/usr/include/c++/13/bits/codecvt.h" 3
+enum _ZNSt12codecvt_base6resultE {
+# 54 "/usr/include/c++/13/bits/codecvt.h" 3
+_ZNSt12codecvt_base2okE,
+# 55 "/usr/include/c++/13/bits/codecvt.h" 3
+_ZNSt12codecvt_base7partialE,
+# 56 "/usr/include/c++/13/bits/codecvt.h" 3
+_ZNSt12codecvt_base5errorE,
+# 57 "/usr/include/c++/13/bits/codecvt.h" 3
+_ZNSt12codecvt_base6noconvE};
+# 341 "/usr/include/c++/13/bits/codecvt.h" 3
+struct _ZSt7codecvtIcc11__mbstate_tE;
+# 54 "/usr/include/x86_64-linux-gnu/c++/13/bits/basic_file.h" 3
+struct _ZSt12__basic_fileIcE;
+# 115 "/usr/include/c++/13/iosfwd" 3
+struct _ZSt13basic_filebufIcSt11char_traitsIcEE;
+# 121 "/usr/include/c++/13/iosfwd" 3
+struct _ZSt14basic_ofstreamIcSt11char_traitsIcEE;
+# 55 "/usr/include/c++/13/bits/locale_facets_nonio.h" 3
+enum _ZNSt9time_base9dateorderE {
+# 55 "/usr/include/c++/13/bits/locale_facets_nonio.h" 3
+_ZNSt9time_base8no_orderE,
+# 55 "/usr/include/c++/13/bits/locale_facets_nonio.h" 3
+_ZNSt9time_base3dmyE,
+# 55 "/usr/include/c++/13/bits/locale_facets_nonio.h" 3
+_ZNSt9time_base3mdyE,
+# 55 "/usr/include/c++/13/bits/locale_facets_nonio.h" 3
+_ZNSt9time_base3ymdE,
+# 55 "/usr/include/c++/13/bits/locale_facets_nonio.h" 3
+_ZNSt9time_base3ydmE};
+# 975 "/usr/include/c++/13/bits/locale_facets_nonio.h" 3
+enum _ZNSt10money_baseUt_E {
+# 976 "/usr/include/c++/13/bits/locale_facets_nonio.h" 3
+_ZNSt10money_base8_S_minusE,
+# 977 "/usr/include/c++/13/bits/locale_facets_nonio.h" 3
+_ZNSt10money_base7_S_zeroE,
+# 978 "/usr/include/c++/13/bits/locale_facets_nonio.h" 3
+_ZNSt10money_base6_S_endE = 11};
+# 187 "/usr/include/c++/13/iomanip" 3
+struct _ZSt13_Setprecision;
+# 217 "/usr/include/c++/13/iomanip" 3
+struct _ZSt5_Setw;
+# 141 "/usr/include/c++/13/bits/stl_uninitialized.h" 3
+struct _ZSt20__uninitialized_copyILb1EE;
+# 63 "/usr/include/c++/13/bits/new_allocator.h" 3
+struct _ZSt15__new_allocatorIfE;
+# 130 "/usr/include/c++/13/bits/allocator.h" 3
+struct _ZSaIfE;
+# 105 "/usr/include/c++/13/bits/alloc_traits.h" 3
+struct _ZSt16allocator_traitsISaIfEE;
+# 92 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZNSt12_Vector_baseIfSaIfEE17_Vector_impl_dataE;
+# 133 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZNSt12_Vector_baseIfSaIfEE12_Vector_implE;
+# 85 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZSt12_Vector_baseIfSaIfEE;
+# 428 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZSt6vectorIfSaIfEE;
+# 177 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+struct _ZSt15iterator_traitsIPKfE;
+# 63 "/usr/include/c++/13/bits/new_allocator.h" 3
+struct _ZSt15__new_allocatorIiE;
+# 130 "/usr/include/c++/13/bits/allocator.h" 3
+struct _ZSaIiE;
+# 105 "/usr/include/c++/13/bits/alloc_traits.h" 3
+struct _ZSt16allocator_traitsISaIiEE;
+# 92 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZNSt12_Vector_baseIiSaIiEE17_Vector_impl_dataE;
+# 133 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZNSt12_Vector_baseIiSaIiEE12_Vector_implE;
+# 85 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZSt12_Vector_baseIiSaIiEE;
+# 428 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZSt6vectorIiSaIiEE;
+# 45 "/usr/include/c++/13/initializer_list" 3
+struct _ZSt16initializer_listIiE;
+# 63 "/usr/include/c++/13/bits/new_allocator.h" 3
+struct _ZSt15__new_allocatorI7RunStatE;
+# 130 "/usr/include/c++/13/bits/allocator.h" 3
+struct _ZSaI7RunStatE;
+# 105 "/usr/include/c++/13/bits/alloc_traits.h" 3
+struct _ZSt16allocator_traitsISaI7RunStatEE;
+# 92 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZNSt12_Vector_baseI7RunStatSaIS0_EE17_Vector_impl_dataE;
+# 133 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZNSt12_Vector_baseI7RunStatSaIS0_EE12_Vector_implE;
+# 85 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZSt12_Vector_baseI7RunStatSaIS0_EE;
+# 428 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZSt6vectorI7RunStatSaIS0_EE;
+# 177 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+struct _ZSt15iterator_traitsIPKiE;
+# 177 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+struct _ZSt15iterator_traitsIP7RunStatE;
+# 102 "/usr/include/c++/13/bits/ptr_traits.h" 3
+struct _ZSt19__ptr_traits_ptr_toIPccLb0EE;
+# 177 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+struct _ZSt15iterator_traitsIPKcE;
+# 102 "/usr/include/c++/13/bits/ptr_traits.h" 3
+struct _ZSt19__ptr_traits_ptr_toIPKcS0_Lb0EE;
+# 177 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+struct _ZSt15iterator_traitsIPfE;
+# 106 "/usr/include/c++/13/type_traits" 3
+struct _ZSt9enable_ifILb1EPfE;
+# 1611 "/usr/include/c++/13/type_traits" 3
+struct _ZSt16remove_referenceIRKfE;
+# 598 "/usr/include/c++/13/bits/cpp_type_traits.h" 3
+enum _ZNSt18__is_move_iteratorIPKiEUt_E {
+# 598 "/usr/include/c++/13/bits/cpp_type_traits.h" 3
+_ZNSt18__is_move_iteratorIPKiE7__valueE};
+# 596 "/usr/include/c++/13/bits/cpp_type_traits.h" 3
+struct _ZSt18__is_move_iteratorIPKiE;
+# 476 "/usr/include/c++/13/bits/cpp_type_traits.h" 3
+enum _ZNSt35__is_nonvolatile_trivially_copyableIiEUt_E {
+# 476 "/usr/include/c++/13/bits/cpp_type_traits.h" 3
+_ZNSt35__is_nonvolatile_trivially_copyableIiE7__valueE = 1};
+# 474 "/usr/include/c++/13/bits/cpp_type_traits.h" 3
+struct _ZSt35__is_nonvolatile_trivially_copyableIiE;
+# 348 "/usr/include/c++/13/bits/stl_algobase.h" 3
+struct _ZSt11__copy_moveILb0ELb1ESt26random_access_iterator_tagE;
+# 1611 "/usr/include/c++/13/type_traits" 3
+struct _ZSt16remove_referenceIR7RunStatE;
+# 1611 "/usr/include/c++/13/type_traits" 3
+struct _ZSt16remove_referenceI7RunStatE;
+# 106 "/usr/include/c++/13/type_traits" 3
+struct _ZSt9enable_ifILb1EP7RunStatE;
+# 111 "/usr/include/c++/13/bits/char_traits.h" 3
+struct _ZN9__gnu_cxx11char_traitsIcEE;
+# 125 "/usr/include/c++/13/ext/alloc_traits.h" 3
+struct _ZN9__gnu_cxx14__alloc_traitsISaIcEcE6rebindIcEE;
+# 45 "/usr/include/c++/13/ext/alloc_traits.h" 3
+struct _ZN9__gnu_cxx14__alloc_traitsISaIcEcEE;
+# 125 "/usr/include/c++/13/ext/alloc_traits.h" 3
+struct _ZN9__gnu_cxx14__alloc_traitsISaIfEfE6rebindIfEE;
+# 45 "/usr/include/c++/13/ext/alloc_traits.h" 3
+struct _ZN9__gnu_cxx14__alloc_traitsISaIfEfEE;
+# 1047 "/usr/include/c++/13/bits/stl_iterator.h" 3
+struct _ZN9__gnu_cxx17__normal_iteratorIPKfSt6vectorIfSaIfEEEE;
+# 125 "/usr/include/c++/13/ext/alloc_traits.h" 3
+struct _ZN9__gnu_cxx14__alloc_traitsISaIiEiE6rebindIiEE;
+# 45 "/usr/include/c++/13/ext/alloc_traits.h" 3
+struct _ZN9__gnu_cxx14__alloc_traitsISaIiEiEE;
+# 1047 "/usr/include/c++/13/bits/stl_iterator.h" 3
+struct _ZN9__gnu_cxx17__normal_iteratorIPiSt6vectorIiSaIiEEEE;
+# 125 "/usr/include/c++/13/ext/alloc_traits.h" 3
+struct _ZN9__gnu_cxx14__alloc_traitsISaI7RunStatES1_E6rebindIS1_EE;
+# 45 "/usr/include/c++/13/ext/alloc_traits.h" 3
+struct _ZN9__gnu_cxx14__alloc_traitsISaI7RunStatES1_EE;
+# 1047 "/usr/include/c++/13/bits/stl_iterator.h" 3
+struct _ZN9__gnu_cxx17__normal_iteratorIPK7RunStatSt6vectorIS1_SaIS1_EEEE;
+# 1047 "/usr/include/c++/13/bits/stl_iterator.h" 3
+struct _ZN9__gnu_cxx17__normal_iteratorIPKiSt6vectorIiSaIiEEEE;
+# 1047 "/usr/include/c++/13/bits/stl_iterator.h" 3
+struct _ZN9__gnu_cxx17__normal_iteratorIP7RunStatSt6vectorIS1_SaIS1_EEEE;
+# 1047 "/usr/include/c++/13/bits/stl_iterator.h" 3
+struct _ZN9__gnu_cxx17__normal_iteratorIPKcNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEEE;
+# 1047 "/usr/include/c++/13/bits/stl_iterator.h" 3
+struct _ZN9__gnu_cxx17__normal_iteratorIPcNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEEE;
+# 57 "/usr/include/c++/13/ext/numeric_traits.h" 3
+enum _ZN9__gnu_cxx22__is_integer_nonstrictIlEUt_E {
+# 57 "/usr/include/c++/13/ext/numeric_traits.h" 3
+_ZN9__gnu_cxx22__is_integer_nonstrictIlE7__widthE = 64};
+# 1047 "/usr/include/c++/13/bits/stl_iterator.h" 3
+struct _ZN9__gnu_cxx17__normal_iteratorIPfSt6vectorIfSaIfEEEE; struct __C3 { struct __C2 *regions; void **obj_table; struct __C1 *array_table; unsigned short saved_region_number;char __nv_no_debug_dummy_end_padding_0[6];}; struct __C5 { const struct __EDG_type_info *tinfo; unsigned flags; unsigned *ptr_flags;}; struct __C6 { long setjmp_buffer[25]; struct __C5 *catch_entries; void *rtinfo; unsigned short region_number;char __nv_no_debug_dummy_end_padding_0[6];}; union __C7 { struct __C6 try_block; struct __C3 function; struct __C5 *throw_spec;}; struct __C8 { struct __C8 *next; unsigned char kind; union __C7 variant;};
+# 41 "/usr/include/x86_64-linux-gnu/bits/types/__locale_t.h" 3
+typedef struct __locale_struct *__locale_t;
+# 214 "/usr/lib/gcc/x86_64-linux-gnu/13/include/stddef.h" 3
+typedef unsigned long size_t;
+#include "crt/device_runtime.h"
+# 51 "/usr/include/x86_64-linux-gnu/bits/thread-shared-types.h" 3
+struct __pthread_internal_list {
+# 53 "/usr/include/x86_64-linux-gnu/bits/thread-shared-types.h" 3
+struct __pthread_internal_list *__prev;
+# 54 "/usr/include/x86_64-linux-gnu/bits/thread-shared-types.h" 3
+struct __pthread_internal_list *__next;};
+# 55 "/usr/include/x86_64-linux-gnu/bits/thread-shared-types.h" 3
+typedef struct __pthread_internal_list __pthread_list_t;
+# 22 "/usr/include/x86_64-linux-gnu/bits/struct_mutex.h" 3
+struct __pthread_mutex_s {
+# 24 "/usr/include/x86_64-linux-gnu/bits/struct_mutex.h" 3
+int __lock;
+# 25 "/usr/include/x86_64-linux-gnu/bits/struct_mutex.h" 3
+unsigned __count;
+# 26 "/usr/include/x86_64-linux-gnu/bits/struct_mutex.h" 3
+int __owner;
+# 28 "/usr/include/x86_64-linux-gnu/bits/struct_mutex.h" 3
+unsigned __nusers;
+# 32 "/usr/include/x86_64-linux-gnu/bits/struct_mutex.h" 3
+int __kind;
+# 34 "/usr/include/x86_64-linux-gnu/bits/struct_mutex.h" 3
+short __spins;
+# 35 "/usr/include/x86_64-linux-gnu/bits/struct_mutex.h" 3
+short __elision;
+# 36 "/usr/include/x86_64-linux-gnu/bits/struct_mutex.h" 3
+__pthread_list_t __list;};
+# 68 "/usr/include/x86_64-linux-gnu/bits/pthreadtypes.h" 3
+union pthread_mutex_t {
+# 69 "/usr/include/x86_64-linux-gnu/bits/pthreadtypes.h" 3
+struct __pthread_mutex_s __data;
+# 70 "/usr/include/x86_64-linux-gnu/bits/pthreadtypes.h" 3
+char __size[40];
+# 71 "/usr/include/x86_64-linux-gnu/bits/pthreadtypes.h" 3
+long __align;};
+# 72 "/usr/include/x86_64-linux-gnu/bits/pthreadtypes.h" 3
+typedef union pthread_mutex_t pthread_mutex_t;
+# 17 "/usr/include/x86_64-linux-gnu/bits/types/__mbstate_t.h" 3
+union _ZN11__mbstate_tUt_E {
+# 18 "/usr/include/x86_64-linux-gnu/bits/types/__mbstate_t.h" 3
+unsigned __wch;
+# 19 "/usr/include/x86_64-linux-gnu/bits/types/__mbstate_t.h" 3
+char __wchb[4];};
+# 14 "/usr/include/x86_64-linux-gnu/bits/types/__mbstate_t.h" 3
+struct __mbstate_t {
+# 15 "/usr/include/x86_64-linux-gnu/bits/types/__mbstate_t.h" 3
+int __count;
+# 20 "/usr/include/x86_64-linux-gnu/bits/types/__mbstate_t.h" 3
+union _ZN11__mbstate_tUt_E __value;};
+# 21 "/usr/include/x86_64-linux-gnu/bits/types/__mbstate_t.h" 3
+typedef struct __mbstate_t __mbstate_t;
+# 7 "/usr/include/x86_64-linux-gnu/bits/types/FILE.h" 3
+typedef struct _IO_FILE FILE;
+# 6 "/usr/include/x86_64-linux-gnu/bits/types/mbstate_t.h" 3
+typedef __mbstate_t mbstate_t;
+# 50 "/usr/include/x86_64-linux-gnu/c++/13/bits/gthr-default.h" 3
+typedef pthread_mutex_t __gthread_mutex_t;
+# 32 "/usr/include/x86_64-linux-gnu/c++/13/bits/atomic_word.h" 3
+typedef int _Atomic_word;
+# 35 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+struct RunStat {
+# 36 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+int blocks_per_sm;
+# 37 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+int blocks;
+# 38 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+int warps_per_block;
+# 39 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+int threads_per_block;
+# 40 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+int total_warps;
+# 41 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+int elements;
+# 42 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+int iterations;
+# 43 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+double avg_ms;
+# 44 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+double std_ms;};
+# 236 "/usr/include/c++/13/bits/basic_string.tcc" 3
+struct _ZZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE12_M_constructIPKcEEvT_S8_St20forward_iterator_tagE6_Guard {
+# 244 "/usr/include/c++/13/bits/basic_string.tcc" 3
+struct _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE *_M_guarded;};
+# 453 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef int _ZNSt6vectorIiSaIiEE10value_typeE;
+# 467 "/usr/include/c++/13/bits/alloc_traits.h" 3
+typedef struct _ZSaIcE _ZNSt16allocator_traitsISaIcEE12rebind_allocIcEE;
+# 126 "/usr/include/c++/13/ext/alloc_traits.h" 3
+typedef _ZNSt16allocator_traitsISaIcEE12rebind_allocIcEE _ZN9__gnu_cxx14__alloc_traitsISaIcEcE6rebindIcE5otherE;
+# 90 "/usr/include/c++/13/bits/basic_string.h" 3
+typedef _ZN9__gnu_cxx14__alloc_traitsISaIcEcE6rebindIcE5otherE _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE16_Char_alloc_typeE;
+# 98 "/usr/include/c++/13/bits/basic_string.h" 3
+typedef _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE16_Char_alloc_typeE _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE14allocator_typeE;
+# 308 "/usr/include/x86_64-linux-gnu/c++/13/bits/c++config.h" 3
+typedef unsigned long _ZSt6size_t;
+# 452 "/usr/include/c++/13/bits/alloc_traits.h" 3
+typedef _ZSt6size_t _ZNSt16allocator_traitsISaIcEE9size_typeE;
+# 56 "/usr/include/c++/13/ext/alloc_traits.h" 3
+typedef _ZNSt16allocator_traitsISaIcEE9size_typeE _ZN9__gnu_cxx14__alloc_traitsISaIcEcE9size_typeE;
+# 99 "/usr/include/c++/13/bits/basic_string.h" 3
+typedef _ZN9__gnu_cxx14__alloc_traitsISaIcEcE9size_typeE _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE9size_typeE;
+# 437 "/usr/include/c++/13/bits/alloc_traits.h" 3
+typedef char *_ZNSt16allocator_traitsISaIcEE7pointerE;
+# 54 "/usr/include/c++/13/ext/alloc_traits.h" 3
+typedef _ZNSt16allocator_traitsISaIcEE7pointerE _ZN9__gnu_cxx14__alloc_traitsISaIcEcE7pointerE;
+# 103 "/usr/include/c++/13/bits/basic_string.h" 3
+typedef _ZN9__gnu_cxx14__alloc_traitsISaIcEcE7pointerE _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE7pointerE;
+# 440 "/usr/include/c++/13/bits/alloc_traits.h" 3
+typedef const char *_ZNSt16allocator_traitsISaIcEE13const_pointerE;
+# 55 "/usr/include/c++/13/ext/alloc_traits.h" 3
+typedef _ZNSt16allocator_traitsISaIcEE13const_pointerE _ZN9__gnu_cxx14__alloc_traitsISaIcEcE13const_pointerE;
+# 104 "/usr/include/c++/13/bits/basic_string.h" 3
+typedef _ZN9__gnu_cxx14__alloc_traitsISaIcEcE13const_pointerE _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE13const_pointerE;
+# 105 "/usr/include/c++/13/bits/basic_string.h" 3
+typedef struct _ZN9__gnu_cxx17__normal_iteratorIPcNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEEE _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE8iteratorE;
+# 107 "/usr/include/c++/13/bits/basic_string.h" 3
+typedef struct _ZN9__gnu_cxx17__normal_iteratorIPKcNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEEE _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE14const_iteratorE;
+# 141 "/usr/include/c++/13/bits/basic_string.h" 3
+typedef struct _ZSt17basic_string_viewIcSt11char_traitsIcEE _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE9__sv_typeE;
+# 181 "/usr/include/c++/13/bits/basic_string.h" 3
+struct _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE12_Alloc_hiderE {
+# 196 "/usr/include/c++/13/bits/basic_string.h" 3
+_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE7pointerE _M_p;};
+# 205 "/usr/include/c++/13/bits/basic_string.h" 3
+union __C11 {
+# 206 "/usr/include/c++/13/bits/basic_string.h" 3
+char _M_local_buf[16];
+# 207 "/usr/include/c++/13/bits/basic_string.h" 3
+_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE9size_typeE _M_allocated_capacity;};
+# 72 "/usr/include/c++/13/bits/stringfwd.h" 3
+struct _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE {
+# 199 "/usr/include/c++/13/bits/basic_string.h" 3
+struct _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE12_Alloc_hiderE _M_dataplus;
+# 200 "/usr/include/c++/13/bits/basic_string.h" 3
+_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE9size_typeE _M_string_length;
+# 204 "/usr/include/c++/13/bits/basic_string.h" 3
+# 205 "/usr/include/c++/13/bits/basic_string.h" 3
+union  {
+# 206 "/usr/include/c++/13/bits/basic_string.h" 3
+char _M_local_buf[16];
+# 207 "/usr/include/c++/13/bits/basic_string.h" 3
+_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE9size_typeE _M_allocated_capacity;};};
+# 82 "/usr/include/c++/13/type_traits" 3
+typedef struct _ZSt17integral_constantIbLb1EE _ZSt9true_type;
+# 309 "/usr/include/x86_64-linux-gnu/c++/13/bits/c++config.h" 3
+typedef long _ZSt9ptrdiff_t;
+# 312 "/usr/include/x86_64-linux-gnu/c++/13/bits/c++config.h" 3
+typedef void *_ZSt9nullptr_t;
+# 73 "/usr/include/c++/13/bits/cpp_type_traits.h" 3
+struct _ZSt11__true_type {};
+# 74 "/usr/include/c++/13/bits/cpp_type_traits.h" 3
+struct _ZSt12__false_type {};
+# 85 "/usr/include/c++/13/type_traits" 3
+typedef struct _ZSt17integral_constantIbLb0EE _ZSt10false_type;
+# 62 "/usr/include/c++/13/type_traits" 3
+struct _ZSt17integral_constantIbLb1EE {};
+# 62 "/usr/include/c++/13/type_traits" 3
+struct _ZSt17integral_constantIbLb0EE {};
+# 93 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+struct _ZSt18input_iterator_tag {};
+# 99 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+struct _ZSt20forward_iterator_tag {};
+# 103 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+struct _ZSt26bidirectional_iterator_tag {};
+# 107 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+struct _ZSt26random_access_iterator_tag {};
+# 378 "/usr/include/c++/13/bits/stl_algobase.h" 3
+struct _ZSt11__copy_moveILb0ELb0ESt26random_access_iterator_tagE {};
+# 168 "/usr/include/c++/13/bits/stl_construct.h" 3
+struct _ZSt12_Destroy_auxILb1EE {};
+# 77 "/usr/include/c++/13/bits/stringfwd.h" 3
+typedef struct _ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE _ZSt6string;
+# 68 "/usr/include/c++/13/bits/postypes.h" 3
+typedef _ZSt9ptrdiff_t _ZSt10streamsize;
+# 143 "/usr/include/c++/13/iosfwd" 3
+typedef struct _ZSo _ZSt7ostream;
+# 167 "/usr/include/c++/13/iosfwd" 3
+typedef struct _ZSt14basic_ofstreamIcSt11char_traitsIcEE _ZSt8ofstream;
+# 339 "/usr/include/c++/13/bits/char_traits.h" 3
+typedef char _ZNSt11char_traitsIcE9char_typeE;
+# 344 "/usr/include/c++/13/bits/char_traits.h" 3
+typedef mbstate_t _ZNSt11char_traitsIcE10state_typeE;
+# 337 "/usr/include/c++/13/bits/char_traits.h" 3
+struct _ZSt11char_traitsIcE {};
+# 62 "/usr/include/x86_64-linux-gnu/c++/13/bits/c++locale.h" 3
+typedef __locale_t _ZSt10__c_locale;
+# 47 "/usr/include/x86_64-linux-gnu/c++/13/bits/c++allocator.h" 3
+typedef struct _ZSt15__new_allocatorIcE _ZSt16__allocator_baseIcE;
+# 67 "/usr/include/c++/13/bits/new_allocator.h" 3
+typedef _ZSt6size_t _ZNSt15__new_allocatorIcE9size_typeE;
+# 63 "/usr/include/c++/13/bits/new_allocator.h" 3
+struct _ZSt15__new_allocatorIcE {};
+# 133 "/usr/include/c++/13/bits/allocator.h" 3
+typedef char _ZNSaIcE10value_typeE;
+# 65 "/usr/include/c++/13/bits/memoryfwd.h" 3
+struct _ZSaIcE {};
+# 431 "/usr/include/c++/13/bits/alloc_traits.h" 3
+typedef struct _ZSaIcE _ZNSt16allocator_traitsISaIcEE14allocator_typeE;
+# 105 "/usr/include/c++/13/bits/alloc_traits.h" 3
+struct _ZSt16allocator_traitsISaIcEE {};
+# 112 "/usr/include/c++/13/type_traits" 3
+typedef struct _ZSaIcE _ZNSt9enable_ifILb1ESaIcEE4typeE;
+# 106 "/usr/include/c++/13/type_traits" 3
+struct _ZSt9enable_ifILb1ESaIcEE {};
+# 853 "/usr/include/c++/13/bits/alloc_traits.h" 3
+typedef _ZNSt9enable_ifILb1ESaIcEE4typeE _ZSt17_RequireAllocatorISaIcEE;
+# 56 "/usr/include/c++/13/bits/uses_allocator.h" 3
+struct _ZSt15allocator_arg_t {};
+# 377 "/usr/include/c++/13/bits/locale_classes.h" 3
+struct _ZNSt6locale5facetE { const long *__vptr;
+# 383 "/usr/include/c++/13/bits/locale_classes.h" 3
+_Atomic_word _M_refcount;char __nv_no_debug_dummy_end_padding_0[4];};
+# 377 "/usr/include/c++/13/bits/locale_classes.h" 3
+struct __SO__NSt6locale5facetE { const long *__vptr;
+# 383 "/usr/include/c++/13/bits/locale_classes.h" 3
+_Atomic_word _M_refcount;};
+# 62 "/usr/include/c++/13/bits/locale_classes.h" 3
+struct _ZSt6locale {
+# 315 "/usr/include/c++/13/bits/locale_classes.h" 3
+struct _ZNSt6locale5_ImplE *_M_impl;};
+# 346 "/usr/include/c++/13/bits/ios_base.h" 3
+typedef enum _ZSt13_Ios_Fmtflags _ZNSt8ios_base8fmtflagsE;
+# 421 "/usr/include/c++/13/bits/ios_base.h" 3
+typedef enum _ZSt12_Ios_Iostate _ZNSt8ios_base7iostateE;
+# 452 "/usr/include/c++/13/bits/ios_base.h" 3
+typedef enum _ZSt13_Ios_Openmode _ZNSt8ios_base8openmodeE;
+# 492 "/usr/include/c++/13/bits/ios_base.h" 3
+typedef enum _ZSt12_Ios_Seekdir _ZNSt8ios_base7seekdirE;
+# 605 "/usr/include/c++/13/bits/ios_base.h" 3
+struct _ZNSt8ios_base6_WordsE {
+# 607 "/usr/include/c++/13/bits/ios_base.h" 3
+void *_M_pword;
+# 608 "/usr/include/c++/13/bits/ios_base.h" 3
+long _M_iword;};
+# 233 "/usr/include/c++/13/bits/ios_base.h" 3
+struct _ZSt8ios_base { const long *__vptr;
+# 558 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt10streamsize _M_precision;
+# 559 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZSt10streamsize _M_width;
+# 560 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZNSt8ios_base8fmtflagsE _M_flags;
+# 561 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZNSt8ios_base7iostateE _M_exception;
+# 562 "/usr/include/c++/13/bits/ios_base.h" 3
+_ZNSt8ios_base7iostateE _M_streambuf_state;
+# 596 "/usr/include/c++/13/bits/ios_base.h" 3
+struct _ZNSt8ios_base14_Callback_listE *_M_callbacks;
+# 613 "/usr/include/c++/13/bits/ios_base.h" 3
+struct _ZNSt8ios_base6_WordsE _M_word_zero;
+# 618 "/usr/include/c++/13/bits/ios_base.h" 3
+struct _ZNSt8ios_base6_WordsE _M_local_word[8];
+# 621 "/usr/include/c++/13/bits/ios_base.h" 3
+int _M_word_size;
+# 622 "/usr/include/c++/13/bits/ios_base.h" 3
+struct _ZNSt8ios_base6_WordsE *_M_word;
+# 628 "/usr/include/c++/13/bits/ios_base.h" 3
+struct _ZSt6locale _M_ios_locale;};
+# 133 "/usr/include/c++/13/streambuf" 3
+typedef char _ZNSt15basic_streambufIcSt11char_traitsIcEE9char_typeE;
+# 134 "/usr/include/c++/13/streambuf" 3
+typedef struct _ZSt11char_traitsIcE _ZNSt15basic_streambufIcSt11char_traitsIcEE11traits_typeE;
+# 82 "/usr/include/c++/13/iosfwd" 3
+struct _ZSt15basic_streambufIcSt11char_traitsIcEE { const long *__vptr;
+# 191 "/usr/include/c++/13/streambuf" 3
+_ZNSt15basic_streambufIcSt11char_traitsIcEE9char_typeE *_M_in_beg;
+# 192 "/usr/include/c++/13/streambuf" 3
+_ZNSt15basic_streambufIcSt11char_traitsIcEE9char_typeE *_M_in_cur;
+# 193 "/usr/include/c++/13/streambuf" 3
+_ZNSt15basic_streambufIcSt11char_traitsIcEE9char_typeE *_M_in_end;
+# 194 "/usr/include/c++/13/streambuf" 3
+_ZNSt15basic_streambufIcSt11char_traitsIcEE9char_typeE *_M_out_beg;
+# 195 "/usr/include/c++/13/streambuf" 3
+_ZNSt15basic_streambufIcSt11char_traitsIcEE9char_typeE *_M_out_cur;
+# 196 "/usr/include/c++/13/streambuf" 3
+_ZNSt15basic_streambufIcSt11char_traitsIcEE9char_typeE *_M_out_end;
+# 199 "/usr/include/c++/13/streambuf" 3
+struct _ZSt6locale _M_buf_locale;};
+# 44 "/usr/include/x86_64-linux-gnu/c++/13/bits/ctype_base.h" 3
+typedef const int *_ZNSt10ctype_base9__to_typeE;
+# 48 "/usr/include/x86_64-linux-gnu/c++/13/bits/ctype_base.h" 3
+typedef unsigned short _ZNSt10ctype_base4maskE;
+# 41 "/usr/include/x86_64-linux-gnu/c++/13/bits/ctype_base.h" 3
+struct _ZSt10ctype_base {};
+# 694 "/usr/include/c++/13/bits/locale_facets.h" 3
+typedef char _ZNSt5ctypeIcE9char_typeE;
+# 689 "/usr/include/c++/13/bits/locale_facets.h" 3
+struct _ZSt5ctypeIcE {  const long *__b_NSt6locale5facetE___vptr;
+# 383 "/usr/include/c++/13/bits/locale_classes.h" 3
+_Atomic_word __b_NSt6locale5facetE__M_refcount;
+# 698 "/usr/include/c++/13/bits/locale_facets.h" 3
+_ZSt10__c_locale _M_c_locale_ctype;
+# 699 "/usr/include/c++/13/bits/locale_facets.h" 3
+__nv_bool _M_del;
+# 700 "/usr/include/c++/13/bits/locale_facets.h" 3
+_ZNSt10ctype_base9__to_typeE _M_toupper;
+# 701 "/usr/include/c++/13/bits/locale_facets.h" 3
+_ZNSt10ctype_base9__to_typeE _M_tolower;
+# 702 "/usr/include/c++/13/bits/locale_facets.h" 3
+const _ZNSt10ctype_base4maskE *_M_table;
+# 703 "/usr/include/c++/13/bits/locale_facets.h" 3
+char _M_widen_ok;
+# 704 "/usr/include/c++/13/bits/locale_facets.h" 3
+char _M_widen[256];
+# 705 "/usr/include/c++/13/bits/locale_facets.h" 3
+char _M_narrow[256];
+# 706 "/usr/include/c++/13/bits/locale_facets.h" 3
+char _M_narrow_ok;char __nv_no_debug_dummy_end_padding_0[6];};
+# 76 "/usr/include/c++/13/bits/basic_ios.h" 3
+typedef char _ZNSt9basic_iosIcSt11char_traitsIcEE9char_typeE;
+# 87 "/usr/include/c++/13/bits/basic_ios.h" 3
+typedef struct _ZSt5ctypeIcE _ZNSt9basic_iosIcSt11char_traitsIcEE12__ctype_typeE;
+# 89 "/usr/include/c++/13/bits/basic_ios.h" 3
+typedef struct _ZSt7num_putIcSt19ostreambuf_iteratorIcSt11char_traitsIcEEE _ZNSt9basic_iosIcSt11char_traitsIcEE14__num_put_typeE;
+# 91 "/usr/include/c++/13/bits/basic_ios.h" 3
+typedef struct _ZSt7num_getIcSt19istreambuf_iteratorIcSt11char_traitsIcEEE _ZNSt9basic_iosIcSt11char_traitsIcEE14__num_get_typeE;
+# 79 "/usr/include/c++/13/iosfwd" 3
+struct _ZSt9basic_iosIcSt11char_traitsIcEE { struct _ZSt8ios_base __b_St8ios_base;
+# 96 "/usr/include/c++/13/bits/basic_ios.h" 3
+struct _ZSo *_M_tie;
+# 97 "/usr/include/c++/13/bits/basic_ios.h" 3
+_ZNSt9basic_iosIcSt11char_traitsIcEE9char_typeE _M_fill;
+# 98 "/usr/include/c++/13/bits/basic_ios.h" 3
+__nv_bool _M_fill_init;
+# 99 "/usr/include/c++/13/bits/basic_ios.h" 3
+struct _ZSt15basic_streambufIcSt11char_traitsIcEE *_M_streambuf;
+# 102 "/usr/include/c++/13/bits/basic_ios.h" 3
+const _ZNSt9basic_iosIcSt11char_traitsIcEE12__ctype_typeE *_M_ctype;
+# 104 "/usr/include/c++/13/bits/basic_ios.h" 3
+const _ZNSt9basic_iosIcSt11char_traitsIcEE14__num_put_typeE *_M_num_put;
+# 106 "/usr/include/c++/13/bits/basic_ios.h" 3
+const _ZNSt9basic_iosIcSt11char_traitsIcEE14__num_get_typeE *_M_num_get;};
+# 64 "/usr/include/c++/13/ostream" 3
+typedef char _ZNSo9char_typeE;
+# 73 "/usr/include/c++/13/ostream" 3
+typedef struct _ZSo _ZNSo14__ostream_typeE;
+# 88 "/usr/include/c++/13/iosfwd" 3
+struct _ZSo { const long *__vptr; struct _ZSt9basic_iosIcSt11char_traitsIcEE __v_St9basic_iosIcSt11char_traitsIcEE;};
+# 88 "/usr/include/c++/13/iosfwd" 3
+struct __SO__So { const long *__vptr;};
+# 48 "/usr/include/x86_64-linux-gnu/c++/13/bits/c++io.h" 3
+typedef __gthread_mutex_t _ZSt8__c_lock;
+# 52 "/usr/include/x86_64-linux-gnu/c++/13/bits/c++io.h" 3
+typedef FILE _ZSt8__c_file;
+# 54 "/usr/include/x86_64-linux-gnu/c++/13/bits/basic_file.h" 3
+struct _ZSt12__basic_fileIcE {
+# 57 "/usr/include/x86_64-linux-gnu/c++/13/bits/basic_file.h" 3
+_ZSt8__c_file *_M_cfile;
+# 60 "/usr/include/x86_64-linux-gnu/c++/13/bits/basic_file.h" 3
+__nv_bool _M_cfile_created;char __nv_no_debug_dummy_end_padding_0[7];};
+# 105 "/usr/include/c++/13/fstream" 3
+typedef char _ZNSt13basic_filebufIcSt11char_traitsIcEE9char_typeE;
+# 112 "/usr/include/c++/13/fstream" 3
+typedef struct _ZSt13basic_filebufIcSt11char_traitsIcEE _ZNSt13basic_filebufIcSt11char_traitsIcEE14__filebuf_typeE;
+# 113 "/usr/include/c++/13/fstream" 3
+typedef struct _ZSt12__basic_fileIcE _ZNSt13basic_filebufIcSt11char_traitsIcEE11__file_typeE;
+# 114 "/usr/include/c++/13/fstream" 3
+typedef _ZNSt11char_traitsIcE10state_typeE _ZNSt13basic_filebufIcSt11char_traitsIcEE12__state_typeE;
+# 115 "/usr/include/c++/13/fstream" 3
+typedef struct _ZSt7codecvtIcc11__mbstate_tE _ZNSt13basic_filebufIcSt11char_traitsIcEE14__codecvt_typeE;
+# 115 "/usr/include/c++/13/iosfwd" 3
+struct _ZSt13basic_filebufIcSt11char_traitsIcEE { struct _ZSt15basic_streambufIcSt11char_traitsIcEE __b_St15basic_streambufIcSt11char_traitsIcEE;
+# 122 "/usr/include/c++/13/fstream" 3
+_ZSt8__c_lock _M_lock;
+# 125 "/usr/include/c++/13/fstream" 3
+_ZNSt13basic_filebufIcSt11char_traitsIcEE11__file_typeE _M_file;
+# 128 "/usr/include/c++/13/fstream" 3
+_ZNSt8ios_base8openmodeE _M_mode;
+# 131 "/usr/include/c++/13/fstream" 3
+_ZNSt13basic_filebufIcSt11char_traitsIcEE12__state_typeE _M_state_beg;
+# 136 "/usr/include/c++/13/fstream" 3
+_ZNSt13basic_filebufIcSt11char_traitsIcEE12__state_typeE _M_state_cur;
+# 140 "/usr/include/c++/13/fstream" 3
+_ZNSt13basic_filebufIcSt11char_traitsIcEE12__state_typeE _M_state_last;
+# 143 "/usr/include/c++/13/fstream" 3
+_ZNSt13basic_filebufIcSt11char_traitsIcEE9char_typeE *_M_buf;
+# 150 "/usr/include/c++/13/fstream" 3
+_ZSt6size_t _M_buf_size;
+# 153 "/usr/include/c++/13/fstream" 3
+__nv_bool _M_buf_allocated;
+# 162 "/usr/include/c++/13/fstream" 3
+__nv_bool _M_reading;
+# 163 "/usr/include/c++/13/fstream" 3
+__nv_bool _M_writing;
+# 171 "/usr/include/c++/13/fstream" 3
+_ZNSt13basic_filebufIcSt11char_traitsIcEE9char_typeE _M_pback;
+# 172 "/usr/include/c++/13/fstream" 3
+_ZNSt13basic_filebufIcSt11char_traitsIcEE9char_typeE *_M_pback_cur_save;
+# 173 "/usr/include/c++/13/fstream" 3
+_ZNSt13basic_filebufIcSt11char_traitsIcEE9char_typeE *_M_pback_end_save;
+# 174 "/usr/include/c++/13/fstream" 3
+__nv_bool _M_pback_init;
+# 178 "/usr/include/c++/13/fstream" 3
+const _ZNSt13basic_filebufIcSt11char_traitsIcEE14__codecvt_typeE *_M_codecvt;
+# 185 "/usr/include/c++/13/fstream" 3
+char *_M_ext_buf;
+# 190 "/usr/include/c++/13/fstream" 3
+_ZSt10streamsize _M_ext_buf_size;
+# 197 "/usr/include/c++/13/fstream" 3
+const char *_M_ext_next;
+# 198 "/usr/include/c++/13/fstream" 3
+char *_M_ext_end;};
+# 771 "/usr/include/c++/13/fstream" 3
+typedef struct _ZSt13basic_filebufIcSt11char_traitsIcEE _ZNSt14basic_ofstreamIcSt11char_traitsIcEE14__filebuf_typeE;
+# 121 "/usr/include/c++/13/iosfwd" 3
+struct _ZSt14basic_ofstreamIcSt11char_traitsIcEE { struct __SO__So __b_So;
+# 775 "/usr/include/c++/13/fstream" 3
+_ZNSt14basic_ofstreamIcSt11char_traitsIcEE14__filebuf_typeE _M_filebuf; struct _ZSt9basic_iosIcSt11char_traitsIcEE __v_St9basic_iosIcSt11char_traitsIcEE;};
+# 187 "/usr/include/c++/13/iomanip" 3
+struct _ZSt13_Setprecision {
+# 187 "/usr/include/c++/13/iomanip" 3
+int _M_n;};
+# 217 "/usr/include/c++/13/iomanip" 3
+struct _ZSt5_Setw {
+# 217 "/usr/include/c++/13/iomanip" 3
+int _M_n;};
+# 141 "/usr/include/c++/13/bits/stl_uninitialized.h" 3
+struct _ZSt20__uninitialized_copyILb1EE {};
+# 47 "/usr/include/x86_64-linux-gnu/c++/13/bits/c++allocator.h" 3
+typedef struct _ZSt15__new_allocatorIfE _ZSt16__allocator_baseIfE;
+# 67 "/usr/include/c++/13/bits/new_allocator.h" 3
+typedef _ZSt6size_t _ZNSt15__new_allocatorIfE9size_typeE;
+# 63 "/usr/include/c++/13/bits/new_allocator.h" 3
+struct _ZSt15__new_allocatorIfE {};
+# 133 "/usr/include/c++/13/bits/allocator.h" 3
+typedef float _ZNSaIfE10value_typeE;
+# 130 "/usr/include/c++/13/bits/allocator.h" 3
+struct _ZSaIfE {};
+# 431 "/usr/include/c++/13/bits/alloc_traits.h" 3
+typedef struct _ZSaIfE _ZNSt16allocator_traitsISaIfEE14allocator_typeE;
+# 434 "/usr/include/c++/13/bits/alloc_traits.h" 3
+typedef float _ZNSt16allocator_traitsISaIfEE10value_typeE;
+# 437 "/usr/include/c++/13/bits/alloc_traits.h" 3
+typedef float *_ZNSt16allocator_traitsISaIfEE7pointerE;
+# 440 "/usr/include/c++/13/bits/alloc_traits.h" 3
+typedef const float *_ZNSt16allocator_traitsISaIfEE13const_pointerE;
+# 452 "/usr/include/c++/13/bits/alloc_traits.h" 3
+typedef _ZSt6size_t _ZNSt16allocator_traitsISaIfEE9size_typeE;
+# 467 "/usr/include/c++/13/bits/alloc_traits.h" 3
+typedef struct _ZSaIfE _ZNSt16allocator_traitsISaIfEE12rebind_allocIfEE;
+# 105 "/usr/include/c++/13/bits/alloc_traits.h" 3
+struct _ZSt16allocator_traitsISaIfEE {};
+# 126 "/usr/include/c++/13/ext/alloc_traits.h" 3
+typedef _ZNSt16allocator_traitsISaIfEE12rebind_allocIfEE _ZN9__gnu_cxx14__alloc_traitsISaIfEfE6rebindIfE5otherE;
+# 88 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef _ZN9__gnu_cxx14__alloc_traitsISaIfEfE6rebindIfE5otherE _ZNSt12_Vector_baseIfSaIfEE14_Tp_alloc_typeE;
+# 54 "/usr/include/c++/13/ext/alloc_traits.h" 3
+typedef _ZNSt16allocator_traitsISaIfEE7pointerE _ZN9__gnu_cxx14__alloc_traitsISaIfEfE7pointerE;
+# 90 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef _ZN9__gnu_cxx14__alloc_traitsISaIfEfE7pointerE _ZNSt12_Vector_baseIfSaIfEE7pointerE;
+# 92 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZNSt12_Vector_baseIfSaIfEE17_Vector_impl_dataE {
+# 94 "/usr/include/c++/13/bits/stl_vector.h" 3
+_ZNSt12_Vector_baseIfSaIfEE7pointerE _M_start;
+# 95 "/usr/include/c++/13/bits/stl_vector.h" 3
+_ZNSt12_Vector_baseIfSaIfEE7pointerE _M_finish;
+# 96 "/usr/include/c++/13/bits/stl_vector.h" 3
+_ZNSt12_Vector_baseIfSaIfEE7pointerE _M_end_of_storage;};
+# 133 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZNSt12_Vector_baseIfSaIfEE12_Vector_implE { struct _ZNSt12_Vector_baseIfSaIfEE17_Vector_impl_dataE __b_NSt12_Vector_baseIfSaIfEE17_Vector_impl_dataE;};
+# 85 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZSt12_Vector_baseIfSaIfEE {
+# 374 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZNSt12_Vector_baseIfSaIfEE12_Vector_implE _M_impl;};
+# 449 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef _ZNSt12_Vector_baseIfSaIfEE14_Tp_alloc_typeE _ZNSt6vectorIfSaIfEE14_Tp_alloc_typeE;
+# 453 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef float _ZNSt6vectorIfSaIfEE10value_typeE;
+# 454 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef _ZNSt12_Vector_baseIfSaIfEE7pointerE _ZNSt6vectorIfSaIfEE7pointerE;
+# 55 "/usr/include/c++/13/ext/alloc_traits.h" 3
+typedef _ZNSt16allocator_traitsISaIfEE13const_pointerE _ZN9__gnu_cxx14__alloc_traitsISaIfEfE13const_pointerE;
+# 455 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef _ZN9__gnu_cxx14__alloc_traitsISaIfEfE13const_pointerE _ZNSt6vectorIfSaIfEE13const_pointerE;
+# 53 "/usr/include/c++/13/ext/alloc_traits.h" 3
+typedef _ZNSt16allocator_traitsISaIfEE10value_typeE _ZN9__gnu_cxx14__alloc_traitsISaIfEfE10value_typeE;
+# 59 "/usr/include/c++/13/ext/alloc_traits.h" 3
+typedef _ZN9__gnu_cxx14__alloc_traitsISaIfEfE10value_typeE *_ZN9__gnu_cxx14__alloc_traitsISaIfEfE9referenceE;
+# 456 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef _ZN9__gnu_cxx14__alloc_traitsISaIfEfE9referenceE _ZNSt6vectorIfSaIfEE9referenceE;
+# 458 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef struct _ZN9__gnu_cxx17__normal_iteratorIPfSt6vectorIfSaIfEEEE _ZNSt6vectorIfSaIfEE8iteratorE;
+# 460 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef struct _ZN9__gnu_cxx17__normal_iteratorIPKfSt6vectorIfSaIfEEEE _ZNSt6vectorIfSaIfEE14const_iteratorE;
+# 463 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef _ZSt6size_t _ZNSt6vectorIfSaIfEE9size_typeE;
+# 465 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef struct _ZSaIfE _ZNSt6vectorIfSaIfEE14allocator_typeE;
+# 428 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZSt6vectorIfSaIfEE { struct _ZSt12_Vector_baseIfSaIfEE __b_St12_Vector_baseIfSaIfEE;};
+# 227 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+typedef const float *_ZNSt15iterator_traitsIPKfE9referenceE;
+# 177 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+struct _ZSt15iterator_traitsIPKfE {};
+# 47 "/usr/include/x86_64-linux-gnu/c++/13/bits/c++allocator.h" 3
+typedef struct _ZSt15__new_allocatorIiE _ZSt16__allocator_baseIiE;
+# 67 "/usr/include/c++/13/bits/new_allocator.h" 3
+typedef _ZSt6size_t _ZNSt15__new_allocatorIiE9size_typeE;
+# 63 "/usr/include/c++/13/bits/new_allocator.h" 3
+struct _ZSt15__new_allocatorIiE {};
+# 133 "/usr/include/c++/13/bits/allocator.h" 3
+typedef int _ZNSaIiE10value_typeE;
+# 130 "/usr/include/c++/13/bits/allocator.h" 3
+struct _ZSaIiE {};
+# 431 "/usr/include/c++/13/bits/alloc_traits.h" 3
+typedef struct _ZSaIiE _ZNSt16allocator_traitsISaIiEE14allocator_typeE;
+# 434 "/usr/include/c++/13/bits/alloc_traits.h" 3
+typedef int _ZNSt16allocator_traitsISaIiEE10value_typeE;
+# 437 "/usr/include/c++/13/bits/alloc_traits.h" 3
+typedef int *_ZNSt16allocator_traitsISaIiEE7pointerE;
+# 440 "/usr/include/c++/13/bits/alloc_traits.h" 3
+typedef const int *_ZNSt16allocator_traitsISaIiEE13const_pointerE;
+# 452 "/usr/include/c++/13/bits/alloc_traits.h" 3
+typedef _ZSt6size_t _ZNSt16allocator_traitsISaIiEE9size_typeE;
+# 467 "/usr/include/c++/13/bits/alloc_traits.h" 3
+typedef struct _ZSaIiE _ZNSt16allocator_traitsISaIiEE12rebind_allocIiEE;
+# 105 "/usr/include/c++/13/bits/alloc_traits.h" 3
+struct _ZSt16allocator_traitsISaIiEE {};
+# 126 "/usr/include/c++/13/ext/alloc_traits.h" 3
+typedef _ZNSt16allocator_traitsISaIiEE12rebind_allocIiEE _ZN9__gnu_cxx14__alloc_traitsISaIiEiE6rebindIiE5otherE;
+# 88 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef _ZN9__gnu_cxx14__alloc_traitsISaIiEiE6rebindIiE5otherE _ZNSt12_Vector_baseIiSaIiEE14_Tp_alloc_typeE;
+# 54 "/usr/include/c++/13/ext/alloc_traits.h" 3
+typedef _ZNSt16allocator_traitsISaIiEE7pointerE _ZN9__gnu_cxx14__alloc_traitsISaIiEiE7pointerE;
+# 90 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef _ZN9__gnu_cxx14__alloc_traitsISaIiEiE7pointerE _ZNSt12_Vector_baseIiSaIiEE7pointerE;
+# 297 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef struct _ZSaIiE _ZNSt12_Vector_baseIiSaIiEE14allocator_typeE;
+# 92 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZNSt12_Vector_baseIiSaIiEE17_Vector_impl_dataE {
+# 94 "/usr/include/c++/13/bits/stl_vector.h" 3
+_ZNSt12_Vector_baseIiSaIiEE7pointerE _M_start;
+# 95 "/usr/include/c++/13/bits/stl_vector.h" 3
+_ZNSt12_Vector_baseIiSaIiEE7pointerE _M_finish;
+# 96 "/usr/include/c++/13/bits/stl_vector.h" 3
+_ZNSt12_Vector_baseIiSaIiEE7pointerE _M_end_of_storage;};
+# 133 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZNSt12_Vector_baseIiSaIiEE12_Vector_implE { struct _ZNSt12_Vector_baseIiSaIiEE17_Vector_impl_dataE __b_NSt12_Vector_baseIiSaIiEE17_Vector_impl_dataE;};
+# 85 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZSt12_Vector_baseIiSaIiEE {
+# 374 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZNSt12_Vector_baseIiSaIiEE12_Vector_implE _M_impl;};
+# 449 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef _ZNSt12_Vector_baseIiSaIiEE14_Tp_alloc_typeE _ZNSt6vectorIiSaIiEE14_Tp_alloc_typeE;
+# 454 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef _ZNSt12_Vector_baseIiSaIiEE7pointerE _ZNSt6vectorIiSaIiEE7pointerE;
+# 55 "/usr/include/c++/13/ext/alloc_traits.h" 3
+typedef _ZNSt16allocator_traitsISaIiEE13const_pointerE _ZN9__gnu_cxx14__alloc_traitsISaIiEiE13const_pointerE;
+# 455 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef _ZN9__gnu_cxx14__alloc_traitsISaIiEiE13const_pointerE _ZNSt6vectorIiSaIiEE13const_pointerE;
+# 53 "/usr/include/c++/13/ext/alloc_traits.h" 3
+typedef _ZNSt16allocator_traitsISaIiEE10value_typeE _ZN9__gnu_cxx14__alloc_traitsISaIiEiE10value_typeE;
+# 59 "/usr/include/c++/13/ext/alloc_traits.h" 3
+typedef _ZN9__gnu_cxx14__alloc_traitsISaIiEiE10value_typeE *_ZN9__gnu_cxx14__alloc_traitsISaIiEiE9referenceE;
+# 456 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef _ZN9__gnu_cxx14__alloc_traitsISaIiEiE9referenceE _ZNSt6vectorIiSaIiEE9referenceE;
+# 458 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef struct _ZN9__gnu_cxx17__normal_iteratorIPiSt6vectorIiSaIiEEEE _ZNSt6vectorIiSaIiEE8iteratorE;
+# 460 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef struct _ZN9__gnu_cxx17__normal_iteratorIPKiSt6vectorIiSaIiEEEE _ZNSt6vectorIiSaIiEE14const_iteratorE;
+# 463 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef _ZSt6size_t _ZNSt6vectorIiSaIiEE9size_typeE;
+# 465 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef struct _ZSaIiE _ZNSt6vectorIiSaIiEE14allocator_typeE;
+# 428 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZSt6vectorIiSaIiEE { struct _ZSt12_Vector_baseIiSaIiEE __b_St12_Vector_baseIiSaIiEE;};
+# 51 "/usr/include/c++/13/initializer_list" 3
+typedef _ZSt6size_t _ZNSt16initializer_listIiE9size_typeE;
+# 52 "/usr/include/c++/13/initializer_list" 3
+typedef const _ZNSt6vectorIiSaIiEE10value_typeE *_ZNSt16initializer_listIiE8iteratorE;
+# 53 "/usr/include/c++/13/initializer_list" 3
+typedef const _ZNSt6vectorIiSaIiEE10value_typeE *_ZNSt16initializer_listIiE14const_iteratorE;
+# 45 "/usr/include/c++/13/initializer_list" 3
+struct _ZSt16initializer_listIiE {
+# 56 "/usr/include/c++/13/initializer_list" 3
+_ZNSt16initializer_listIiE8iteratorE _M_array;
+# 57 "/usr/include/c++/13/initializer_list" 3
+_ZNSt16initializer_listIiE9size_typeE _M_len;};
+# 47 "/usr/include/x86_64-linux-gnu/c++/13/bits/c++allocator.h" 3
+typedef struct _ZSt15__new_allocatorI7RunStatE _ZSt16__allocator_baseI7RunStatE;
+# 67 "/usr/include/c++/13/bits/new_allocator.h" 3
+typedef _ZSt6size_t _ZNSt15__new_allocatorI7RunStatE9size_typeE;
+# 63 "/usr/include/c++/13/bits/new_allocator.h" 3
+struct _ZSt15__new_allocatorI7RunStatE {};
+# 133 "/usr/include/c++/13/bits/allocator.h" 3
+typedef struct RunStat _ZNSaI7RunStatE10value_typeE;
+# 130 "/usr/include/c++/13/bits/allocator.h" 3
+struct _ZSaI7RunStatE {};
+# 431 "/usr/include/c++/13/bits/alloc_traits.h" 3
+typedef struct _ZSaI7RunStatE _ZNSt16allocator_traitsISaI7RunStatEE14allocator_typeE;
+# 434 "/usr/include/c++/13/bits/alloc_traits.h" 3
+typedef struct RunStat _ZNSt16allocator_traitsISaI7RunStatEE10value_typeE;
+# 437 "/usr/include/c++/13/bits/alloc_traits.h" 3
+typedef struct RunStat *_ZNSt16allocator_traitsISaI7RunStatEE7pointerE;
+# 440 "/usr/include/c++/13/bits/alloc_traits.h" 3
+typedef const struct RunStat *_ZNSt16allocator_traitsISaI7RunStatEE13const_pointerE;
+# 452 "/usr/include/c++/13/bits/alloc_traits.h" 3
+typedef _ZSt6size_t _ZNSt16allocator_traitsISaI7RunStatEE9size_typeE;
+# 467 "/usr/include/c++/13/bits/alloc_traits.h" 3
+typedef struct _ZSaI7RunStatE _ZNSt16allocator_traitsISaI7RunStatEE12rebind_allocIS0_EE;
+# 105 "/usr/include/c++/13/bits/alloc_traits.h" 3
+struct _ZSt16allocator_traitsISaI7RunStatEE {};
+# 126 "/usr/include/c++/13/ext/alloc_traits.h" 3
+typedef _ZNSt16allocator_traitsISaI7RunStatEE12rebind_allocIS0_EE _ZN9__gnu_cxx14__alloc_traitsISaI7RunStatES1_E6rebindIS1_E5otherE;
+# 88 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef _ZN9__gnu_cxx14__alloc_traitsISaI7RunStatES1_E6rebindIS1_E5otherE _ZNSt12_Vector_baseI7RunStatSaIS0_EE14_Tp_alloc_typeE;
+# 54 "/usr/include/c++/13/ext/alloc_traits.h" 3
+typedef _ZNSt16allocator_traitsISaI7RunStatEE7pointerE _ZN9__gnu_cxx14__alloc_traitsISaI7RunStatES1_E7pointerE;
+# 90 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef _ZN9__gnu_cxx14__alloc_traitsISaI7RunStatES1_E7pointerE _ZNSt12_Vector_baseI7RunStatSaIS0_EE7pointerE;
+# 92 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZNSt12_Vector_baseI7RunStatSaIS0_EE17_Vector_impl_dataE {
+# 94 "/usr/include/c++/13/bits/stl_vector.h" 3
+_ZNSt12_Vector_baseI7RunStatSaIS0_EE7pointerE _M_start;
+# 95 "/usr/include/c++/13/bits/stl_vector.h" 3
+_ZNSt12_Vector_baseI7RunStatSaIS0_EE7pointerE _M_finish;
+# 96 "/usr/include/c++/13/bits/stl_vector.h" 3
+_ZNSt12_Vector_baseI7RunStatSaIS0_EE7pointerE _M_end_of_storage;};
+# 133 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZNSt12_Vector_baseI7RunStatSaIS0_EE12_Vector_implE { struct _ZNSt12_Vector_baseI7RunStatSaIS0_EE17_Vector_impl_dataE __b_NSt12_Vector_baseI7RunStatSaIS0_EE17_Vector_impl_dataE;};
+# 85 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZSt12_Vector_baseI7RunStatSaIS0_EE {
+# 374 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZNSt12_Vector_baseI7RunStatSaIS0_EE12_Vector_implE _M_impl;};
+# 449 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef _ZNSt12_Vector_baseI7RunStatSaIS0_EE14_Tp_alloc_typeE _ZNSt6vectorI7RunStatSaIS0_EE14_Tp_alloc_typeE;
+# 453 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef struct RunStat _ZNSt6vectorI7RunStatSaIS0_EE10value_typeE;
+# 454 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef _ZNSt12_Vector_baseI7RunStatSaIS0_EE7pointerE _ZNSt6vectorI7RunStatSaIS0_EE7pointerE;
+# 55 "/usr/include/c++/13/ext/alloc_traits.h" 3
+typedef _ZNSt16allocator_traitsISaI7RunStatEE13const_pointerE _ZN9__gnu_cxx14__alloc_traitsISaI7RunStatES1_E13const_pointerE;
+# 455 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef _ZN9__gnu_cxx14__alloc_traitsISaI7RunStatES1_E13const_pointerE _ZNSt6vectorI7RunStatSaIS0_EE13const_pointerE;
+# 53 "/usr/include/c++/13/ext/alloc_traits.h" 3
+typedef _ZNSt16allocator_traitsISaI7RunStatEE10value_typeE _ZN9__gnu_cxx14__alloc_traitsISaI7RunStatES1_E10value_typeE;
+# 59 "/usr/include/c++/13/ext/alloc_traits.h" 3
+typedef _ZN9__gnu_cxx14__alloc_traitsISaI7RunStatES1_E10value_typeE *_ZN9__gnu_cxx14__alloc_traitsISaI7RunStatES1_E9referenceE;
+# 456 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef _ZN9__gnu_cxx14__alloc_traitsISaI7RunStatES1_E9referenceE _ZNSt6vectorI7RunStatSaIS0_EE9referenceE;
+# 458 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef struct _ZN9__gnu_cxx17__normal_iteratorIP7RunStatSt6vectorIS1_SaIS1_EEEE _ZNSt6vectorI7RunStatSaIS0_EE8iteratorE;
+# 460 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef struct _ZN9__gnu_cxx17__normal_iteratorIPK7RunStatSt6vectorIS1_SaIS1_EEEE _ZNSt6vectorI7RunStatSaIS0_EE14const_iteratorE;
+# 463 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef _ZSt6size_t _ZNSt6vectorI7RunStatSaIS0_EE9size_typeE;
+# 465 "/usr/include/c++/13/bits/stl_vector.h" 3
+typedef struct _ZSaI7RunStatE _ZNSt6vectorI7RunStatSaIS0_EE14allocator_typeE;
+# 428 "/usr/include/c++/13/bits/stl_vector.h" 3
+struct _ZSt6vectorI7RunStatSaIS0_EE { struct _ZSt12_Vector_baseI7RunStatSaIS0_EE __b_St12_Vector_baseI7RunStatSaIS0_EE;};
+# 223 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+typedef struct _ZSt26random_access_iterator_tag _ZNSt15iterator_traitsIPKiE17iterator_categoryE;
+# 225 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+typedef _ZSt9ptrdiff_t _ZNSt15iterator_traitsIPKiE15difference_typeE;
+# 227 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+typedef const int *_ZNSt15iterator_traitsIPKiE9referenceE;
+# 177 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+struct _ZSt15iterator_traitsIPKiE {};
+# 214 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+typedef _ZSt9ptrdiff_t _ZNSt15iterator_traitsIP7RunStatE15difference_typeE;
+# 216 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+typedef struct RunStat *_ZNSt15iterator_traitsIP7RunStatE9referenceE;
+# 177 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+struct _ZSt15iterator_traitsIP7RunStatE {};
+# 132 "/usr/include/c++/13/bits/ptr_traits.h" 3
+typedef char *_ZNSt19__ptr_traits_ptr_toIPccLb0EE7pointerE;
+# 133 "/usr/include/c++/13/bits/ptr_traits.h" 3
+typedef char _ZNSt19__ptr_traits_ptr_toIPccLb0EE12element_typeE;
+# 102 "/usr/include/c++/13/bits/ptr_traits.h" 3
+struct _ZSt19__ptr_traits_ptr_toIPccLb0EE {};
+# 223 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+typedef struct _ZSt26random_access_iterator_tag _ZNSt15iterator_traitsIPKcE17iterator_categoryE;
+# 225 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+typedef _ZSt9ptrdiff_t _ZNSt15iterator_traitsIPKcE15difference_typeE;
+# 177 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+struct _ZSt15iterator_traitsIPKcE {};
+# 132 "/usr/include/c++/13/bits/ptr_traits.h" 3
+typedef const char *_ZNSt19__ptr_traits_ptr_toIPKcS0_Lb0EE7pointerE;
+# 133 "/usr/include/c++/13/bits/ptr_traits.h" 3
+typedef const char _ZNSt19__ptr_traits_ptr_toIPKcS0_Lb0EE12element_typeE;
+# 102 "/usr/include/c++/13/bits/ptr_traits.h" 3
+struct _ZSt19__ptr_traits_ptr_toIPKcS0_Lb0EE {};
+# 214 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+typedef _ZSt9ptrdiff_t _ZNSt15iterator_traitsIPfE15difference_typeE;
+# 177 "/usr/include/c++/13/bits/stl_iterator_base_types.h" 3
+struct _ZSt15iterator_traitsIPfE {};
+# 112 "/usr/include/c++/13/type_traits" 3
+typedef float *_ZNSt9enable_ifILb1EPfE4typeE;
+# 106 "/usr/include/c++/13/type_traits" 3
+struct _ZSt9enable_ifILb1EPfE {};
+# 116 "/usr/include/c++/13/type_traits" 3
+typedef _ZNSt9enable_ifILb1EPfE4typeE _ZSt13__enable_if_tILb1EPfE;
+# 1612 "/usr/include/c++/13/type_traits" 3
+typedef const _ZNSt6vectorIfSaIfEE10value_typeE _ZNSt16remove_referenceIRKfE4typeE;
+# 1611 "/usr/include/c++/13/type_traits" 3
+struct _ZSt16remove_referenceIRKfE {};
+# 596 "/usr/include/c++/13/bits/cpp_type_traits.h" 3
+struct _ZSt18__is_move_iteratorIPKiE {};
+# 474 "/usr/include/c++/13/bits/cpp_type_traits.h" 3
+struct _ZSt35__is_nonvolatile_trivially_copyableIiE {};
+# 348 "/usr/include/c++/13/bits/stl_algobase.h" 3
+struct _ZSt11__copy_moveILb0ELb1ESt26random_access_iterator_tagE {};
+# 1612 "/usr/include/c++/13/type_traits" 3
+typedef _ZNSt6vectorI7RunStatSaIS0_EE10value_typeE _ZNSt16remove_referenceIR7RunStatE4typeE;
+# 1611 "/usr/include/c++/13/type_traits" 3
+struct _ZSt16remove_referenceIR7RunStatE {};
+# 1612 "/usr/include/c++/13/type_traits" 3
+typedef _ZNSt16remove_referenceIR7RunStatE4typeE _ZNSt16remove_referenceI7RunStatE4typeE;
+# 1611 "/usr/include/c++/13/type_traits" 3
+struct _ZSt16remove_referenceI7RunStatE {};
+# 112 "/usr/include/c++/13/type_traits" 3
+typedef struct RunStat *_ZNSt9enable_ifILb1EP7RunStatE4typeE;
+# 106 "/usr/include/c++/13/type_traits" 3
+struct _ZSt9enable_ifILb1EP7RunStatE {};
+# 116 "/usr/include/c++/13/type_traits" 3
+typedef _ZNSt9enable_ifILb1EP7RunStatE4typeE _ZSt13__enable_if_tILb1EP7RunStatE;
+# 113 "/usr/include/c++/13/bits/char_traits.h" 3
+typedef _ZNSt11char_traitsIcE9char_typeE _ZN9__gnu_cxx11char_traitsIcE9char_typeE;
+# 111 "/usr/include/c++/13/bits/char_traits.h" 3
+struct _ZN9__gnu_cxx11char_traitsIcEE {};
+# 125 "/usr/include/c++/13/ext/alloc_traits.h" 3
+struct _ZN9__gnu_cxx14__alloc_traitsISaIcEcE6rebindIcEE {};
+# 45 "/usr/include/c++/13/ext/alloc_traits.h" 3
+struct _ZN9__gnu_cxx14__alloc_traitsISaIcEcEE {};
+# 125 "/usr/include/c++/13/ext/alloc_traits.h" 3
+struct _ZN9__gnu_cxx14__alloc_traitsISaIfEfE6rebindIfEE {};
+# 45 "/usr/include/c++/13/ext/alloc_traits.h" 3
+struct _ZN9__gnu_cxx14__alloc_traitsISaIfEfEE {};
+# 1065 "/usr/include/c++/13/bits/stl_iterator.h" 3
+typedef _ZNSt15iterator_traitsIPKfE9referenceE _ZN9__gnu_cxx17__normal_iteratorIPKfSt6vectorIfSaIfEEE9referenceE;
+# 1047 "/usr/include/c++/13/bits/stl_iterator.h" 3
+struct _ZN9__gnu_cxx17__normal_iteratorIPKfSt6vectorIfSaIfEEEE {
+# 1050 "/usr/include/c++/13/bits/stl_iterator.h" 3
+_ZNSt6vectorIfSaIfEE13const_pointerE _M_current;};
+# 125 "/usr/include/c++/13/ext/alloc_traits.h" 3
+struct _ZN9__gnu_cxx14__alloc_traitsISaIiEiE6rebindIiEE {};
+# 45 "/usr/include/c++/13/ext/alloc_traits.h" 3
+struct _ZN9__gnu_cxx14__alloc_traitsISaIiEiEE {};
+# 125 "/usr/include/c++/13/ext/alloc_traits.h" 3
+struct _ZN9__gnu_cxx14__alloc_traitsISaI7RunStatES1_E6rebindIS1_EE {};
+# 45 "/usr/include/c++/13/ext/alloc_traits.h" 3
+struct _ZN9__gnu_cxx14__alloc_traitsISaI7RunStatES1_EE {};
+# 1065 "/usr/include/c++/13/bits/stl_iterator.h" 3
+typedef _ZNSt15iterator_traitsIPKiE9referenceE _ZN9__gnu_cxx17__normal_iteratorIPKiSt6vectorIiSaIiEEE9referenceE;
+# 1047 "/usr/include/c++/13/bits/stl_iterator.h" 3
+struct _ZN9__gnu_cxx17__normal_iteratorIPKiSt6vectorIiSaIiEEEE {
+# 1050 "/usr/include/c++/13/bits/stl_iterator.h" 3
+_ZNSt6vectorIiSaIiEE13const_pointerE _M_current;};
+# 1064 "/usr/include/c++/13/bits/stl_iterator.h" 3
+typedef _ZNSt15iterator_traitsIP7RunStatE15difference_typeE _ZN9__gnu_cxx17__normal_iteratorIP7RunStatSt6vectorIS1_SaIS1_EEE15difference_typeE;
+# 1065 "/usr/include/c++/13/bits/stl_iterator.h" 3
+typedef _ZNSt15iterator_traitsIP7RunStatE9referenceE _ZN9__gnu_cxx17__normal_iteratorIP7RunStatSt6vectorIS1_SaIS1_EEE9referenceE;
+# 1047 "/usr/include/c++/13/bits/stl_iterator.h" 3
+struct _ZN9__gnu_cxx17__normal_iteratorIP7RunStatSt6vectorIS1_SaIS1_EEEE {
+# 1050 "/usr/include/c++/13/bits/stl_iterator.h" 3
+_ZNSt6vectorI7RunStatSaIS0_EE7pointerE _M_current;};
+# 1047 "/usr/include/c++/13/bits/stl_iterator.h" 3
+struct _ZN9__gnu_cxx17__normal_iteratorIPKcNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEEE {
+# 1050 "/usr/include/c++/13/bits/stl_iterator.h" 3
+_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE13const_pointerE _M_current;};
+# 1064 "/usr/include/c++/13/bits/stl_iterator.h" 3
+typedef _ZNSt15iterator_traitsIPfE15difference_typeE _ZN9__gnu_cxx17__normal_iteratorIPfSt6vectorIfSaIfEEE15difference_typeE;
+# 1047 "/usr/include/c++/13/bits/stl_iterator.h" 3
+struct _ZN9__gnu_cxx17__normal_iteratorIPfSt6vectorIfSaIfEEEE {
+# 1050 "/usr/include/c++/13/bits/stl_iterator.h" 3
+_ZNSt6vectorIfSaIfEE7pointerE _M_current;};
+# 267 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/crt/common_functions.h"
+___device__(extern  __no_sc__) __attribute__((__externally_visible__)) __attribute__((visibility("default"))) void *_Znwm(_ZSt6size_t);
+# 130 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/crt/common_functions.h"
+___device__(extern  __no_sc__) __attribute__((__externally_visible__)) __attribute__((__nothrow__)) __attribute__((visibility("default"))) void _ZdlPvm(void *, _ZSt6size_t);
+# 277 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/crt/common_functions.h"
+___device__(extern  __no_sc__) __attribute__((__alloc_size__(1))) __attribute__((__externally_visible__)) __attribute__((__malloc__)) __attribute__((visibility("default"))) void *_ZnwmSt11align_val_t(_ZSt6size_t, unsigned long);
+# 281 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/crt/common_functions.h"
+___device__(extern  __no_sc__) __attribute__((__externally_visible__)) __attribute__((__nothrow__)) __attribute__((visibility("default"))) void _ZdlPvmSt11align_val_t(void *, _ZSt6size_t, unsigned long);
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+# 250 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+___device__(extern  __no_sc__) const char *__cudaCDP2GetErrorString(enum cudaError);
+# 259 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+___device__(extern  __no_sc__) enum cudaError __cudaCDP2EventRecord(struct CUevent_st *, struct CUstream_st *);
+# 263 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+___device__(extern  __no_sc__) enum cudaError __cudaCDP2EventDestroy(struct CUevent_st *);
+# 265 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+___device__(extern  __no_sc__) enum cudaError __cudaCDP2Free(void *);
+# 266 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+___device__(extern  __no_sc__) enum cudaError __cudaCDP2Malloc(void **, size_t);
+# 525 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+___device__(static  __no_sc__) __inline__ const char *_ZN44_INTERNAL_1eef773f_13_warp_bench_cu_51737f3e18cudaGetErrorStringE9cudaError(enum cudaError);
+# 570 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+___device__(static  __no_sc__) __inline__ enum cudaError _ZN44_INTERNAL_1eef773f_13_warp_bench_cu_51737f3e15cudaEventRecordEP10CUevent_stP11CUstream_st(struct CUevent_st *, struct CUstream_st *);
+# 590 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+___device__(static  __no_sc__) __inline__ enum cudaError _ZN44_INTERNAL_1eef773f_13_warp_bench_cu_51737f3e16cudaEventDestroyEP10CUevent_st(struct CUevent_st *);
+# 600 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+___device__(static  __no_sc__) __inline__ enum cudaError _ZN44_INTERNAL_1eef773f_13_warp_bench_cu_51737f3e8cudaFreeEPv(void *);
+# 605 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+___device__(static  __no_sc__) __inline__ enum cudaError _ZN44_INTERNAL_1eef773f_13_warp_bench_cu_51737f3e10cudaMallocEPPvm(void **, size_t);
+# 174 "/usr/include/c++/13/new" 3
+___device__(extern  __no_sc__) __inline__ __attribute__((__nothrow__)) __attribute__((visibility("default"))) void *_ZnwmPv(_ZSt6size_t, void *);
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+# 565 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/crt/math_functions.h"
+ __device_builtin__ ___device__(extern  __no_sc__) __attribute__((__nothrow__)) double sqrt(double);
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+# 2912 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/crt/device_functions.h"
+___device__(extern  __no_sc__) unsigned __cudaPushCallConfiguration(struct dim3, struct dim3, size_t, struct CUstream_st *);
+# 762 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_runtime.h"
+___device__(static  __no_sc__) __inline__ enum cudaError _ZN44_INTERNAL_1eef773f_13_warp_bench_cu_51737f3e10cudaMallocIfEE9cudaErrorPPT_m(float **, size_t);
+# 23 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+__global__ __var_used__ extern void _Z18warp_stress_kernelPfii(float *, int, int);
+# 431 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/vector_types.h"
+___device__(extern  __no_sc__) __inline__ void _ZN4dim3C1Ejjj(struct dim3 *const, unsigned, unsigned, unsigned);
+___device__(extern  __no_sc__) __inline__ void _ZN4dim3C2Ejjj(struct dim3 *const, unsigned, unsigned, unsigned);
+# 60 "/usr/include/c++/13/initializer_list" 3
+___device__(extern  __no_sc__) __inline__ __attribute__((visibility("default"))) void _ZNSt16initializer_listIiEC1EPKim(struct _ZSt16initializer_listIiE *const, _ZNSt16initializer_listIiE14const_iteratorE, _ZNSt16initializer_listIiE9size_typeE);
+___device__(extern  __no_sc__) __inline__ __attribute__((visibility("default"))) void _ZNSt16initializer_listIiEC2EPKim(struct _ZSt16initializer_listIiE *const, _ZNSt16initializer_listIiE14const_iteratorE, _ZNSt16initializer_listIiE9size_typeE);
+# 69 "/usr/include/c++/13/initializer_list" 3
+___device__(extern  __no_sc__) __inline__ __attribute__((__nothrow__)) __attribute__((visibility("default"))) _ZNSt16initializer_listIiE9size_typeE _ZNKSt16initializer_listIiE4sizeEv(const struct _ZSt16initializer_listIiE *const);
+# 73 "/usr/include/c++/13/initializer_list" 3
+___device__(extern  __no_sc__) __inline__ __attribute__((__nothrow__)) __attribute__((visibility("default"))) _ZNSt16initializer_listIiE14const_iteratorE _ZNKSt16initializer_listIiE5beginEv(const struct _ZSt16initializer_listIiE *const);
+# 77 "/usr/include/c++/13/initializer_list" 3
+___device__(extern  __no_sc__) __inline__ __attribute__((__nothrow__)) __attribute__((visibility("default"))) _ZNSt16initializer_listIiE14const_iteratorE _ZNKSt16initializer_listIiE3endEv(const struct _ZSt16initializer_listIiE *const);
+# 70 "/usr/include/c++/13/bits/move.h" 3
+___device__(extern  __no_sc__) __inline__ __attribute__((__nothrow__)) const _ZNSt6vectorIfSaIfEE10value_typeE *_ZSt7forwardIRKfEOT_RNSt16remove_referenceIS2_E4typeE(_ZNSt16remove_referenceIRKfE4typeE *);
+# 97 "/usr/include/c++/13/bits/move.h" 3
+___device__(extern  __no_sc__) __inline__ __attribute__((__nothrow__)) _ZNSt16remove_referenceIR7RunStatE4typeE *_ZSt4moveIR7RunStatEONSt16remove_referenceIT_E4typeEOS3_(_ZNSt6vectorI7RunStatSaIS0_EE10value_typeE *);
+# 70 "/usr/include/c++/13/bits/move.h" 3
+___device__(extern  __no_sc__) __inline__ __attribute__((__nothrow__)) _ZNSt16remove_referenceIR7RunStatE4typeE *_ZSt7forwardI7RunStatEOT_RNSt16remove_referenceIS1_E4typeE(_ZNSt16remove_referenceI7RunStatE4typeE *);
+extern  __device__  __var_used__ const long _ZTVSt9basic_iosIcSt11char_traitsIcEE[4];
+extern  __device__  __var_used__ const long *const _ZTTSo[];
+extern  __device__  __var_used__ const long _ZTVSt15basic_streambufIcSt11char_traitsIcEE[16];
+extern  __device__  __var_used__ const long _ZTVSt13basic_filebufIcSt11char_traitsIcEE[16];
+extern  __device__  __var_used__ const long *const _ZTTSt14basic_ofstreamIcSt11char_traitsIcEE[];
+#include "common_functions.h"
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+# 525 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+___device__(static  __no_sc__) __inline__ const char *_ZN44_INTERNAL_1eef773f_13_warp_bench_cu_51737f3e18cudaGetErrorStringE9cudaError(
+# 525 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+enum cudaError error){
+# 526 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+{
+# 527 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+return __cudaCDP2GetErrorString(error);
+# 528 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+}}
+# 570 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+___device__(static  __no_sc__) __inline__ enum cudaError _ZN44_INTERNAL_1eef773f_13_warp_bench_cu_51737f3e15cudaEventRecordEP10CUevent_stP11CUstream_st(
+# 570 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+struct CUevent_st *event, 
+# 570 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+struct CUstream_st *stream){
+# 571 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+{  struct CUevent_st *__T0;
+ struct CUstream_st *__T1;
+# 572 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+return ((__T0 = event) , (void)(__T1 = stream)) , (__cudaCDP2EventRecord(__T0, __T1));
+# 573 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+}}
+# 590 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+___device__(static  __no_sc__) __inline__ enum cudaError _ZN44_INTERNAL_1eef773f_13_warp_bench_cu_51737f3e16cudaEventDestroyEP10CUevent_st(
+# 590 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+struct CUevent_st *event){
+# 591 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+{
+# 592 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+return __cudaCDP2EventDestroy(event);
+# 593 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+}}
+# 600 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+___device__(static  __no_sc__) __inline__ enum cudaError _ZN44_INTERNAL_1eef773f_13_warp_bench_cu_51737f3e8cudaFreeEPv(
+# 600 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+void *devPtr){
+# 601 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+{
+# 602 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+return __cudaCDP2Free(devPtr);
+# 603 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+}}
+# 605 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+___device__(static  __no_sc__) __inline__ enum cudaError _ZN44_INTERNAL_1eef773f_13_warp_bench_cu_51737f3e10cudaMallocEPPvm(
+# 605 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+void **devPtr, 
+# 605 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+size_t size){
+# 606 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+{  void **__T2;
+ size_t __T3;
+# 607 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+return ((__T2 = devPtr) , (void)(__T3 = size)) , (__cudaCDP2Malloc(__T2, __T3));
+# 608 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_device_runtime_api.h"
+}}
+# 174 "/usr/include/c++/13/new" 3
+ __attribute__((nv_linkonce_odr)) ___device__( __no_sc__) __inline__ __attribute__((__nothrow__)) __attribute__((visibility("default"))) void *_ZnwmPv( _ZSt6size_t __T4, 
+# 174 "/usr/include/c++/13/new" 3
+void *__p){
+# 175 "/usr/include/c++/13/new" 3
+{
+# 175 "/usr/include/c++/13/new" 3
+return __p;
+# 175 "/usr/include/c++/13/new" 3
+}}
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+#if !defined(__CUDABE__)
+#endif
+# 762 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_runtime.h"
+___device__(static  __no_sc__) __inline__ enum cudaError _ZN44_INTERNAL_1eef773f_13_warp_bench_cu_51737f3e10cudaMallocIfEE9cudaErrorPPT_m(
+# 763 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_runtime.h"
+float **devPtr, 
+# 764 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_runtime.h"
+size_t size){
+# 766 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_runtime.h"
+{  void **__T5;
+ size_t __T6;
+# 767 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_runtime.h"
+return ((__T5 = ((void **)((void *)devPtr))) , (void)(__T6 = size)) , (_ZN44_INTERNAL_1eef773f_13_warp_bench_cu_51737f3e10cudaMallocEPPvm(__T5, __T6));
+# 768 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/cuda_runtime.h"
+}}
+# 23 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+__global__ __var_used__ void _Z18warp_stress_kernelPfii(
+# 23 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+float *out, 
+# 23 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+int n, 
+# 23 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+int iters){
+# 23 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+{
+# 24 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+ int __cuda_local_var_78980_9_non_const_idx;
+# 27 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+ float __cuda_local_var_78983_11_non_const_x;
+# 24 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+__cuda_local_var_78980_9_non_const_idx = ((int)(((blockIdx.x) * (blockDim.x)) + (threadIdx.x)));
+# 25 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+if (__cuda_local_var_78980_9_non_const_idx >= n) {
+# 25 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+return; }
+# 27 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+__cuda_local_var_78983_11_non_const_x = (((float)__cuda_local_var_78980_9_non_const_idx) * (1.0E-4F));
+# 29 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+{
+# 29 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+ int i;
+# 29 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+i = 0;
+# 29 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+
+#pragma unroll 4
+for (; i < iters; ++i)
+# 29 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+{
+# 30 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+__cuda_local_var_78983_11_non_const_x = ((__cuda_local_var_78983_11_non_const_x * (1.000001F)) + (1.0E-5F));
+# 31 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+} }
+# 32 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+(out[__cuda_local_var_78980_9_non_const_idx]) = __cuda_local_var_78983_11_non_const_x; 
+# 33 "/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/warp_schedule/src/warp_bench.cu"
+}}
+__asm__(".align 2");
+# 431 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/vector_types.h"
+ __attribute__((nv_linkonce_odr)) ___device__( __no_sc__) __inline__ void _ZN4dim3C1Ejjj( struct dim3 *const this, 
+# 431 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/vector_types.h"
+unsigned vx, 
+# 431 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/vector_types.h"
+unsigned vy, 
+# 431 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/vector_types.h"
+unsigned vz){
+# 431 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/vector_types.h"
+{
+# 431 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/vector_types.h"
+(this->x) = vx;
+# 431 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/vector_types.h"
+(this->y) = vy;
+# 431 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/vector_types.h"
+(this->z) = vz; 
+# 431 "/usr/local/cuda-12.6/bin/../targets/x86_64-linux/include/vector_types.h"
+}}
+__asm__(".align 2");
+ __attribute__((nv_linkonce_odr)) ___device__( __no_sc__) __inline__ void _ZN4dim3C2Ejjj( struct dim3 *const this,  unsigned __T7,  unsigned __T8,  unsigned __T9){ {  _ZN4dim3C1Ejjj(this, __T7, __T8, __T9);  }}
+__asm__(".align 2");
+# 60 "/usr/include/c++/13/initializer_list" 3
+ __attribute__((nv_linkonce_odr)) ___device__( __no_sc__) __inline__ __attribute__((visibility("default"))) void _ZNSt16initializer_listIiEC1EPKim( struct _ZSt16initializer_listIiE *const this, 
+# 60 "/usr/include/c++/13/initializer_list" 3
+_ZNSt16initializer_listIiE14const_iteratorE __a, 
+# 60 "/usr/include/c++/13/initializer_list" 3
+_ZNSt16initializer_listIiE9size_typeE __l){
+# 61 "/usr/include/c++/13/initializer_list" 3
+{
+# 61 "/usr/include/c++/13/initializer_list" 3
+(this->_M_array) = __a;
+# 61 "/usr/include/c++/13/initializer_list" 3
+(this->_M_len) = __l; 
+# 61 "/usr/include/c++/13/initializer_list" 3
+}}
+__asm__(".align 2");
+ __attribute__((nv_linkonce_odr)) ___device__( __no_sc__) __inline__ __attribute__((visibility("default"))) void _ZNSt16initializer_listIiEC2EPKim( struct _ZSt16initializer_listIiE *const this,  _ZNSt16initializer_listIiE14const_iteratorE __T10,  _ZNSt16initializer_listIiE9size_typeE __T11){ {  _ZNSt16initializer_listIiEC1EPKim(this, __T10, __T11);  }}
+__asm__(".align 2");
+# 69 "/usr/include/c++/13/initializer_list" 3
+ __attribute__((nv_linkonce_odr)) ___device__( __no_sc__) __inline__ __attribute__((__nothrow__)) __attribute__((visibility("default"))) _ZNSt16initializer_listIiE9size_typeE _ZNKSt16initializer_listIiE4sizeEv( const struct _ZSt16initializer_listIiE *const this){
+# 69 "/usr/include/c++/13/initializer_list" 3
+{
+# 69 "/usr/include/c++/13/initializer_list" 3
+return this->_M_len;
+# 69 "/usr/include/c++/13/initializer_list" 3
+}}
+__asm__(".align 2");
+# 73 "/usr/include/c++/13/initializer_list" 3
+ __attribute__((nv_linkonce_odr)) ___device__( __no_sc__) __inline__ __attribute__((__nothrow__)) __attribute__((visibility("default"))) _ZNSt16initializer_listIiE14const_iteratorE _ZNKSt16initializer_listIiE5beginEv( const struct _ZSt16initializer_listIiE *const this){
+# 73 "/usr/include/c++/13/initializer_list" 3
+{
+# 73 "/usr/include/c++/13/initializer_list" 3
+return this->_M_array;
+# 73 "/usr/include/c++/13/initializer_list" 3
+}}
+__asm__(".align 2");
+# 77 "/usr/include/c++/13/initializer_list" 3
+ __attribute__((nv_linkonce_odr)) ___device__( __no_sc__) __inline__ __attribute__((__nothrow__)) __attribute__((visibility("default"))) _ZNSt16initializer_listIiE14const_iteratorE _ZNKSt16initializer_listIiE3endEv( const struct _ZSt16initializer_listIiE *const this){
+# 77 "/usr/include/c++/13/initializer_list" 3
+{
+# 77 "/usr/include/c++/13/initializer_list" 3
+return (_ZNKSt16initializer_listIiE5beginEv(this)) + (_ZNKSt16initializer_listIiE4sizeEv(this));
+# 77 "/usr/include/c++/13/initializer_list" 3
+}}
+# 70 "/usr/include/c++/13/bits/move.h" 3
+ __attribute__((nv_linkonce_odr)) ___device__( __no_sc__) __inline__ __attribute__((__nothrow__)) const _ZNSt6vectorIfSaIfEE10value_typeE *_ZSt7forwardIRKfEOT_RNSt16remove_referenceIS2_E4typeE(
+# 70 "/usr/include/c++/13/bits/move.h" 3
+_ZNSt16remove_referenceIRKfE4typeE *__t){
+# 71 "/usr/include/c++/13/bits/move.h" 3
+{
+# 71 "/usr/include/c++/13/bits/move.h" 3
+return (const _ZNSt6vectorIfSaIfEE10value_typeE *)__t;
+# 71 "/usr/include/c++/13/bits/move.h" 3
+}}
+# 97 "/usr/include/c++/13/bits/move.h" 3
+ __attribute__((nv_linkonce_odr)) ___device__( __no_sc__) __inline__ __attribute__((__nothrow__)) _ZNSt16remove_referenceIR7RunStatE4typeE *_ZSt4moveIR7RunStatEONSt16remove_referenceIT_E4typeEOS3_(
+# 97 "/usr/include/c++/13/bits/move.h" 3
+_ZNSt6vectorI7RunStatSaIS0_EE10value_typeE *__t){
+# 98 "/usr/include/c++/13/bits/move.h" 3
+{
+# 98 "/usr/include/c++/13/bits/move.h" 3
+return (_ZNSt16remove_referenceIR7RunStatE4typeE *)__t;
+# 98 "/usr/include/c++/13/bits/move.h" 3
+}}
+# 70 "/usr/include/c++/13/bits/move.h" 3
+ __attribute__((nv_linkonce_odr)) ___device__( __no_sc__) __inline__ __attribute__((__nothrow__)) _ZNSt16remove_referenceIR7RunStatE4typeE *_ZSt7forwardI7RunStatEOT_RNSt16remove_referenceIS1_E4typeE(
+# 70 "/usr/include/c++/13/bits/move.h" 3
+_ZNSt16remove_referenceI7RunStatE4typeE *__t){
+# 71 "/usr/include/c++/13/bits/move.h" 3
+{
+# 71 "/usr/include/c++/13/bits/move.h" 3
+return (_ZNSt16remove_referenceIR7RunStatE4typeE *)__t;
+# 71 "/usr/include/c++/13/bits/move.h" 3
+}}

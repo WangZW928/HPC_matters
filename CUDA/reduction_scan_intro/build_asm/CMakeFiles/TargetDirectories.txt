@@ -1,0 +1,3 @@
+/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/reduction_scan_intro/build_asm/CMakeFiles/reduce_scan_bench.dir
+/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/reduction_scan_intro/build_asm/CMakeFiles/edit_cache.dir
+/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/reduction_scan_intro/build_asm/CMakeFiles/rebuild_cache.dir
