@@ -1,0 +1,58 @@
+0000000000000000 V DW.ref.__gxx_personality_v0
+                 U _Unwind_Resume
+                 U vectorAdd(int*, int*, unsigned long)
+0000000000000000 W std::unique_ptr<int [], std::default_delete<int []> >::get() const
+0000000000000000 W std::unique_ptr<int [], std::default_delete<int []> >::operator[](unsigned long) const
+0000000000000000 W std::enable_if<std::is_convertible<int (*) [], int (*) []>::value, void>::type std::default_delete<int []>::operator()<int>(int*) const
+0000000000000000 W std::__uniq_ptr_impl<int, std::default_delete<int []> >::_M_ptr() const
+0000000000000000 W std::_Head_base<0ul, int*, false>::_M_head(std::_Head_base<0ul, int*, false> const&)
+0000000000000000 W std::_Head_base<0ul, int*, false>::_M_head(std::_Head_base<0ul, int*, false>&)
+0000000000000000 W std::_Head_base<0ul, int*, false>::_Head_base()
+0000000000000000 W std::_Head_base<0ul, int*, false>::_Head_base()
+0000000000000000 n std::_Head_base<0ul, int*, false>::_Head_base()
+0000000000000000 W std::_Head_base<1ul, std::default_delete<int []>, true>::_M_head(std::_Head_base<1ul, std::default_delete<int []>, true>&)
+0000000000000000 W std::_Head_base<1ul, std::default_delete<int []>, true>::_Head_base()
+0000000000000000 W std::_Head_base<1ul, std::default_delete<int []>, true>::_Head_base()
+0000000000000000 n std::_Head_base<1ul, std::default_delete<int []>, true>::_Head_base()
+0000000000000000 W std::unique_ptr<int [], std::default_delete<int []> >::get_deleter()
+0000000000000000 W std::unique_ptr<int [], std::default_delete<int []> >::unique_ptr<int*, std::default_delete<int []>, void, bool>(int*)
+0000000000000000 W std::unique_ptr<int [], std::default_delete<int []> >::unique_ptr<int*, std::default_delete<int []>, void, bool>(int*)
+0000000000000000 n std::unique_ptr<int [], std::default_delete<int []> >::unique_ptr<int*, std::default_delete<int []>, void, bool>(int*)
+0000000000000000 W std::unique_ptr<int [], std::default_delete<int []> >::~unique_ptr()
+0000000000000000 W std::unique_ptr<int [], std::default_delete<int []> >::~unique_ptr()
+0000000000000000 n std::unique_ptr<int [], std::default_delete<int []> >::~unique_ptr()
+0000000000000000 W std::_Tuple_impl<0ul, int*, std::default_delete<int []> >::_M_head(std::_Tuple_impl<0ul, int*, std::default_delete<int []> > const&)
+0000000000000000 W std::_Tuple_impl<0ul, int*, std::default_delete<int []> >::_M_head(std::_Tuple_impl<0ul, int*, std::default_delete<int []> >&)
+0000000000000000 W std::_Tuple_impl<0ul, int*, std::default_delete<int []> >::_Tuple_impl()
+0000000000000000 W std::_Tuple_impl<0ul, int*, std::default_delete<int []> >::_Tuple_impl()
+0000000000000000 n std::_Tuple_impl<0ul, int*, std::default_delete<int []> >::_Tuple_impl()
+0000000000000000 W std::_Tuple_impl<1ul, std::default_delete<int []> >::_M_head(std::_Tuple_impl<1ul, std::default_delete<int []> >&)
+0000000000000000 W std::_Tuple_impl<1ul, std::default_delete<int []> >::_Tuple_impl()
+0000000000000000 W std::_Tuple_impl<1ul, std::default_delete<int []> >::_Tuple_impl()
+0000000000000000 n std::_Tuple_impl<1ul, std::default_delete<int []> >::_Tuple_impl()
+0000000000000000 W std::__uniq_ptr_data<int, std::default_delete<int []>, true, true>::__uniq_ptr_impl(int*)
+0000000000000000 W std::__uniq_ptr_data<int, std::default_delete<int []>, true, true>::__uniq_ptr_impl(int*)
+0000000000000000 n std::__uniq_ptr_data<int, std::default_delete<int []>, true, true>::__uniq_ptr_impl(int*)
+0000000000000000 W std::__uniq_ptr_impl<int, std::default_delete<int []> >::_M_deleter()
+0000000000000000 W std::__uniq_ptr_impl<int, std::default_delete<int []> >::_M_ptr()
+0000000000000000 W std::__uniq_ptr_impl<int, std::default_delete<int []> >::__uniq_ptr_impl(int*)
+0000000000000000 W std::__uniq_ptr_impl<int, std::default_delete<int []> >::__uniq_ptr_impl(int*)
+0000000000000000 n std::__uniq_ptr_impl<int, std::default_delete<int []> >::__uniq_ptr_impl(int*)
+0000000000000000 W std::tuple<int*, std::default_delete<int []> >::tuple<true, true>()
+0000000000000000 W std::tuple<int*, std::default_delete<int []> >::tuple<true, true>()
+0000000000000000 n std::tuple<int*, std::default_delete<int []> >::tuple<true, true>()
+0000000000000000 W std::__detail::_MakeUniq<int []>::__array std::make_unique<int []>(unsigned long)
+0000000000000000 W int* const& std::__get_helper<0ul, int*, std::default_delete<int []> >(std::_Tuple_impl<0ul, int*, std::default_delete<int []> > const&)
+0000000000000000 W int*& std::__get_helper<0ul, int*, std::default_delete<int []> >(std::_Tuple_impl<0ul, int*, std::default_delete<int []> >&)
+0000000000000000 W std::default_delete<int []>& std::__get_helper<1ul, std::default_delete<int []>>(std::_Tuple_impl<1ul, std::default_delete<int []>>&)
+0000000000000000 W std::__is_constant_evaluated()
+0000000000000000 W std::tuple_element<0ul, std::tuple<int*, std::default_delete<int []> > >::type const& std::get<0ul, int*, std::default_delete<int []> >(std::tuple<int*, std::default_delete<int []> > const&)
+0000000000000000 W std::tuple_element<0ul, std::tuple<int*, std::default_delete<int []> > >::type& std::get<0ul, int*, std::default_delete<int []> >(std::tuple<int*, std::default_delete<int []> >&)
+0000000000000000 W std::tuple_element<1ul, std::tuple<int*, std::default_delete<int []> > >::type& std::get<1ul, int*, std::default_delete<int []> >(std::tuple<int*, std::default_delete<int []> >&)
+                 U operator delete[](void*)
+                 U operator new[](unsigned long)
+                 U __cxa_throw_bad_array_new_length
+                 U __gxx_personality_v0
+                 U __stack_chk_fail
+0000000000000000 T main
+                 U printf
