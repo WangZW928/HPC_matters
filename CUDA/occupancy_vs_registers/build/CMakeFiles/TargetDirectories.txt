@@ -1,0 +1,3 @@
+/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/occupancy_vs_registers/build/CMakeFiles/occupancy_bench.dir
+/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/occupancy_vs_registers/build/CMakeFiles/edit_cache.dir
+/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/occupancy_vs_registers/build/CMakeFiles/rebuild_cache.dir
