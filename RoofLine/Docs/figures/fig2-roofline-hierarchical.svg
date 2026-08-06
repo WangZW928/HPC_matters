@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 610" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+    </marker>
+    <style>
+      .ax { stroke:#64748b; stroke-width:1.5; fill:none; }
+      .grid { stroke:#cbd5e1; stroke-width:1; stroke-dasharray:4 4; }
+      .l1 { stroke:#0f766e; stroke-width:3; fill:none; }
+      .l2 { stroke:#0369a1; stroke-width:2.6; fill:none; }
+      .l3 { stroke:#7c3aed; stroke-width:2.2; fill:none; }
+      .dram { stroke:#b45309; stroke-width:1.8; fill:none; }
+      .ceil { stroke:#4338ca; stroke-width:3; fill:none; }
+      .lbl { font-size:13px; fill:#1e293b; }
+      .lbl-muted { font-size:12px; fill:#64748b; }
+      .lbl-title { font-size:14px; font-weight:700; fill:#0f172a; }
+      .tick { font-size:11px; fill:#475569; }
+      .note { font-size:12px; fill:#334155; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="860" height="610" fill="#ffffff"/>
+
+  <!-- plot area: x 90..770, y 40..510 -->
+  <line class="grid" x1="90" y1="510" x2="770" y2="510"/>
+  <line class="grid" x1="90" y1="300" x2="770" y2="300"/>
+  <line class="grid" x1="90" y1="100" x2="770" y2="100"/>
+  <line class="grid" x1="313" y1="42" x2="313" y2="510"/>
+  <line class="grid" x1="537" y1="42" x2="537" y2="510"/>
+
+  <line class="ax" x1="90" y1="510" x2="770" y2="510" marker-end="url(#arrow)"/>
+  <line class="ax" x1="90" y1="510" x2="90" y2="30" marker-end="url(#arrow)"/>
+
+  <text class="tick" x="90" y="528" text-anchor="middle">0.1</text>
+  <text class="tick" x="313" y="528" text-anchor="middle">1</text>
+  <text class="tick" x="537" y="528" text-anchor="middle">10</text>
+  <text class="tick" x="770" y="528" text-anchor="middle">100</text>
+  <text class="tick" x="80" y="514" text-anchor="end">100</text>
+  <text class="tick" x="80" y="304" text-anchor="end">1000</text>
+  <text class="tick" x="80" y="104" text-anchor="end">10000</text>
+
+  <text class="lbl" x="430" y="562" text-anchor="middle">算术强度 I（FLOP/Byte，对数坐标）</text>
+  <text class="lbl" x="26" y="270" text-anchor="middle" transform="rotate(-90 26 270)">性能 P（GFLOPS，对数坐标）</text>
+
+  <!-- compute ceiling (P_peak = 19500) -->
+  <line class="ceil" x1="311" y1="42" x2="770" y2="42"/>
+  <text class="lbl-title" x="530" y="30">算力屋顶 P_peak（不同精度各一条）</text>
+
+  <!-- memory lines, ridge = P_peak / B -->
+  <!-- DRAM: B=1555, ridge I=12.54 -> (558,42); at I=0.1 -> (90,462) -->
+  <line class="dram" x1="90" y1="462" x2="558" y2="42"/>
+  <!-- L3: B=4000, ridge I=4.875 -> (467,42); at I=0.1 -> (90,380) -->
+  <line class="l3" x1="90" y1="380" x2="467" y2="42"/>
+  <!-- L2: B=8000, ridge I=2.44 -> (400,42); at I=0.1 -> (90,319) -->
+  <line class="l2" x1="90" y1="319" x2="400" y2="42"/>
+  <!-- L1: B=20000, ridge I=0.975 -> (311,42); at I=0.1 -> (90,240) -->
+  <line class="l1" x1="90" y1="240" x2="311" y2="42"/>
+
+  <!-- labels -->
+  <text class="lbl" x="196" y="452" transform="rotate(-24 196 452)">DRAM / HBM 带宽线</text>
+  <text class="lbl" x="150" y="350" transform="rotate(-32 150 350)">L3 / LLC 带宽线</text>
+  <text class="lbl" x="120" y="282" transform="rotate(-39 120 282)">L2 带宽线</text>
+  <text class="lbl" x="280" y="176" transform="rotate(-58 280 176)">L1 带宽线</text>
+
+  <!-- ridge points -->
+  <circle cx="558" cy="42" r="5" fill="#dc2626"/>
+  <circle cx="467" cy="42" r="5" fill="#dc2626"/>
+  <circle cx="400" cy="42" r="5" fill="#dc2626"/>
+  <circle cx="311" cy="42" r="5" fill="#dc2626"/>
+  <line x1="558" y1="42" x2="558" y2="510" stroke="#dc2626" stroke-width="1.2" stroke-dasharray="5 4"/>
+
+  <text class="lbl-muted" x="585" y="90">DRAM 拐点（I_ridge ≈ 12.5）</text>
+  <text class="lbl" x="640" y="132">算力受限区</text>
+  <text class="lbl-muted" x="640" y="150">（Compute-Bound）</text>
+  <text class="lbl" x="120" y="500">内存受限区（Memory-Bound）</text>
+
+  <text class="note" x="90" y="574">图 2：多层级 Roofline —— 同一 Kernel 相对不同存储层级呈现不同的瓶颈：</text>
+  <text class="note" x="90" y="592">如相对 DRAM 已算力受限、相对 L1 却内存受限，说明瓶颈在 L1 读取带宽，应做寄存器级优化。</text>
+
+  <text class="lbl-title" x="90" y="24">多层级 Roofline 模型（Hierarchical Roofline）</text>
+</svg>

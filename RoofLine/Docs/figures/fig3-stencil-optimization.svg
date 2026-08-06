@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 620" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+    </marker>
+    <style>
+      .ax { stroke:#64748b; stroke-width:1.5; fill:none; }
+      .grid { stroke:#cbd5e1; stroke-width:1; stroke-dasharray:4 4; }
+      .diag { stroke:#0f766e; stroke-width:3; fill:none; }
+      .ceil { stroke:#4338ca; stroke-width:3; fill:none; }
+      .lbl { font-size:13px; fill:#1e293b; }
+      .lbl-muted { font-size:12px; fill:#64748b; }
+      .lbl-title { font-size:14px; font-weight:700; fill:#0f172a; }
+      .tick { font-size:11px; fill:#475569; }
+      .note { font-size:12px; fill:#334155; }
+      .dot { stroke:#ffffff; stroke-width:1.5; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="960" height="620" fill="#ffffff"/>
+
+  <!-- plot area: x 90..770 (3 decades), y 40..510 -->
+  <line class="grid" x1="90" y1="510" x2="770" y2="510"/>
+  <line class="grid" x1="90" y1="300" x2="770" y2="300"/>
+  <line class="grid" x1="90" y1="100" x2="770" y2="100"/>
+  <line class="grid" x1="313" y1="42" x2="313" y2="510"/>
+  <line class="grid" x1="537" y1="42" x2="537" y2="510"/>
+
+  <line class="ax" x1="90" y1="510" x2="770" y2="510" marker-end="url(#arrow)"/>
+  <line class="ax" x1="90" y1="510" x2="90" y2="30" marker-end="url(#arrow)"/>
+
+  <text class="tick" x="90" y="528" text-anchor="middle">0.1</text>
+  <text class="tick" x="313" y="528" text-anchor="middle">1</text>
+  <text class="tick" x="537" y="528" text-anchor="middle">10</text>
+  <text class="tick" x="770" y="528" text-anchor="middle">100</text>
+  <text class="tick" x="80" y="514" text-anchor="end">100</text>
+  <text class="tick" x="80" y="304" text-anchor="end">1000</text>
+  <text class="tick" x="80" y="104" text-anchor="end">10000</text>
+
+  <text class="lbl" x="430" y="562" text-anchor="middle">算术强度 I（FLOP/Byte，对数坐标）</text>
+  <text class="lbl" x="26" y="270" text-anchor="middle" transform="rotate(-90 26 270)">性能 P（GFLOPS，对数坐标）</text>
+
+  <!-- roofline: P = I*1555 from (90,462) to ridge (558,42); ceiling 19500 -->
+  <line class="diag" x1="90" y1="462" x2="558" y2="42"/>
+  <line class="ceil" x1="558" y1="42" x2="770" y2="42"/>
+  <circle cx="558" cy="42" r="6" fill="#dc2626"/>
+  <line x1="558" y1="42" x2="558" y2="510" stroke="#dc2626" stroke-width="1.2" stroke-dasharray="5 4"/>
+
+  <!-- V1: I=0.25 -> x=90+(log10(0.25)+1)*223.3=178.9; P=388.75 -> y=500-(log10(388.75)-2)*200=382.1 -->
+  <circle class="dot" cx="179" cy="382" r="8" fill="#dc2626"/>
+  <!-- V2: I=1.0 -> x=313.3; P=1555 -> y=262 -->
+  <circle class="dot" cx="313" cy="262" r="8" fill="#059669"/>
+
+  <!-- movement arrow V1 -> V2 -->
+  <line x1="187" y1="374" x2="305" y2="270" stroke="#334155" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="6 4"/>
+
+  <text class="lbl-title" x="179" y="414" text-anchor="middle" fill="#dc2626">V1 未优化</text>
+  <text class="lbl-muted" x="179" y="430" text-anchor="middle">I = 0.25，P ≈ 389 GFLOPS</text>
+  <text class="lbl-muted" x="179" y="446" text-anchor="middle">仅达峰值约 2%</text>
+
+  <text class="lbl-title" x="313" y="236" text-anchor="middle" fill="#059669">V2 优化后</text>
+  <text class="lbl-muted" x="313" y="220" text-anchor="middle">I = 1.0，P ≈ 1555 GFLOPS</text>
+
+  <text class="note" x="90" y="580">图 3：3D 7 点 Stencil 优化前后在 A100 Roofline 上的位置（Shared Memory + 寄存器滑动窗口使 I 从 0.25 → 1.0，</text>
+  <text class="note" x="90" y="596">带宽饱和时吞吐量提升约 4 倍：389 → 1555 GFLOPS，仍处于内存受限区，尚未触及 19500 GFLOPS 算力屋顶）</text>
+
+  <text class="lbl-title" x="90" y="24">Stencil 优化效果：Roofline 上的移动（A100-SXM4-40GB，FP32）</text>
+</svg>

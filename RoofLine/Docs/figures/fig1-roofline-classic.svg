@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 600" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+    </marker>
+    <style>
+      .ax { stroke:#64748b; stroke-width:1.5; fill:none; }
+      .grid { stroke:#cbd5e1; stroke-width:1; stroke-dasharray:4 4; }
+      .diag { stroke:#0f766e; stroke-width:3; fill:none; }
+      .ceil { stroke:#4338ca; stroke-width:3; fill:none; }
+      .lbl { font-size:13px; fill:#1e293b; }
+      .lbl-muted { font-size:12px; fill:#64748b; }
+      .lbl-title { font-size:14px; font-weight:700; fill:#0f172a; }
+      .tick { font-size:11px; fill:#475569; }
+      .memreg { fill:#ccfbf1; opacity:0.55; }
+      .compreg { fill:#e0e7ff; opacity:0.55; }
+      .ridge { fill:#dc2626; }
+      .note { font-size:12px; fill:#334155; }
+    </style>
+  </defs>
+
+  <!-- background -->
+  <rect x="0" y="0" width="860" height="600" fill="#ffffff"/>
+
+  <!-- plot area: x 90..770 (3 decades), y 40..510 (2.3 decades) -->
+  <!-- region shading: memory-bound below diagonal left of ridge; compute-bound right of ridge -->
+  <path class="memreg" d="M90,462 L90,510 L770,510 L770,42 L558,42 Z"/>
+  <path class="compreg" d="M558,42 L770,42 L770,510 L770,510 L558,510 Z"/>
+
+  <!-- gridlines X: I=0.1,1,10,100 ; Y: P=100,1000,10000 -->
+  <line class="grid" x1="90" y1="42" x2="90" y2="510"/>
+  <line class="grid" x1="313" y1="42" x2="313" y2="510"/>
+  <line class="grid" x1="537" y1="42" x2="537" y2="510"/>
+  <line class="grid" x1="770" y1="42" x2="770" y2="510"/>
+  <line class="grid" x1="90" y1="510" x2="770" y2="510"/>
+  <line class="grid" x1="90" y1="300" x2="770" y2="300"/>
+  <line class="grid" x1="90" y1="100" x2="770" y2="100"/>
+
+  <!-- axes -->
+  <line class="ax" x1="90" y1="510" x2="770" y2="510" marker-end="url(#arrow)"/>
+  <line class="ax" x1="90" y1="510" x2="90" y2="30" marker-end="url(#arrow)"/>
+
+  <!-- tick labels X -->
+  <text class="tick" x="90" y="528" text-anchor="middle">0.1</text>
+  <text class="tick" x="313" y="528" text-anchor="middle">1</text>
+  <text class="tick" x="537" y="528" text-anchor="middle">10</text>
+  <text class="tick" x="770" y="528" text-anchor="middle">100</text>
+  <!-- tick labels Y -->
+  <text class="tick" x="80" y="514" text-anchor="end">100</text>
+  <text class="tick" x="80" y="304" text-anchor="end">1000</text>
+  <text class="tick" x="80" y="104" text-anchor="end">10000</text>
+
+  <!-- axis titles -->
+  <text class="lbl" x="430" y="562" text-anchor="middle">算术强度 I（FLOP/Byte，对数坐标）</text>
+  <text class="lbl" x="26" y="270" text-anchor="middle" transform="rotate(-90 26 270)">性能 P（GFLOPS，对数坐标）</text>
+
+  <!-- roofline: diagonal P = I*B_peak (B_peak=1555) from (90,462) to ridge (558,42) -->
+  <line class="diag" x1="90" y1="462" x2="558" y2="42"/>
+  <!-- ceiling P = 19500 from ridge to right edge -->
+  <line class="ceil" x1="558" y1="42" x2="770" y2="42"/>
+
+  <!-- ridge point -->
+  <circle class="ridge" cx="558" cy="42" r="6"/>
+  <line x1="558" y1="42" x2="558" y2="510" stroke="#dc2626" stroke-width="1.2" stroke-dasharray="5 4"/>
+
+  <!-- annotations -->
+  <text class="lbl-title" x="480" y="30">算力屋顶（Compute Ceiling）P_peak</text>
+  <text class="lbl" x="610" y="132">算力受限区</text>
+  <text class="lbl-muted" x="610" y="150">（Compute-Bound）</text>
+  <text class="lbl" x="130" y="380" transform="rotate(-24 130 380)">内存带宽线</text>
+  <text class="lbl-muted" x="150" y="398" transform="rotate(-24 150 398)">P = I × B_peak</text>
+  <text class="lbl" x="140" y="470">内存受限区</text>
+  <text class="lbl-muted" x="140" y="488">（Memory-Bound）</text>
+  <text class="lbl" x="700" y="330">程序运行点</text>
+  <circle cx="668" cy="316" r="5" fill="#f59e0b"/>
+  <text class="note" x="568" y="64" text-anchor="start">拐点 I_ridge = P_peak / B_peak</text>
+  <text class="note" x="568" y="80" text-anchor="start">I &lt; I_ridge → 内存受限</text>
+  <text class="note" x="568" y="96" text-anchor="start">I &gt; I_ridge → 算力受限</text>
+
+  <!-- title -->
+  <text class="lbl-title" x="90" y="24">图 1：经典 Roofline 模型（对数-对数坐标系）</text>
+</svg>

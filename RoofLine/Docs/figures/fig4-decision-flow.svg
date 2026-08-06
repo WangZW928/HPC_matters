@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 620" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+    </marker>
+    <style>
+      .edge { stroke:#64748b; stroke-width:1.8; fill:none; }
+      .node { stroke:#475569; stroke-width:1.2; }
+      .start { fill:#e0e7ff; }
+      .decide { fill:#fef3c7; }
+      .act-mem { fill:#ccfbf1; }
+      .act-comp { fill:#e0e7ff; }
+      .lbl { font-size:13.5px; fill:#0f172a; font-weight:600; }
+      .lbl-muted { font-size:12px; fill:#475569; }
+      .title { font-size:14px; font-weight:700; fill:#0f172a; }
+      .edge-lbl { font-size:12px; fill:#475569; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="860" height="620" fill="#ffffff"/>
+
+  <!-- edges first -->
+  <line class="edge" x1="430" y1="64" x2="430" y2="116" marker-end="url(#arrow)"/>
+  <line class="edge" x1="430" y1="170" x2="430" y2="222" marker-end="url(#arrow)"/>
+  <line class="edge" x1="250" y1="276" x2="250" y2="328" marker-end="url(#arrow)"/>
+  <line class="edge" x1="610" y1="276" x2="610" y2="328" marker-end="url(#arrow)"/>
+  <line class="edge" x1="430" y1="276" x2="430" y2="328" marker-end="url(#arrow)"/>
+
+  <!-- decision labels -->
+  <text class="edge-lbl" x="340" y="258" text-anchor="start">I &lt; I_ridge</text>
+  <text class="edge-lbl" x="340" y="272" text-anchor="start">（内存受限）</text>
+  <text class="edge-lbl" x="520" y="258" text-anchor="start">I ≥ I_ridge</text>
+  <text class="edge-lbl" x="520" y="272" text-anchor="start">（算力受限）</text>
+
+  <!-- nodes -->
+  <rect class="node start" x="330" y="20" width="200" height="44" rx="8"/>
+  <text class="lbl" x="430" y="47" text-anchor="middle">程序运行点定位</text>
+
+  <polygon class="node decide" points="430,120 540,170 430,220 320,170" />
+  <text class="lbl" x="430" y="164" text-anchor="middle">在哪一侧？</text>
+  <text class="lbl-muted" x="430" y="180" text-anchor="middle">（I 与 I_ridge 比较）</text>
+
+  <rect class="node act-mem" x="140" y="328" width="220" height="120" rx="8"/>
+  <text class="lbl" x="250" y="352" text-anchor="middle">内存受限区策略</text>
+  <text class="lbl-muted" x="250" y="372" text-anchor="middle">目标：向右移动 ↑I</text>
+  <text class="lbl-muted" x="250" y="392" text-anchor="middle">• 循环分块 / Tiling</text>
+  <text class="lbl-muted" x="250" y="410" text-anchor="middle">• 算子融合 Fusion</text>
+  <text class="lbl-muted" x="250" y="428" text-anchor="middle">• 寄存器/缓存复用</text>
+  <text class="lbl-muted" x="250" y="446" text-anchor="middle">• 合并访问 / NUMA 绑定</text>
+
+  <rect class="node act-comp" x="500" y="328" width="220" height="120" rx="8"/>
+  <text class="lbl" x="610" y="352" text-anchor="middle">算力受限区策略</text>
+  <text class="lbl-muted" x="610" y="372" text-anchor="middle">目标：向上移动 ↑P</text>
+  <text class="lbl-muted" x="610" y="392" text-anchor="middle">• SIMD / 向量化</text>
+  <text class="lbl-muted" x="610" y="410" text-anchor="middle">• 混合精度 / Tensor Core</text>
+  <text class="lbl-muted" x="610" y="428" text-anchor="middle">• ILP / 循环展开</text>
+  <text class="lbl-muted" x="610" y="446" text-anchor="middle">• FMA 指令</text>
+
+  <rect class="node act-mem" x="320" y="328" width="220" height="120" rx="8"/>
+  <text class="lbl" x="430" y="352" text-anchor="middle">拐点附近（临界）</text>
+  <text class="lbl-muted" x="430" y="372" text-anchor="middle">两个方向都要看：</text>
+  <text class="lbl-muted" x="430" y="392" text-anchor="middle">• 略微提高 I 即可上屋顶</text>
+  <text class="lbl-muted" x="430" y="410" text-anchor="middle">• 检查多层级瓶颈</text>
+  <text class="lbl-muted" x="430" y="428" text-anchor="middle">（如 L1 带宽限制）</text>
+  <text class="lbl-muted" x="430" y="446" text-anchor="middle">• 用 profiler 交叉验证</text>
+
+  <!-- bottom annotation -->
+  <text class="lbl-muted" x="430" y="510" text-anchor="middle" font-size="12">优化后回到起点重新测量：profile → 定位 → 优化 → 再 profile</text>
+  <text class="lbl-muted" x="430" y="528" text-anchor="middle" font-size="12">形成闭环。</text>
+
+  <!-- re-measure loop -->
+  <path class="edge" d="M250,448 C250,540 610,540 610,448" marker-end="url(#arrow)"/>
+  <text class="edge-lbl" x="430" y="556" text-anchor="middle">重新 profile 验证收益</text>
+
+  <text class="title" x="30" y="30">图 4：基于 Roofline 的性能优化决策流程</text>
+</svg>
