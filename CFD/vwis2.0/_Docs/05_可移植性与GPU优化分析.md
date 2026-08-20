@@ -1,5 +1,7 @@
 # vwis2.0 可移植性与 GPU 优化分析
 
+> 证据级别：当前源码没有 CUDA/HIP/Kokkos/OpenMP target 调用，makefile 也是 host PETSc/HYPRE 路径。本页的 GPU 代码和性能判断都是迁移设计，不是现有实现或实测结果；须以目标机基准替代。
+
 本文基于 `_Docs/00_整体架构.md` 到 `_Docs/04_编译与运行.md` 以及 `vwis2.0/` 源码评估 GPU/Kokkos 迁移路径。结论先行：vwis2.0 最合理的路线不是直接重写为 CUDA/HIP，而是先升级 PETSc/构建系统并启用 PETSc GPU Vec/KSP 后端，再把 `RHSSolver`、`LESModel`、`UData::Contra2Cart`、`PoissonSolver::PoissonRHS2_hypre/Projection` 等规则网格热点逐步抽成 Kokkos kernel。IBM 搜索和 FSI 力积分应后置，先保持 CPU 或做混合执行。
 
 ## 1. 代码架构评估
@@ -755,4 +757,10 @@ FSI 每个强耦合子迭代可能触发：
 4. RHS/LES/Projection。这里才是主要性能回报。
 5. IBM/FSI 数据结构重构。先压平链表，再谈 GPU。
 
-最终目标架构应是：DMDA/MPI 继续负责分解和 halo，PETSc GPU Vec/KSP 负责线性代数和求解器，Kokkos 负责自定义 stencil/IBM/FSI kernel，I/O 和复杂几何预处理按需留在 CPU。这样既保留现有 CFD 数值结构，又能获得跨 CUDA/HIP/SYCL/OpenMP 的长期可移植性。
+最终目标架构可采用：DMDA/MPI 负责分解和 halo，PETSc GPU Vec/KSP 负责线性代数和求解器，Kokkos 负责自定义 stencil/IBM/FSI kernel，I/O 和复杂几何预处理按需留在 CPU。这只是候选设计；可移植性能取决于 PETSc/HYPRE 后端、GPU-aware MPI、数据驻留和端到端基准。
+
+## 审阅校正：性能假设与准入门槛
+
+- `PoissonRHS2_hypre` 在 host 逐项 `HYPRE_IJVectorSetValues`，`PetsctoHypreVector/HypretoPetscVector` 又显式复制；它是 GPU 迁移的首要数据流风险，而非可假定的 GPU 热点。
+- `RHSSolver`、`LESModel`、`Contra2Cart` 的规则循环应先经 profile 确认为候选；IBM 链表/分桶/分支须先压平数据。
+- 文中所有加速比均为待验证估计；准入条件为 CPU、单 GPU、强弱缩放、传输/halo 时间、线性求解占比和数值回归同时通过。

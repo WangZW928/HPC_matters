@@ -1,5 +1,7 @@
 # VFS-Wind 到 AMReX 迁移方案
 
+> 审阅校正（实现边界）：AMReX 提供 `Geometry/BoxArray/DistributionMapping/MultiFab`、`MFIter`、ghost 填充、MLMG、I/O 和 EB/AMR 基础设施，但不会自动保持本代码的曲线 metric、IBM 插值、压力零空间、守恒或稳定性。下文 API 是建议的适配目标；当前仓库尚未使用 AMReX。
+
 本文面向 VFS-Wind 当前基于 PETSc DMDA/HYPRE 的结构化曲线网格求解器，说明如何把核心算法迁移到 AMReX 生态。目标不是逐行翻译旧代码，而是在保持 `Ucont/Ucat/P/Nvert` 等数值语义可追踪的前提下，逐步替换为 AMReX 原生的数据结构、AMR 层级、几何多重网格和 GPU-friendly kernel。
 
 迁移原则：
@@ -754,3 +756,15 @@ Phase 5：
 - 所有跨 level 的 force、flux、source 都要定义“哪个 level 拥有该物理量”，避免 coarse/fine 双计数。
 
 最实际的迁移切入点是 Phase 1 的 AMReX MAC projection。只要单层 Cartesian 的 `Ucont`、Poisson 和投影语义站稳，后续曲线坐标和 AMR 才有可靠的基座。
+
+## 审阅补充：迁移验收矩阵
+
+| 主题 | 可复用 | 必须重写/适配 | 科学或数值风险 |
+|---|---|---|---|
+| 网格与字段 | 变量语义、曲线 metric 输入 | `Geometry`、`BoxArray`、`DistributionMapping`、cell/face `MultiFab`、`MFIter` | DMDA 单块与多 Box/AMR 的索引、所有权和 metric 保守恒不等价 |
+| ghost/BC/MPI | 边界类型意图、通量诊断 | `FillBoundary`/`FillPatch`、BC functor、coarse-fine ghost | AMReX 不会推导 VFS ghost 或 IBM 例外；逐面通量须验证 |
+| 投影/线性系统 | `Ucont` 散度、压力修正语义 | Cartesian `MLMG`/`MacProjector`；曲线 19 点项自定义 `MLLinOp` 或 PETSc/Hypre 适配层 | 非正交交叉 metric、零空间、可解性和 BC 不会自动正确 |
+| IBM/FSI | 三角面、`Nvert`、插值/力逻辑 | EB2 或自定义 sharp IBM 二选一；移动重建接口 | cut-cell 稳定性、移动重建、跨层插值和力守恒 |
+| GPU/I/O/测试 | 输出变量名、现有基准意图 | `ParallelFor`、设备数据、plotfile/checkpoint、CMake 与回归测试 | 驻留/通信/重启/regrid 后 metric 与 IB mask 一致性 |
+
+验证顺序：均匀 Cartesian 制造解/Taylor–Green（空间时间阶）→ 通道/腔流（BC/投影）→ 静态 IBM（无穿透、力、通量）→ 曲线单层 → 移动 IBM/FSI → AMR/EB。每阶段比较 L2/L∞、质量误差、压力均值、力矩和 MPI 分块不变性；没有这些基准不得声称迁移保持科学结果。
