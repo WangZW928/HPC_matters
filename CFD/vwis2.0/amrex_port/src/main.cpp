@@ -5,10 +5,14 @@
 #include <AMReX_REAL.H>
 #include <AMReX_Vector.H>
 
+#include <exception>
+#include <string>
+
 int main(int argc, char* argv[])
 {
     amrex::Initialize(argc, argv);
-    {
+    int status = 0;
+    try {
         amrex::ParmParse pp("vwis");
         amrex::Vector<int> n_cell(AMREX_SPACEDIM, 16);
         amrex::Vector<int> is_periodic(AMREX_SPACEDIM, 0);
@@ -18,9 +22,11 @@ int main(int argc, char* argv[])
         int max_grid_size = 32;
         int nghost = 2;
         amrex::Real dt = 1.0e-3;
+        std::string metadata_file;
         pp.query("max_grid_size", max_grid_size);
         pp.query("nghost", nghost);
         pp.query("dt", dt);
+        pp.query("metadata_file", metadata_file);
 
         amrex::RealBox physical_domain(
             {AMREX_D_DECL(0.0, 0.0, 0.0)},
@@ -28,9 +34,14 @@ int main(int argc, char* argv[])
         VwisAmrExSolver solver(n_cell, max_grid_size, nghost,
                                 physical_domain, is_periodic);
         solver.initialize();
+        // Explicit P1 no-op: no physical state is advanced.
         solver.advance_one_step(dt);
+        if (!metadata_file.empty()) solver.write_metadata_manifest(metadata_file);
         solver.diagnostics();
+    } catch (std::exception const& error) {
+        amrex::Print() << "VWiS AMReX P1 error: " << error.what() << "\n";
+        status = 1;
     }
     amrex::Finalize();
-    return 0;
+    return status;
 }

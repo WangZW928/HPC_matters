@@ -1,0 +1,14 @@
+{
+  "version": 3,
+  "configurePresets": [{
+    "name": "amrex-cpu",
+    "displayName": "VWiS P1 CPU",
+    "generator": "Ninja",
+    "binaryDir": "${sourceDir}/../build/amrex_port",
+    "cacheVariables": {
+      "CMAKE_BUILD_TYPE": "Release",
+      "BUILD_TESTING": "ON",
+      "VWIS_AMREX_EXPECTED_VERSION": "25.02"
+    }
+  }]
+}

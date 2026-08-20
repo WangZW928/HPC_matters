@@ -7,15 +7,17 @@
 |状态|数量|说明|
 |---|---:|---|
 |已完成|2|源码/文档审阅、迁移规划复核（本清单所记录的文档工作）|
-|进行中|1|`amrex_port` 基础骨架已落盘，但未配置或编译，且没有物理算法|
-|未开始|50|其余实现、数值验证、构建和发布任务|
+|进行中|6|P0 配置/契约及 P1 骨架、构建、halo、BC、I/O 均已有部分工程证据；没有编译或数值验收|
+|未开始|45|其余实现、数值验证、构建和发布任务|
 |合计|53|按下列任务 ID 计数|
 
 ### 当前已完成的真实项与证据边界
 
 - `P0-001`：已审阅本计划相关源码、三份规划/审阅文档；证据为 `_Docs/CODEX_VWIS_REVIEW_20260820.md` 与本次针对 `main.C`、`CurvGrid.C`、`UData.C`、`FlowSolver.C`、`Integrator.C`、`PoissonSolver.C`、`ImmersedBoundary.C`、`StructSolver.C` 的符号/函数复核。
 - `P0-002`：两份规划已复核并修订，尤其是阶段依赖、曲线 19 点压力算子和骨架边界；证据为 `_Docs/AMReX初步移植规划.md`、`_Docs/AMReX迁移方案.md` 的本次改动。
-- `P1-001`：`amrex_port/CMakeLists.txt` 与 `src/{main.cpp,VwisAmrExSolver.H,VwisAmrExSolver.cpp}` 已有 `Initialize/Finalize`、`ParmParse`、`Geometry`、`BoxArray`、`DistributionMapping`、cell/face `MultiFab`、`MFIter`、`ParallelFor`、`FillBoundary` 骨架。`advance_one_step()` 是 no-op；尚未配置/编译/运行，故只能标记为“进行中”。
+- `P0-003`：已新增 `amrex_port/{amrex_version.lock,CMakePresets.json,inputs/*}` 与清晰的 `AMReXConfig.cmake` 诊断；旧 PETSc/HYPRE/HDF5/MPI 实际安装和 AMReX 包均未找到/未验证，因此仍进行中。
+- `P0-004/P0-005`：已在 `_Docs/AMReX_P0P1_设计说明.md` 形成可审计的 provisional 字段/单位/时间层/BC/datum/I/O 契约和缺口；没有 case/基准输出，不能冻结或声称数值基准。
+- `P1-001`：`amrex_port` 已有 `Initialize/Finalize`、`ParmParse`、`Geometry`、`BoxArray`、`DistributionMapping`、cell/face `MultiFab`、字段注册、`MFIter`/GPU-safe `ParallelFor`、`FillBoundary`、`BCRec` 元数据、日志/计时和 schema-only metadata。`advance_one_step()` 是 no-op；尚未配置/编译/运行，故只能标记为“进行中”。
 
 ## 关键路径与门禁
 
@@ -43,19 +45,19 @@ P0 基线/接口
 |---|---|---|---|---|---|---|---|---|---|
 |P0-001|审阅|提取调用链、字段、离散与风险证据|无|源码/旧文档 → 审阅结论|`vwis2.0/{main,CurvGrid,UData,FlowSolver,Integrator,PoissonSolver,ImmersedBoundary,StructSolver}.C`|证据边界已写入审阅报告|未运行算例不能替代数值证据|已完成|只读相关函数，未全量输出源码|
 |P0-002|规划|复核并修订迁移顺序与结论强度|P0-001|三份文档 → 修订计划|`_Docs/AMReX初步移植规划.md`、`AMReX迁移方案.md`|曲线算子、骨架、阶段依赖已校正|后续源码/算例可能改变结论|已完成|本清单为后续主记录|
-|P0-003|构建基线|冻结 PETSc/HYPRE/MPI/编译器、编译选项和 AMReX 分支/CMake 版本|P0-001|环境与命令 → lockfile/构建说明|`vwis2.0/makefile`、`amrex_port/CMakeLists.txt`、目标 `cmake-presets.json`|可复现旧程序和骨架的 configure/build 命令|依赖 ABI/精度/GPU 后端不一致|未开始|当前两条构建均未在本次验证|
-|P0-004|数值基准|选择固定 Cartesian、曲线、IBM/FSI（若可运行）参考 case，记录网格、dt、容差|P0-003|case/控制文件 → 基准 manifest|`control.dat`、`bcs.dat`、输出目录（待定位）|每 case 输入可重跑且版本化|原树 case/外部网格缺失|未开始|至少覆盖质量、散度、压力、力和重启|
-|P0-005|接口冻结|字段字典：单位、索引、时间层、BC 码、pressure datum、输出命名和 I/O 策略|P0-004|基准字段 → interface contract|`UData.C`、`BcsUtility.C`、`PoissonSolver.C`、目标文档|评审签字；所有 P1+ 字段可追溯|`Ucont` 旧布局并非类型化 face MAC|未开始|`Aj` 是何种 Jacobian/体积语义必须明确|
+|P0-003|构建基线|冻结 PETSc/HYPRE/MPI/编译器、编译选项和 AMReX 分支/CMake 版本|P0-001|环境与命令 → lockfile/构建说明|`vwis2.0/makefile`、`amrex_port/{CMakeLists.txt,CMakePresets.json,amrex_version.lock}`|可复现旧程序和骨架的 configure/build 命令|依赖 ABI/精度/GPU 后端不一致|进行中|已记录 AMReX 25.02/CMake/C++17 与命令；旧 makefile 硬编码路径，未发现 AMReXConfig.cmake，故无 configure/build 证据|
+|P0-004|数值基准|选择固定 Cartesian、曲线、IBM/FSI（若可运行）参考 case，记录网格、dt、容差|P0-003|case/控制文件 → 基准 manifest|`control.dat`、`bcs.dat`、输出目录（待定位）|每 case 输入可重跑且版本化|原树 case/外部网格缺失|进行中|提供 P1 smoke/multibox 输入模板；旧 reference case、控制/BC 文件和结果未提供，数值部分 blocked|
+|P0-005|接口冻结|字段字典：单位、索引、时间层、BC 码、pressure datum、输出命名和 I/O 策略|P0-004|基准字段 → interface contract|`UData.C`、`BcsUtility.C`、`PoissonSolver.C`、`_Docs/AMReX_P0P1_设计说明.md`|评审签字；所有 P1+ 字段可追溯|`Ucont` 旧布局并非类型化 face MAC|进行中|已列 P1 provisional contract；单位/BC 整数码/datum/Aj 与 case 缺失，不能冻结或签字|
 
 ### P1 基础框架
 
 |ID|模块|任务描述|依赖|I/O|文件|验收|风险|状态|备注|
 |---|---|---|---|---|---|---|---|---|---|
-|P1-001|骨架|保持 AMReX 初始化、ParmParse、Geometry/BA/DM 与基础字段布局|P0-001|输入参数 → 单层对象|`amrex_port/src/*`|静态代码存在，见上方证据|尚未编译；无物理算法|进行中|不等同 P1 完成|
-|P1-002|构建|为骨架固定 AMReX 分支、CMake preset、CPU/MPI 选项和最小 inputs|P0-003|依赖版本 → 可配置工程|目标 `amrex_port/CMakePresets.json`、inputs|clean configure/build 成功|AMReX package discovery/编译器不匹配|未开始|不得修改本任务范围外文件前需另行实施授权|
-|P1-003|并行框架|验证 MultiFab 多 Box、MFIter、nGrow、periodic `FillBoundary` 与 MPI halo|P1-002|制造场 → halo 对比|目标 `amrex_port/src/FieldRepository.*`|1/多 rank bitwise 或容差一致|physical ghost 不由 FillBoundary 填充|未开始|`FillPatch` 留给多层 P9|
-|P1-004|BC/运行设施|建立 `BCRec` 映射接口、物理 BC functor、日志/计时和错误报告|P0-005,P1-002|BC 字典 → 边界元数据/日志|`BcsUtility.C/.h`、目标 `Boundary.*`,`Diagnostics.*`|六面 BC 分类完整，未实现类型显式拒绝|旧整数码有算例特例|未开始|仅接口不构成 P3 BC 完成|
-|P1-005|基础 I/O|建立 plotfile/checkpoint 元数据、字段注册与版本头|P1-002,P0-005|字段注册 → 空场 plot/checkpoint|目标 `IO.*`|空场可读回并校验 schema|与 PETSc 文件格式不兼容|未开始|完整兼容在 P8|
+|P1-001|骨架|保持 AMReX 初始化、ParmParse、Geometry/BA/DM 与基础字段布局|P0-001|输入参数 → 单层对象|`amrex_port/src/*`|静态代码存在，见上方证据|尚未编译；无物理算法|进行中|cell/face/历史层/ownership 注释已补；不等同 P1 完成|
+|P1-002|构建|为骨架固定 AMReX 分支、CMake preset、CPU/MPI 选项和最小 inputs|P0-003|依赖版本 → 可配置工程|`amrex_port/{CMakePresets.json,inputs/*}`|clean configure/build 成功|AMReX package discovery/编译器不匹配|进行中|lock/preset/input/CMake diagnostics 已有；AMReX package 不在环境，configure/build blocked|
+|P1-003|并行框架|验证 MultiFab 多 Box、MFIter、nGrow、periodic `FillBoundary` 与 MPI halo|P1-002|制造场 → halo 对比|`amrex_port/src/VwisAmrExSolver.cpp`、inputs|1/多 rank bitwise 或容差一致|physical ghost 不由 FillBoundary 填充|进行中|实现单/多 Box 配置、same-level/periodic FillBoundary 和测试命令；未运行 AMReX/MPI，不能验收 halo|
+|P1-004|BC/运行设施|建立 `BCRec` 映射接口、物理 BC functor、日志/计时和错误报告|P0-005,P1-002|BC 字典 → 边界元数据/日志|`amrex_port/src/VwisAmrExSolver.*`|六面 BC 分类完整，未实现类型显式拒绝|旧整数码有算例特例|进行中|已建立 `ext_dir` BCRec、参数校验、rank 输出/计时；旧码未逐面映射，物理 functor 未实现|
+|P1-005|基础 I/O|建立 plotfile/checkpoint 元数据、字段注册与版本头|P1-002,P0-005|字段注册 → 空场 plot/checkpoint|`amrex_port/src/VwisAmrExSolver.*`|空场可读回并校验 schema|与 PETSc 文件格式不兼容|进行中|已注册字段并写 schema-only JSON (`payload_written=false`)；未写 plot/checkpoint payload，不能恢复|
 
 ### P2 字段与网格
 

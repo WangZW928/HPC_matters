@@ -1,0 +1,7 @@
+# Multi-Box P1 layout/periodic-halo smoke input; no MPI result is claimed.
+vwis.n_cell = 32 24 16
+vwis.max_grid_size = 8
+vwis.nghost = 2
+vwis.dt = 1.0e-3
+vwis.is_periodic = 1 1 1
+vwis.metadata_file = vwis_p1_multibox_metadata.json

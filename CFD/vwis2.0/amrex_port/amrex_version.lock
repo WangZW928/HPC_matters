@@ -1,0 +1,5 @@
+# P0-003 requested package, not evidence that it is installed in this workspace.
+AMReX_VERSION=25.02
+CMAKE_MINIMUM_VERSION=3.20
+CXX_STANDARD=17
+BACKEND=CPU baseline; MPI/GPU options installation-defined and unvalidated

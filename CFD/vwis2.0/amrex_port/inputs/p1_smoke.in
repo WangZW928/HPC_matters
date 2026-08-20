@@ -1,0 +1,7 @@
+# Single-Box P1 framework smoke input; intentionally no physics controls.
+vwis.n_cell = 16 16 16
+vwis.max_grid_size = 32
+vwis.nghost = 2
+vwis.dt = 1.0e-3
+vwis.is_periodic = 1 1 1
+vwis.metadata_file = vwis_p1_smoke_metadata.json
