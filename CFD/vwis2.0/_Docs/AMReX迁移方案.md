@@ -1,6 +1,6 @@
 # VFS-Wind 到 AMReX 迁移方案
 
-> 审阅校正（实现边界）：AMReX 提供 `Geometry/BoxArray/DistributionMapping/MultiFab`、`MFIter`、ghost 填充、MLMG、I/O 和 EB/AMR 基础设施，但不会自动保持本代码的曲线 metric、IBM 插值、压力零空间、守恒或稳定性。下文 API 是建议的适配目标；当前仓库尚未使用 AMReX。
+> 审阅校正（实现边界）：AMReX 提供 `Geometry/BoxArray/DistributionMapping/MultiFab`、`MFIter`、ghost 填充、MLMG、I/O 和 EB/AMR 基础设施，但不会自动保持本代码的曲线 metric、IBM 插值、压力零空间、守恒或稳定性。仓库已有未编译的 `amrex_port/` 单层数据布局骨架；它不含 RHS、投影、物理 BC、IBM、FSI 或 I/O，不能视为算法已移植。下文 API 是建议的适配目标。
 
 本文面向 VFS-Wind 当前基于 PETSc DMDA/HYPRE 的结构化曲线网格求解器，说明如何把核心算法迁移到 AMReX 生态。目标不是逐行翻译旧代码，而是在保持 `Ucont/Ucat/P/Nvert` 等数值语义可追踪的前提下，逐步替换为 AMReX 原生的数据结构、AMR 层级、几何多重网格和 GPU-friendly kernel。
 
@@ -20,7 +20,7 @@
 | PETSc DMDA structured grid | `BoxArray` + `DistributionMapping` + `Geometry` | AMReX native structured AMR |
 | PETSc Vec (scalar/vector fields) | `MultiFab` | Multiple components per cell |
 | Contravariant fluxes `Ucont` | `MultiFab` with face-centered data | Use `FaceLinear`/`IndexType` |
-| CurvGrid metrics (`Csi`, `Eta`, `Zet`) | `MultiFab` for metric arrays | Store as regular cell-centered fields |
+| CurvGrid metrics (`Csi`, `Eta`, `Zet`) | cell/face `MultiFab` metric fields | 位置由离散式决定；面通量所需 metric 不可仅以 cell 数据替代 |
 | Poisson solver (HYPRE/GMRES+AMG) | `MLMG` (geometric multigrid) | Use EB-aware if needed |
 | Ghost exchange (`DMGlobalToLocal`) | `FillBoundary` + `FillPatch` | AMReX handles automatically |
 | PointProbe / PlaneExtraction | `amrex::ParticleContainer` or custom | Simple interpolation kernel |
@@ -263,9 +263,9 @@ $$
 
 1. 正交或近正交网格：先忽略非对角项，验证主体流程。
 2. 非对角项 deferred correction：主 solve 使用对角 SPD operator，交叉项显式放入 RHS，外迭代更新。
-3. 自定义 `MLLinOp`：完整实现 19 点 stencil、restriction、interpolation 和 boundary treatment。
+3. 原型评估自定义离散与求解路径：先确认 AMReX 版本中的可扩展线性算子接口、边界/粗细层语义和 GPU 可行性；必要时才实现完整 19 点算子及其多层 transfer/边界处理，或在过渡期保留 PETSc/HYPRE 对照路径。
 
-推荐按 1 -> 2 -> 3 推进。直接上自定义 `MLLinOp` 会把迁移风险集中到最难调试的模块。
+推荐按 1 -> 2 -> 3 推进。这里的第 1 步仅为误差归因实验，不能作为非正交生产算例的数值等价实现；直接上完整自定义算子会把迁移风险集中到最难调试的模块。
 
 ### 2.3 Level Set 对流与重初始化
 
