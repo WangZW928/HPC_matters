@@ -22,10 +22,14 @@ int main(int argc, char* argv[])
         int max_grid_size = 32;
         int nghost = 2;
         amrex::Real dt = 1.0e-3;
+        bool run_contract_checks = false;
+        bool run_p2_transform_checks = false;
         std::string metadata_file;
         pp.query("max_grid_size", max_grid_size);
         pp.query("nghost", nghost);
         pp.query("dt", dt);
+        pp.query("run_contract_checks", run_contract_checks);
+        pp.query("run_p2_transform_checks", run_p2_transform_checks);
         pp.query("metadata_file", metadata_file);
 
         amrex::RealBox physical_domain(
@@ -34,12 +38,18 @@ int main(int argc, char* argv[])
         VwisAmrExSolver solver(n_cell, max_grid_size, nghost,
                                 physical_domain, is_periodic);
         solver.initialize();
-        // Explicit P1 no-op: no physical state is advanced.
+        if (run_contract_checks) {
+            solver.run_runtime_contract_checks();
+        }
+        if (run_p2_transform_checks) {
+            solver.run_p2_transform_layout_checks();
+        }
+        // Explicit P2 no-op: no physical state is advanced.
         solver.advance_one_step(dt);
         if (!metadata_file.empty()) solver.write_metadata_manifest(metadata_file);
         solver.diagnostics();
     } catch (std::exception const& error) {
-        amrex::Print() << "VWiS AMReX P1 error: " << error.what() << "\n";
+        amrex::Print() << "VWiS AMReX P2 error: " << error.what() << "\n";
         status = 1;
     }
     amrex::Finalize();

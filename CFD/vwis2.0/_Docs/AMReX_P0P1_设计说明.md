@@ -1,6 +1,6 @@
 # AMReX P0/P1 基础工程设计说明
 
-更新：2026-08-20。本说明记录已实现的 P0/P1 工程边界，不修改也不重述
+更新：2026-08-20；P2 语义复核：2026-08-21。本说明记录已实现的 P0/P1 工程边界，不修改也不重述
 原 `vwis2.0/` 求解器的历史事实。P1 是单层规则 Cartesian 框架，绝不是
 任一物理算法、旧曲线网格或 IBM/FSI 的完成声明。
 
@@ -10,28 +10,33 @@
 `UData.C` 的向量及历史层、`BcsUtility.h/.C` 的宏和算例分支、
 `FlowSolver.C` 的步骤顺序、`PoissonSolver.C` 的压力更新/零空间；构建来源
 是 `makefile`。旧 makefile 硬编码 PETSc 3.4、HDF5、HYPRE、`mpicxx`，并不
-构成可重现安装：当前 workspace 也没有找到 `AMReXConfig.cmake`。
+构成可重现安装。后续已建立 AMReX 26.04 CPU/MPI/CUDA 构建证据，见
+`AMReX_P0P1_测试计划与结果_20260821.md`；旧 PETSc/HYPRE ABI 与 CFD case
+仍未复现。
 
-P0 提供 `amrex_port/amrex_version.lock`（请求 AMReX 25.02/CMake 3.20/C++17）
+P0 提供 `amrex_port/amrex_version.lock`（当前锁定 AMReX 26.04/CMake 3.20/C++17）
 和 CMake preset、两份最小输入、静态检查脚本。它们可重放配置意图和失败
-诊断，但没有宣称 PETSc case、AMReX、MPI 或基准数据真实可运行。实际配置应
+诊断；AMReX CPU/MPI 与单卡 CUDA contract 已运行，但没有 PETSc reference
+case 或 CFD 数值基准。实际配置应
 记录 AMReX git SHA、编译器、MPI、GPU backend、PETSc/HYPRE/HDF5 ABI、完整
 CMake cache，以及命令/退出码。
 
 |契约项|P1 表达|仍待冻结/验证|
 |---|---|---|
-|`P`|cell, 1 component, `n`, nGrow=`vwis.nghost`|旧 pressure 的量纲转换和 datum|
-|`Phi`|cell, 1 component, workspace|Poisson 符号、单位、BC、零空间|
+|`P`|cell, 1 component, `n`, nGrow=`vwis.nghost`；legacy 无量纲压力|物理量纲换算和 datum|
+|`Phi`|cell, 1 component, workspace；与 `P` 同尺度（legacy 做 `P+=Phi`）|Poisson 符号、BC、零空间|
 |`Nvert`|cell, 1 component, legacy 分类|分类整数语义；不是 EB volume fraction|
 |`Ucat`|cell, 3 components (x/y/z), `n` 与 `n-1`|无量纲速度标度和 `Ucont` 同步|
-|`Ucont[d]`|d-face, 1 normal component, `n/n-1/n-2`|它究竟是速度或体积通量、metric 归一化|
-|时间|`dt>0` 由 ParmParse 读取；不旋转历史层|旧 BDF/SNES 分支的时间系数|
+|`Ucont[d]`|d-face, 1 normal component, `n/n-1/n-2`；积分面体积通量 $u_dA_d$|曲线面积余因子留 P5；P4 projector 的 velocity adapter|
+|时间|`dt>0` 由 ParmParse 读取；不旋转历史层|legacy 当前 `getTimeCoeff()==1`，BDF2 分支不可达；P5 再选择推进方案|
 |BC|每 component 的 `BCRec(ext_dir)` 元数据|旧六面整数码、入口/出口/墙面具体条件|
 |pressure datum|明确未设置|case 驱动的 Dirichlet/Neumann/均值策略|
 |I/O|JSON schema metadata，`payload_written=false`|AMReX plot/checkpoint payload 与旧 PETSc 转换|
 
-旧 `UData` 的 `Ucont/Ucat` 都是三分量 DMDA 视图；本框架有意将 `Ucont`
-拆成类型化 MAC face 数组，避免把旧表示误当作 face ownership 的证据。
+旧 `UData` 的 `Ucont/Ucat` 都是三分量 DMDA 视图；但 `FormMetrics` 的叉积、
+`Contra2Cart` 的线性方程和 `Aj × 面差` 散度共同证明 `Ucont` 是
+$\mathbf u\cdot\mathbf A_f$，不是裸面速度。本框架将其拆成类型化 MAC face
+数组；这仍不是旧 DMDA 存储位置的逐点等价证明。
 
 ## 2. 框架与内存设计
 
@@ -40,12 +45,13 @@ CMake cache，以及命令/退出码。
 `MultiFab*` 或 PETSc global/local alias。`DistributionMapping` 是唯一的并行
 ownership 定义；每个 rank 只经 `MFIter` 访问自己的 FAB。`BoxArray::maxSize`
 决定单/多 Box 布局，输入 `p1_smoke.in` 和 `p1_multibox.in` 分别覆盖这两种
-结构。多 rank 运行是待 AMReX/MPI 可用后执行的验证命令，尚无结果。
+结构。CPU 2/4-rank MPI contract 已有结果；CUDA-aware MPI 尚未测试。
 
 所有 P1 场采用同一 `nGrow`，以便接口先保持一致；这不是未来离散模板必需
 的最终选择。cell 数据使用 cell `IndexType`；`Ucont[0/1/2]` 使用 x/y/z-face
-`IndexType`，各自仅含 normal component。面上合法的 face ownership 由 AMReX
-的 face `BoxArray` 与 `DistributionMapping` 决定，不能自行双写 box 边界面。
+`IndexType`，各自仅含 normal component。face `BoxArray` 的 valid 区在 box
+接口重叠；最低 global box index 是共享面的 owner。写后用 `OverrideSync`
+传播 owner 值，积分/归约用 `OwnerMask` 或 `sum_unique` 排除重复。
 
 初始化 kernel 只写 `validbox()`，Array4 按值捕获并标为
 `AMREX_GPU_DEVICE`，故不捕获 host 容器、`this` 或临时 host 指针。长期字段

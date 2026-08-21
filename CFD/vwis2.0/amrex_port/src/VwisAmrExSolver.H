@@ -16,7 +16,7 @@
 enum class FieldLocation { Cell, XFace, YFace, ZFace };
 
 /**
- * P0/P1 field contract. `ghost_cells` is allocated same-level halo width;
+ * P0--P2 field contract. `ghost_cells` is allocated same-level halo width;
  * ghost reads require fill_ghost_cells() after a valid-region write.  The
  * `time_layer` is descriptive metadata, not evidence of an integrator.
  */
@@ -27,10 +27,20 @@ struct FieldSpec {
     int ghost_cells;
     std::string units;
     std::string time_layer;
+    std::string component_names;
+    std::string ownership;
+};
+
+/** Cartesian metric names and values; no curvilinear metric is implied. */
+struct MetricSpec {
+    std::string name;
+    std::string location;
+    std::string value;
+    std::string meaning;
 };
 
 /**
- * Single-level Cartesian P1 data owner. MultiFabs remain owned here for the
+ * Single-level Cartesian P0--P2 data owner. MultiFabs remain owned here for the
  * complete solver lifetime, while tile Array4 views never escape an MFIter.
  * Thus DistributionMapping is the sole MPI ownership authority; valid cells
  * may be written independently and only fill_ghost_cells() exchanges halos.
@@ -39,7 +49,7 @@ struct FieldSpec {
 class VwisAmrExSolver {
 public:
     /**
-     * Define the sole P1 level. n_cell is cell count, max_grid_size controls
+     * Define the sole Cartesian level. n_cell is cell count, max_grid_size controls
      * BoxArray splitting, nghost allocates halos for every registered field,
      * and is_periodic controls only geometry/halo wrapping. physical_domain is
      * Cartesian geometry, never a curvilinear metric input.
@@ -50,10 +60,18 @@ public:
 
     /** Initialize valid state to zero; physical ghost values remain undefined. */
     void initialize();
-    /** Same-level/MPI/periodic exchange only; no physical BC is evaluated. */
+    /** Sync shared face owners, then exchange same-level/MPI/periodic ghosts; no physical BC. */
     void fill_ghost_cells();
     /** P1 placeholder with an explicit positive-dt contract; it does not rotate time layers. */
     void advance_one_step(amrex::Real dt);
+    /** Exercise base cell layout, initialization, periodic halo, and physical-BC limitation contracts. */
+    void run_runtime_contract_checks();
+    /** Recover Cartesian velocity by averaging adjacent face volume-flux densities. */
+    void sync_ucat_from_ucont();
+    /** Build Cartesian face volume flux from interpolated normal velocity times area. */
+    void sync_ucont_from_ucat();
+    /** Verify P2-003/004/005 manufactured transforms, metrics, and multi-box layout. */
+    void run_p2_transform_layout_checks();
     /** IO-rank layout/schema diagnostics, safe after initialization or a no-op step. */
     void diagnostics() const;
     /** Write schema-only metadata; this never writes a plotfile/restart payload. */
@@ -61,6 +79,7 @@ public:
 
 private:
     void register_fields();
+    void register_metric_metadata();
     void define_boundary_metadata();
 
     amrex::Geometry m_geom;
@@ -74,12 +93,16 @@ private:
     amrex::MultiFab m_ucat;
     amrex::MultiFab m_ucat_old;
 
-    // MAC face IndexType: each field has one normal flux/velocity component.
+    // MAC face IndexType: each field has one normal volume-flux component.
     amrex::Array<amrex::MultiFab, AMREX_SPACEDIM> m_ucont;
     amrex::Array<amrex::MultiFab, AMREX_SPACEDIM> m_ucont_old;
     amrex::Array<amrex::MultiFab, AMREX_SPACEDIM> m_ucont_older;
     std::vector<FieldSpec> m_fields;
+    std::vector<MetricSpec> m_metrics;
     std::vector<amrex::BCRec> m_cell_bcs;
+    amrex::Array<amrex::Real, AMREX_SPACEDIM> m_dx{};
+    amrex::Array<amrex::Real, AMREX_SPACEDIM> m_face_area{};
+    amrex::Real m_cell_volume = 0.0;
     int m_nghost;
     amrex::Real m_initialize_seconds = 0.0;
     amrex::Real m_last_noop_seconds = 0.0;

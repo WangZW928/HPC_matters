@@ -1,0 +1,10 @@
+# P2 manufactured contract: typed cell fields, three integrated-volume-flux
+# face fields, Cartesian area/volume metadata, unique face sums, transforms,
+# derived divergence stencil, and periodic cell/face halos.
+vwis.n_cell = 32 24 16
+vwis.max_grid_size = 8
+vwis.nghost = 2
+vwis.dt = 1.0e-3
+vwis.is_periodic = 1 1 1
+vwis.run_contract_checks = 1
+vwis.run_p2_transform_checks = 1

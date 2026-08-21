@@ -1,0 +1,8 @@
+# P1 manufactured runtime contract: multi-box, periodic exchange, and explicit
+# confirmation that non-periodic physical ghosts remain unfilled without a BC functor.
+vwis.n_cell = 32 24 16
+vwis.max_grid_size = 8
+vwis.nghost = 2
+vwis.dt = 1.0e-3
+vwis.is_periodic = 1 1 1
+vwis.run_contract_checks = 1

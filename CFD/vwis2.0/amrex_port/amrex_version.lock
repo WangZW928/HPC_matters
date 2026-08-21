@@ -1,5 +1,7 @@
-# P0-003 requested package, not evidence that it is installed in this workspace.
-AMReX_VERSION=25.02
+# P0-003 local source baseline. The test-results report records each concrete
+# install prefix, compiler, backend, and git SHA used as evidence.
+AMReX_VERSION=26.04
+AMReX_GIT_SHA=9219ba416b7ba2073dd1b12bf19fdce27391f17b
 CMAKE_MINIMUM_VERSION=3.20
 CXX_STANDARD=17
-BACKEND=CPU baseline; MPI/GPU options installation-defined and unvalidated
+BACKEND=CPU and CUDA builds are configuration-specific; MPI requires an installed MPI toolchain

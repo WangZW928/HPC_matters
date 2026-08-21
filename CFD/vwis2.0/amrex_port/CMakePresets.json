@@ -1,14 +1,14 @@
 {
   "version": 3,
   "configurePresets": [{
-    "name": "amrex-cpu",
-    "displayName": "VWiS P1 CPU",
-    "generator": "Ninja",
+    "name": "amrex-local-26.04",
+    "displayName": "VWiS P1 local AMReX 26.04",
+    "generator": "Unix Makefiles",
     "binaryDir": "${sourceDir}/../build/amrex_port",
     "cacheVariables": {
       "CMAKE_BUILD_TYPE": "Release",
       "BUILD_TESTING": "ON",
-      "VWIS_AMREX_EXPECTED_VERSION": "25.02"
+      "VWIS_AMREX_EXPECTED_VERSION": "26.04"
     }
   }]
 }

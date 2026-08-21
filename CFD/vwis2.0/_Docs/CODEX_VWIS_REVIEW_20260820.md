@@ -36,24 +36,30 @@ $$
 D_{ijk}(U)=A_{j,ijk}[(U^1_{ijk}-U^1_{i-1,j,k})+(U^2_{ijk}-U^2_{i,j-1,k})+(U^3_{ijk}-U^3_{i,j,k-1})].
 $$
 
-证据是 `FlowSolver::CalculateDivergence`。`PoissonSolver::PoissonRHS2_hypre` 对可解流体点组装同一通量差（周期端点另行回绕），乘 $-Stc_t/\Delta t$；`PoissonLHS` 用曲线 metric 组装最多 19 个非零元；`Projection` 再改写 `Ucont`，`UpdatePressure` 令 $P\leftarrow P+\Phi$。故可安全写成
+证据是 `FlowSolver::CalculateDivergence`。令括号内的原始净通量为 $R(U)$，则
+诊断是 $|Aj\,R|$；`PoissonRHS2_hypre` 实际写入
+$+(Stc_t/\Delta t)R$，没有乘 `Aj`（代码先形成 $-R$ 再乘负系数）。
+`PoissonLHS` 用曲线 metric 组装最多 19 个非零元；`Projection` 以
+$-(\Delta t\,St/c_t)$ 乘压力通量梯度改写 `Ucont`，`UpdatePressure` 令
+$P\leftarrow P+\Phi$。可追溯关系应写成
 
 $$
-L_g\Phi=-\frac{Stc_t}{\Delta t}D(U^*),\qquad
-U^{n+1}=U^*-\mathcal G_g\Phi,
+L_g\Phi=\frac{Stc_t}{\Delta t}R(U^*),\qquad
+U^{n+1}=U^*-\frac{\Delta t\,St}{c_t}\mathcal G_g\Phi,
 $$
 
-并以 $D(U^{n+1})\approx0$ 为目标。$L_g$ 和 $\mathcal G_g$ 不能未经边界行/metric 逐项比较而替代为 Cartesian 7 点 Laplacian。更重要的是，散度诊断主动跳过外边界和 `Nvert` 邻域，不能单独证明 IBM 邻域守恒。
+并以 $AjR(U^{n+1})\approx0$ 为目标。$L_g$ 和 $\mathcal G_g$ 不能未经边界行/metric 逐项比较而替代为 Cartesian 7 点 Laplacian；`-St` 非默认 1 时两处缩放也须单独核验。更重要的是，散度诊断主动跳过外边界和 `Nvert` 邻域，不能单独证明 IBM 邻域守恒。
 
 ### 3.2 动量、时间推进、LES 与稳定性
 
-`RHSSolver::Solve` 从局部 `Ucont/Ucat/metric/Nvert` 构建对流和粘性项；`-second_order` 影响对流插值。`Integrator::SolveFunction` 的 `timeCoeff≈1` 分支含一阶时间差分和新旧 RHS 各半，另一分支含
+`RHSSolver::Solve` 从局部 `Ucont/Ucat/metric/Nvert` 构建对流和粘性项；`-second_order` 影响对流插值。`Integrator::SolveFunction` 的 `timeCoeff≈1` 分支含一阶时间差分和新旧 RHS 各半，源码还保留另一分支
 
 $$
 \frac{-1.5U^n+2U^{n-1}-0.5U^{n-2}}{\Delta t},
 $$
 
-并把相应 RHS 缩放 $1/1.5$。残差由 SNES 解到其配置容差；这不是独立的线性 CFL 证明。`CalculateMinimumDt` 计算 $|U^q A_j|^{-1}$ 量级与最小网格尺度后只保存/输出，`main.C` 从 options 读取固定 `dt`；因此稳定性条件是运行前验算，不是代码强制。
+并把相应 RHS 缩放 $1/1.5$。但 `UData::getTimeCoeff()` 在当前树硬编码返回
+1.0，所以 BDF2 分支不可达，不能称为已启用。残差由 SNES 解到其配置容差；这不是独立的线性 CFL 证明。`CalculateMinimumDt` 计算 $|U^q A_j|^{-1}$ 量级与最小网格尺度后只保存/输出，`main.C` 从 options 读取固定 `dt`；因此稳定性条件是运行前验算，不是代码强制。
 
 `LESModel::ComputeSmagorinksyConstant/ComputeEddyViscosity` 是 SGS 路径。可由代码支持的闭合形式为 $\nu_t=C_s\Delta^2|S|$，其中体积尺度来自 Jacobian；具体滤波、裁剪和 IBM 例外应以所用 options 分支复查。没有 rho/phase 字段，所以不可从本树推出变密度动量、level set 或表面张力方程。
 
@@ -61,7 +67,9 @@ $$
 
 物理边界由 `BcsUtility::FormBcs/InitializeFlowField/IbBC` 与 `Integrator::SolveFunction` 的面通量置零共同完成；类型宏位于 `BcsUtility.h`，但还有算例特定整数分支，必须用实际 `bcs.dat/control.dat` 复核。IBM 从 `ImmersedBoundary::IBMRead/IBMSearchAdvanced/IBMInterpolationAdvanced` 的三角面、分桶、相交、最近面与 image/interpolation 路径进入 `Nvert/IBMInfo`；它是 sharp-interface 插值法，不是连续 delta 体力 IBM。
 
-`PoissonSolver::RemoveNullspace` 对不是特殊 `BC(3)==-10` 的情况移除 RHS 均值；压力零空间和出口参考仍需算例检查。HYPRE 是 IJMatrix/IJVector/ParCSR，默认 GMRES + BoomerAMG、宏 `PCG_POISSON` 时 PCG。`StructSolver::CheckConvergence` 的“差大于容差即 converge”以及旋转支路容差赋值是静态风险；`-str>1` 只能称有限次分区迭代，不能称已验证强耦合。
+`PoissonSolver::RemoveNullspace` 对不是特殊 `BC(3)==-10` 的情况，在 HYPRE
+solve **之后**从解向量减去均值；它固定 gauge，但不修正 RHS compatibility。
+压力零空间和出口参考仍需算例检查。HYPRE 是 IJMatrix/IJVector/ParCSR，默认 GMRES + BoomerAMG、宏 `PCG_POISSON` 时 PCG。`StructSolver::CheckConvergence` 的“差大于容差即 converge”以及旋转支路容差赋值是静态风险；`-str>1` 只能称有限次分区迭代，不能称已验证强耦合。
 
 ## 4. 源码覆盖清单与证据
 

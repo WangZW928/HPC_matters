@@ -17,14 +17,21 @@ $$
 其中 $\mathbf{u}=(u_1,u_2,u_3)$ 是笛卡尔速度。令物理坐标为 $\mathbf{x}=(x_1,x_2,x_3)$，计算坐标为 $\boldsymbol{\xi}=(\xi^1,\xi^2,\xi^3)$。坐标映射写作：
 
 $$
-\mathbf{x}=\mathbf{x}(\xi^1,\xi^2,\xi^3), \qquad
-J=\det \left(\frac{\partial \boldsymbol{\xi}}{\partial \mathbf{x}}\right).
+\mathbf{x}=\mathbf{x}(\xi^1,\xi^2,\xi^3).
 $$
 
-注意 VFS 手册采用的 $J$ 是逆变换 Jacobian，即 $J=\partial(\xi^1,\xi^2,\xi^3)/\partial(x_1,x_2,x_3)$；因此物理单元体积与计算空间单元体积的关系为：
+为避免源码中的 `Aj` 与通常文献记号混淆，以下定义
 
 $$
-dV=\frac{1}{J}d\xi^1d\xi^2d\xi^3.
+J_\xi=\det\!\left(\frac{\partial\boldsymbol\xi}{\partial\mathbf x}\right),
+\qquad \mathcal J=\det\!\left(\frac{\partial\mathbf x}{\partial\boldsymbol\xi}\right)=\frac1{J_\xi}.
+$$
+
+legacy `Aj` 存 $J_\xi$，不是物理体积；`CurvGrid::FormMetrics` 先算
+$\mathcal J$ 再取倒数。因而
+
+$$
+dV=\mathcal J\,d\xi^1d\xi^2d\xi^3=\frac{1}{J_\xi}d\xi^1d\xi^2d\xi^3.
 $$
 
 对任意控制体 $\Omega$，体积守恒积分形式为：
@@ -33,34 +40,41 @@ $$
 \int_{\partial \Omega} \mathbf{u}\cdot \mathbf{n}\,dS=0.
 $$
 
-曲线网格中，一个 $\xi^i=\text{const}$ 面的面积向量与坐标度量相关，可写成：
+曲线网格中，一个 $\xi^i=\text{const}$ 面的有向面积余因子为
 
 $$
-\mathbf{A}^{\,i}=\frac{1}{J}\nabla \xi^i.
+\mathbf a^i=\mathcal J\nabla\xi^i=\frac{1}{J_\xi}\nabla\xi^i.
 $$
 
-定义逆变体积通量：
+必须区分逆变速度与守恒面通量：
 
 $$
-U^i=\mathbf{u}\cdot \nabla \xi^i
-=\xi^i_l u_l,
+q^i=\mathbf u\cdot\nabla\xi^i=\xi^i_lu_l,
+\qquad
+\widehat U^i=\mathbf u\cdot\mathbf a^i=\frac{q^i}{J_\xi}.
 $$
 
-其中 $\xi^i_l=\partial \xi^i/\partial x_l$，重复下标表示求和。将笛卡尔散度公式变换到计算空间，有：
+其中 $\xi^i_l=\partial\xi^i/\partial x_l$。将笛卡尔散度变换到计算空间：
 
 $$
-\nabla \cdot \mathbf{u}
-=J\frac{\partial}{\partial \xi^i}\left(\frac{U^i}{J}\right).
+\nabla\cdot\mathbf u
+=J_\xi\frac{\partial\widehat U^i}{\partial\xi^i}
+=J_\xi\frac{\partial}{\partial\xi^i}\left(\frac{q^i}{J_\xi}\right).
 $$
 
-若把 $U^i/J$ 视为穿过计算单元面的体积通量，有限体积离散直接对相邻面通量作差。手册 Eq. 2.1 写作：
+有限体积离散直接对 $\widehat U^i$ 作相邻面差。手册常把
+$\widehat U^i$ 简写成 $U^i$，于是 Eq. 2.1 写作：
 
 $$
-J\frac{\partial U^i}{\partial \xi^i}=0.
+J_\xi\frac{\partial U^i}{\partial \xi^i}=0.
 \tag{2.1}
 $$
 
-这里的 $U^i$ 在 VFS 语境中是离散面上的 contravariant volume flux，已吸收相应面积/Jacobian 因子；因此 Eq. 2.1 的离散意义就是单元六个面净通量为零。当前代码中的 `Ucont` 即该守恒通量变量，`CalculateDivergence` 用相邻面通量差诊断不可压缩约束。
+这里简写的 $U^i$ 是 $\widehat U^i$，不是 $q^i$。源码证据是：
+`FormMetrics` 用两条局部边的叉积生成 `Csi/Eta/Zet`（面积余因子），
+`Contra2Cart` 解 $U^i=\mathbf u\cdot\mathbf a^i$，而
+`CalculateDivergence` 计算 `Aj × 面通量差`。因此 `Ucont` 已吸收面面积/Jacobian
+因子；把它当作普通 face-normal velocity 会造成量纲错误。
 
 物理解释：连续性方程不直接约束笛卡尔速度点值，而约束每个曲线网格单元的净体积流量。这样做使压力投影天然保持有限体积意义上的质量守恒，也使曲线网格和复杂地形边界能够共用同一通量框架。
 
@@ -92,26 +106,22 @@ $$
 +\frac{1}{\rho}f^g_l.
 $$
 
-VFS 的主未知量不是 $u_l$，而是曲线方向的守恒通量 $U^i$。将笛卡尔动量投影到 $\xi^i$ 方向：
+VFS 的主未知量不是 $u_l$，而是曲线方向的守恒通量
+$\widehat U^i=a^i_lu_l$。逆变速度 $q^i=\xi^i_lu_l$ 只用于连续坐标变换；二者不能混写：
 
 $$
-U^i=\xi^i_l u_l.
+\widehat U^i=\frac{\xi^i_l}{J_\xi}u_l=a^i_lu_l.
 $$
 
-若网格固定，度量 $\xi^i_l$ 不随时间变，于是：
+若网格固定，面积余因子 $a^i_l$ 不随时间变，于是：
 
 $$
-\frac{\partial U^i}{\partial t}
-=\xi^i_l\frac{\partial u_l}{\partial t}.
+\frac{\partial \widehat U^i}{\partial t}
+=a^i_l\frac{\partial u_l}{\partial t}.
 $$
 
-考虑控制体体积因子，时间项写成：
-
-$$
-\frac{1}{J}\frac{\partial U^i}{\partial t}.
-$$
-
-下面逐项推导 Eq. 2.2。
+下面只给出连续变换的守恒核心；legacy `RHSSolver/Integrator` 对各项还使用
+面/中心 metric 与离散缩放，不能仅凭手册紧凑记号补出一个已验证的离散 Eq. 2.2。
 
 #### 1.2.1 对流项
 
@@ -139,28 +149,21 @@ $$
 =\xi^m_j\frac{\partial u_l}{\partial \xi^m}.
 $$
 
-将速度沿计算坐标投影，$u_j\xi^m_j=U^m$，得到非保守形式：
+将速度沿计算坐标投影，$u_j\xi^m_j=q^m$，得到非保守形式：
 
 $$
 u_j\frac{\partial u_l}{\partial x_j}
-=U^m\frac{\partial u_l}{\partial \xi^m}.
+=q^m\frac{\partial u_l}{\partial \xi^m}.
 $$
 
-为了离散守恒和稳定，VFS 采用通量形式：
+不可压缩时，对流项的计算空间守恒恒等式是：
 
 $$
-\frac{\partial}{\partial \xi^m}\left(U^m u_l\right).
+\frac{\partial(u_ju_l)}{\partial x_j}
+=J_\xi\frac{\partial}{\partial\xi^m}\left(\widehat U^m u_l\right).
 $$
 
-因此投影到 $i$ 方向并带上负号进入右端：
-
-$$
-\mathcal{C}^i
-=-\frac{\xi^i_l}{J}
-\frac{\partial}{\partial \xi^m}\left(U^m u_l\right).
-$$
-
-物理解释：$U^m$ 表示穿过 $\xi^m$ 面的体积通量，$u_l$ 是被输运的笛卡尔动量分量。VFS 先在笛卡尔分量上构造对流，再用曲线度量投影回 `Ucont`。
+物理解释：$\widehat U^m$ 表示穿过 $\xi^m$ 面的体积通量，$u_l$ 是被输运的笛卡尔动量分量。VFS 先在笛卡尔分量上构造对流，再用曲线度量投影回 `Ucont`；额外的 $J_\xi$ 或 $\mathcal J$ 因子必须按具体离散位置核对，不能把 $q^m$ 与 $\widehat U^m$ 互换。
 
 #### 1.2.2 粘性扩散项
 

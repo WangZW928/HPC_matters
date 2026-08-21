@@ -41,12 +41,19 @@ main/PETSc+MPI
 
 - `CurvGrid::CreateDM` 以 `DMDACreate3d(..., DMDA_STENCIL_BOX, ...)` 建立标量 `da` 和向量 `fda` 的分区；periodic 由 DMDA boundary type 设置（`CurvGrid.C:270-304`）。`UData::InitializeData` 为全局和 local Vec 成对分配（`UData.C:142-165`）。
 - local Vec 是显式 ghost 工作区：`DMGlobalToLocalBegin/End` 反复用于 `Ucont/Ucat/Nvert/P`（例如 `UData.C:305-325,541-548`）。AMReX 对应为 `MultiFab` 的 grow cells、`FillBoundary`（同层/MPI/周期）和跨层 `FillPatch`；物理 ghost 仍须 BC 代码填充。
-- `Ucont` 是逆变/面通量式三分量，`Ucat` 是物理 Cartesian 三分量，二者借 `Csi/Eta/Zet/Aj` 变换（`UData.C:553-572,704-725`）；`P`、`Nvert` 是标量格点场。AMReX 中优先把 `Ucont` 拆为 x/y/z 三个 face-centred `MultiFab`（MAC），而不是一个 cell-centred 三分量场；`P/Phi/Nvert` 为 cell-centred `MultiFab`。
+- `Ucont` 是积分面体积通量 $\mathbf u\cdot\mathbf A_f$，`Ucat` 是物理
+  Cartesian 速度；证据是 `FormMetrics` 的面积叉积、`Contra2Cart` 的线性方程
+  及 `Aj × 面差` 散度（`UData.C:553-572,704-725`）。AMReX 将 `Ucont` 拆为
+  x/y/z 三个 face-centred `MultiFab`；需要面速度的 API 必须显式除以面积。
+  `P/Phi/Nvert` 为 cell-centred `MultiFab`。
 - 曲线连续性诊断在 `FlowSolver.C:133-...` 使用 metric/Jacobian。其最小形式为
 
   `D(U)=A_j[(U^1_i-U^1_{i-1})+(U^2_j-U^2_{j-1})+(U^3_k-U^3_{k-1})]`。
 
-  对预测通量的投影可写为 `L_g Phi = -(St*c_t/dt) D(U*)`，再以 metric 梯度校正速度。`L_g` 和该 19 点曲线 stencil **不能**直接用 Cartesian `MLMG` 替换。
+  若括号内原始净通量记为 `R(U)`，legacy RHS 实际写入
+  `+(St*c_t/dt) R(U*)`（不乘 `Aj`），Projection 再按源码系数修正通量。
+  符号、`St/timeCoeff` 缩放和边界行必须在 P4 逐项验证；`L_g` 的 19 点曲线
+  stencil **不能**直接用 Cartesian `MLMG` 替换。
 
 ## 3. AMReX 对应物与边界
 
@@ -54,7 +61,7 @@ main/PETSc+MPI
 |---|---|---|
 |DMDA 网格/坐标分区|`Geometry` + `BoxArray` + `DistributionMapping`|P1 用规则 Cartesian；`Geometry` 本身不是曲线 metric 容器|
 |global/local Vec 与 ghost|`MultiFab`（nGrow）、`MFIter`、`FillBoundary`/`FillPatch`|AMReX/MPI halo 管理由 `MultiFab`；物理边界单独填充|
-|`Ucont`|每方向 face `MultiFab`|MAC 速度/通量的首选布局，骨架已采用|
+|`Ucont`|每方向 face `MultiFab`|积分面体积通量；共享面归约须去重，MacProjector 面速度需显式 adapter|
 |`P/Phi/Nvert`|cell `MultiFab`|`Nvert` 仅占位，尚无几何赋值|
 |循环与 MPI 局部遍历|`MFIter` + `ParallelFor`|天然可迁 GPU；避免 PETSc Array 视图语义|
 |BC 编码|`BCRec` + `FillPatch` + 边界 functor|需将每个现有 BC code 显式分类/测试|
@@ -91,7 +98,7 @@ main/PETSc+MPI
 
 ## 5. 最小可行路线与延后项
 
-最小可行路线是 **P0 → P1 → P2 → P3（无 LES 或固定模型）→ P4 静态几何**：先在单层 Cartesian、固定几何上得到可复现实验的 MAC 质量守恒和动量基线，再决定 EB2 与 custom IBM 的取舍。`amrex_port/` 已提供 P1 的最小数据布局：它只分配、清零并做周期/inter-box ghost 交换，`advance_one_step()` 是明确的 no-op。
+最小可行路线是 **P0 → P1 → P2 → P3（无 LES 或固定模型）→ P4 静态几何**：先在单层 Cartesian、固定几何上得到可复现实验的 MAC 质量守恒和动量基线，再决定 EB2 与 custom IBM 的取舍。`amrex_port/` 当前完成到限定 P2 Cartesian 数据/变换/布局 contract；`advance_one_step()` 仍是明确的 no-op，尚无质量守恒或动量基线。
 
 不应过早做：AMR tagging/重网格、GPU 性能调优、曲线 metric 的强行 `MLMG` 替换、移动 IBM、FSI 强耦合、以及复刻 PETSc→HYPRE 复制路径。它们均会在基线、离散和 BC 尚未固定时掩盖数值差异。
 

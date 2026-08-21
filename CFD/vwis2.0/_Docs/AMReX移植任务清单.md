@@ -6,18 +6,19 @@
 
 |状态|数量|说明|
 |---|---:|---|
-|已完成|2|源码/文档审阅、迁移规划复核（本清单所记录的文档工作）|
-|进行中|6|P0 配置/契约及 P1 骨架、构建、halo、BC、I/O 均已有部分工程证据；没有编译或数值验收|
-|未开始|45|其余实现、数值验证、构建和发布任务|
+|已完成|7|P0-001/002 与 P2-001--005 的限定工程契约；P2 完成不代表 CFD 求解器完成|
+|进行中|8|P0 配置/基准/接口及 P1 骨架、构建、halo、BC、I/O 均已有部分工程证据；没有 CFD 数值验收|
+|未开始|38|其余物理实现、数值验证、AMR/IBM/FSI、I/O 和发布任务|
 |合计|53|按下列任务 ID 计数|
 
 ### 当前已完成的真实项与证据边界
 
 - `P0-001`：已审阅本计划相关源码、三份规划/审阅文档；证据为 `_Docs/CODEX_VWIS_REVIEW_20260820.md` 与本次针对 `main.C`、`CurvGrid.C`、`UData.C`、`FlowSolver.C`、`Integrator.C`、`PoissonSolver.C`、`ImmersedBoundary.C`、`StructSolver.C` 的符号/函数复核。
 - `P0-002`：两份规划已复核并修订，尤其是阶段依赖、曲线 19 点压力算子和骨架边界；证据为 `_Docs/AMReX初步移植规划.md`、`_Docs/AMReX迁移方案.md` 的本次改动。
-- `P0-003`：已新增 `amrex_port/{amrex_version.lock,CMakePresets.json,inputs/*}` 与清晰的 `AMReXConfig.cmake` 诊断；旧 PETSc/HYPRE/HDF5/MPI 实际安装和 AMReX 包均未找到/未验证，因此仍进行中。
-- `P0-004/P0-005`：已在 `_Docs/AMReX_P0P1_设计说明.md` 形成可审计的 provisional 字段/单位/时间层/BC/datum/I/O 契约和缺口；没有 case/基准输出，不能冻结或声称数值基准。
-- `P1-001`：`amrex_port` 已有 `Initialize/Finalize`、`ParmParse`、`Geometry`、`BoxArray`、`DistributionMapping`、cell/face `MultiFab`、字段注册、`MFIter`/GPU-safe `ParallelFor`、`FillBoundary`、`BCRec` 元数据、日志/计时和 schema-only metadata。`advance_one_step()` 是 no-op；尚未配置/编译/运行，故只能标记为“进行中”。
+- `P0-003`：AMReX 26.04 已以 CPU、MPI（OpenMPI 4.1.6）和 CUDA（arch 89）构建/安装并记录；旧 PETSc/HYPRE/HDF5 ABI、旧 solver 和 CFD 基准仍未验证，因此仍进行中。
+- `P0-004/P0-005`：已形成 provisional 字段/时间层/BC/datum/I/O 契约；P2 review 已从 legacy 冻结 `Ucont=Ucat·面面积余因子` 的体积通量语义及 `Aj=det(∂ξ/∂x)`，但没有 case/压力基准/BC 表/输出，P0-005 仍不能签字完成。
+- `P1-001`：`amrex_port` 已有 `Initialize/Finalize`、`ParmParse`、`Geometry`、`BoxArray`、`DistributionMapping`、cell/face `MultiFab`、字段注册、`MFIter`/GPU-safe `ParallelFor`、`FillBoundary`、`BCRec` 元数据、日志/计时和 schema-only metadata。CPU MPI 与单 rank CUDA contract 已运行通过；`advance_one_step()` 仍是 no-op，故只能标记为“进行中”。
+- `P2-001--005`：限定为单层均匀 Cartesian 数据/变换/布局契约。`Ucont[d]` 是积分面体积通量 $u_d A_d$，`Ucat` 是 cell 速度；散度回归使用净面通量/单元体积。唯一面求和用 `OwnerMask/sum_unique`，face ghost 仅覆盖 inter-Box/MPI/周期，非周期 domain face 的邻接单元复制只是 P2 外推闭合，不是物理 BC。CPU/MPI 与单卡 CUDA 历史结果须以 P2 review 后的定向复测记录为准；这些都不是 P3/P4/P5 数值验收。
 
 ## 关键路径与门禁
 
@@ -37,7 +38,7 @@ P0 基线/接口
 
 ## 任务明细
 
-列含义：**依赖**为必须已验收的任务；**I/O** 为任务输入/输出；**文件**为当前源码证据或预期目标位置（目标文件名仅作规划，不创建）；**验收**为可判定结果。
+列含义：**依赖**为所需上游证据；若上游任务因更宽范围仍“进行中”，下游只能在备注中明确已验收的子契约，不能反向宣称上游整体完成。**I/O** 为任务输入/输出；**文件**为当前源码证据或预期目标位置（目标文件名仅作规划，不创建）；**验收**为可判定结果。
 
 ### P0 基线与接口冻结
 
@@ -45,17 +46,17 @@ P0 基线/接口
 |---|---|---|---|---|---|---|---|---|---|
 |P0-001|审阅|提取调用链、字段、离散与风险证据|无|源码/旧文档 → 审阅结论|`vwis2.0/{main,CurvGrid,UData,FlowSolver,Integrator,PoissonSolver,ImmersedBoundary,StructSolver}.C`|证据边界已写入审阅报告|未运行算例不能替代数值证据|已完成|只读相关函数，未全量输出源码|
 |P0-002|规划|复核并修订迁移顺序与结论强度|P0-001|三份文档 → 修订计划|`_Docs/AMReX初步移植规划.md`、`AMReX迁移方案.md`|曲线算子、骨架、阶段依赖已校正|后续源码/算例可能改变结论|已完成|本清单为后续主记录|
-|P0-003|构建基线|冻结 PETSc/HYPRE/MPI/编译器、编译选项和 AMReX 分支/CMake 版本|P0-001|环境与命令 → lockfile/构建说明|`vwis2.0/makefile`、`amrex_port/{CMakeLists.txt,CMakePresets.json,amrex_version.lock}`|可复现旧程序和骨架的 configure/build 命令|依赖 ABI/精度/GPU 后端不一致|进行中|已记录 AMReX 25.02/CMake/C++17 与命令；旧 makefile 硬编码路径，未发现 AMReXConfig.cmake，故无 configure/build 证据|
+|P0-003|构建基线|冻结 PETSc/HYPRE/MPI/编译器、编译选项和 AMReX 分支/CMake 版本|P0-001|环境与命令 → lockfile/构建说明|`vwis2.0/makefile`、`amrex_port/{CMakeLists.txt,CMakePresets.json,amrex_version.lock}`|可复现旧程序和骨架的 configure/build 命令|依赖 ABI/精度/GPU 后端不一致|进行中|AMReX 26.04 SHA、CPU/MPI/CUDA arch-89 build/install、CMake/compilers/options/commands 已实测并记录；OpenMPI 4.1.6 MPI run 与单 rank CUDA runtime 已通过。旧 PETSc/HYPRE ABI、CUDA-aware MPI 和 CFD 基准仍未验证|
 |P0-004|数值基准|选择固定 Cartesian、曲线、IBM/FSI（若可运行）参考 case，记录网格、dt、容差|P0-003|case/控制文件 → 基准 manifest|`control.dat`、`bcs.dat`、输出目录（待定位）|每 case 输入可重跑且版本化|原树 case/外部网格缺失|进行中|提供 P1 smoke/multibox 输入模板；旧 reference case、控制/BC 文件和结果未提供，数值部分 blocked|
-|P0-005|接口冻结|字段字典：单位、索引、时间层、BC 码、pressure datum、输出命名和 I/O 策略|P0-004|基准字段 → interface contract|`UData.C`、`BcsUtility.C`、`PoissonSolver.C`、`_Docs/AMReX_P0P1_设计说明.md`|评审签字；所有 P1+ 字段可追溯|`Ucont` 旧布局并非类型化 face MAC|进行中|已列 P1 provisional contract；单位/BC 整数码/datum/Aj 与 case 缺失，不能冻结或签字|
+|P0-005|接口冻结|字段字典：单位、索引、时间层、BC 码、pressure datum、输出命名和 I/O 策略|P0-004|基准字段 → interface contract|`UData.C`、`BcsUtility.C`、`PoissonSolver.C`、`_Docs/AMReX_P0P1_设计说明.md`|评审签字；所有 P1+ 字段可追溯|`Ucont` 旧布局并非类型化 face MAC|进行中|已冻结 P2 所需的 Cartesian `Ucont/Ucat` 与 `Aj` 语义；物理单位换算、BC 整数码、datum、I/O/case 仍缺失，不能整体签字|
 
 ### P1 基础框架
 
 |ID|模块|任务描述|依赖|I/O|文件|验收|风险|状态|备注|
 |---|---|---|---|---|---|---|---|---|---|
-|P1-001|骨架|保持 AMReX 初始化、ParmParse、Geometry/BA/DM 与基础字段布局|P0-001|输入参数 → 单层对象|`amrex_port/src/*`|静态代码存在，见上方证据|尚未编译；无物理算法|进行中|cell/face/历史层/ownership 注释已补；不等同 P1 完成|
-|P1-002|构建|为骨架固定 AMReX 分支、CMake preset、CPU/MPI 选项和最小 inputs|P0-003|依赖版本 → 可配置工程|`amrex_port/{CMakePresets.json,inputs/*}`|clean configure/build 成功|AMReX package discovery/编译器不匹配|进行中|lock/preset/input/CMake diagnostics 已有；AMReX package 不在环境，configure/build blocked|
-|P1-003|并行框架|验证 MultiFab 多 Box、MFIter、nGrow、periodic `FillBoundary` 与 MPI halo|P1-002|制造场 → halo 对比|`amrex_port/src/VwisAmrExSolver.cpp`、inputs|1/多 rank bitwise 或容差一致|physical ghost 不由 FillBoundary 填充|进行中|实现单/多 Box 配置、same-level/periodic FillBoundary 和测试命令；未运行 AMReX/MPI，不能验收 halo|
+|P1-001|骨架|保持 AMReX 初始化、ParmParse、Geometry/BA/DM 与基础字段布局|P0-001|输入参数 → 单层对象|`amrex_port/src/*`|静态代码存在，见上方证据|无物理算法|进行中|AMReX 26.04 CPU/MPI/CUDA builds compile; MPI and single-rank CUDA runtime contracts pass. cell/face/历史层/ownership 仍只是 P1 framework，不等同 CFD 移植|
+|P1-002|构建|为骨架固定 AMReX 分支、CMake preset、CPU/MPI 选项和最小 inputs|P0-003|依赖版本 → 可配置工程|`amrex_port/{CMakeLists.txt,CMakePresets.json,inputs/*}`|clean configure/build 成功|AMReX package discovery/编译器不匹配|进行中|26.04 lock/SHA；CPU/MPI/CUDA arch-89 configure/build 成功。MPI consumer 因 AMReX package 导出 C MPI dependency，最小修复为 `project(... LANGUAGES C CXX)`；CUDA device link 和单 rank runtime 均通过，CUDA-aware MPI 未测试|
+|P1-003|并行框架|验证 MultiFab 多 Box、MFIter、nGrow、periodic `FillBoundary` 与 MPI halo|P1-002|制造场 → halo 对比|`amrex_port/src/VwisAmrExSolver.cpp`、inputs|1/多 rank bitwise 或容差一致|physical ghost 不由 FillBoundary 填充|进行中|CPU MPI `p1_contract.in` 在 2/4 ranks PASS；`p1_multibox.in` 在 2 ranks PASS。CUDA 单 rank 同类 contract PASS；CUDA-aware MPI 未测试|
 |P1-004|BC/运行设施|建立 `BCRec` 映射接口、物理 BC functor、日志/计时和错误报告|P0-005,P1-002|BC 字典 → 边界元数据/日志|`amrex_port/src/VwisAmrExSolver.*`|六面 BC 分类完整，未实现类型显式拒绝|旧整数码有算例特例|进行中|已建立 `ext_dir` BCRec、参数校验、rank 输出/计时；旧码未逐面映射，物理 functor 未实现|
 |P1-005|基础 I/O|建立 plotfile/checkpoint 元数据、字段注册与版本头|P1-002,P0-005|字段注册 → 空场 plot/checkpoint|`amrex_port/src/VwisAmrExSolver.*`|空场可读回并校验 schema|与 PETSc 文件格式不兼容|进行中|已注册字段并写 schema-only JSON (`payload_written=false`)；未写 plot/checkpoint payload，不能恢复|
 
@@ -63,11 +64,11 @@ P0 基线/接口
 
 |ID|模块|任务描述|依赖|I/O|文件|验收|风险|状态|备注|
 |---|---|---|---|---|---|---|---|---|---|
-|P2-001|字段|定义 `P/Phi/Nvert` cell MultiFab、时间层和 component 命名|P0-005,P1-003|契约 → scalar fields|`UData.C`、目标 `FieldRepository.*`|IndexType/nGrow/units 断言通过|把 `Nvert` 当 EB volume fraction|未开始|`Nvert` 保持自定义分类语义|
-|P2-002|速度|定义三个 face `Ucont` 与 cell 三分量 `Ucat`，并冻结 face ownership|P2-001|字段 → MAC/cell 布局|`UData.C:137-180`、目标 `VelocityFields.*`|常量流和面通量积分正确|旧 `fda` 是三分量 DM 视图，位置语义需重建|未开始|禁止退化为 cell 三分量伪 MAC|
-|P2-003|变换|实现/测试 Cartesian `Ucont↔Ucat` 同步；曲线变换只定义接口|P2-002|Ucat/Ucont → 同步场|`UData.C` `Contra2Cart`、目标 `MetricData.*`|常量/线性场和单位一致|曲线 metric 不能以 Cartesian 恒等代替|未开始|曲线实现在 P5 设计原型|
-|P2-004|网格|建立单层 Cartesian 坐标、dx、cell volume 和 metric 数据命名|P1-003,P0-005|domain/n_cell → Geometry/metric metadata|`CurvGrid.C`、目标 `MeshManager.*`|volume 与 Geometry 一致；索引测试通过|`Aj`/J/1/J 混淆|未开始|不读取/声称支持曲线网格|
-|P2-005|布局回归|多 Box/MPI 上验证 cell/face ghost、边界 face 与 derived field 一致性|P2-001--004|制造场 → layout report|目标测试|1/多 rank 范数、face sum 一致|跨 Box face 双计数|未开始|P3 前置|
+|P2-001|字段|定义 `P/Phi/Nvert` cell MultiFab、时间层和 component 命名|P0-005,P1-003|契约 → scalar fields|`amrex_port/src/VwisAmrExSolver.*`、`inputs/p2_contract.in`|IndexType/nGrow/单位语义字段断言；未决物理换算显式标出|把 `Nvert` 当 EB volume fraction|已完成|字段契约含 component/time-layer/units；`P/Phi` 同为 legacy 无量纲压力尺度，物理换算/pressure datum 仍属 P0/P4；`Nvert` 保持分类语义|
+|P2-002|速度|定义三个 face `Ucont` 与 cell 三分量 `Ucat`，冻结体积通量和 face ownership|P2-001|字段 → MAC/cell 布局|`amrex_port/src/VwisAmrExSolver.*`、`inputs/p2_contract.in`|常量速度给出 $Ucont_d=u_dA_d$；唯一面数/通量和正确|把 legacy 积分通量当 MacProjector 面速度|已完成|三个独立 face `MultiFab`；共享面最低 global box 为 owner，归约用 `OwnerMask/sum_unique`；legacy 依据为 `FormMetrics/Contra2Cart/CalculateDivergence`|
+|P2-003|变换|实现/测试 Cartesian `Ucont↔Ucat`；曲线变换显式留为未实现边界|P2-002|Ucat/Ucont → 同步场|`VwisAmrExSolver.*`|常量/线性场按 face area 乘除且单位一致|曲线 metric 不能以 Cartesian 面积代替|已完成|cell→face：法向速度线性平均后乘面积；face→cell：相邻通量和除以 `2A_d`；共享 valid face `OverrideSync` 后再 halo；曲线实现仍在 P5|
+|P2-004|网格|建立单层 Cartesian 坐标、dx、cell volume 和 metric 数据命名|P1-003,P0-005|domain/n_cell → Geometry/metric metadata|`VwisAmrExSolver.*`|$A_d\Delta x_d=V$ 与 Geometry 一致；`Aj` 定义不含糊|`Aj`/J/1/J 混淆|已完成|记录 dx、volume、face area；仅登记未分配的 `legacy_Aj_equivalent=1/V`（unit-index 计算坐标），不声称曲线 metric/Jacobian 场|
+|P2-005|布局回归|多 Box/MPI 上验证 cell/face ghost、边界 face 与 derived field 一致性|P2-001--004|制造场 → layout report|`inputs/p2_contract.in`、`p2_boundary_face.in`|1/多 rank 范数、唯一 face sum、face ghost 和 divergence stencil 一致|跨 Box face 双计数|已完成|周期/非周期 face ghost、OwnerMask 唯一计数/通量和、非周期边界邻接单元外推、净面通量/体积 derived divergence；只是 manufactured layout regression，不是全域守恒或物理 BC|
 
 ### P3 边界与数据流
 
@@ -82,9 +83,9 @@ P0 基线/接口
 
 |ID|模块|任务描述|依赖|I/O|文件|验收|风险|状态|备注|
 |---|---|---|---|---|---|---|---|---|---|
-|P4-001|散度/RHS|从 face `Ucont` 计算 Cartesian 散度和 pressure RHS，冻结符号/时间系数|P3-004|U* → div/RHS|`FlowSolver.C:133+`,`PoissonSolver.C:209+`|解析场 L2/L∞、积分 RHS 可解性通过|旧诊断跳过边界和 Nvert 邻域|未开始|曲线 19 点算子不在此任务替换|
+|P4-001|散度/RHS|从积分 face `Ucont` 以净通量/体积计算 Cartesian 散度和 pressure RHS，冻结符号/时间系数|P3-004|U* → div/RHS|`FlowSolver.C:133+`,`PoissonSolver.C:209+`|解析场 L2/L∞、全域通量恒等式、积分 RHS 可解性通过|把 volume flux 再除 dx；旧诊断跳过边界/IBM 邻域|未开始|P2 derived divergence 只是 stencil regression；曲线 19 点算子不在此任务替换|
 |P4-002|压力 BC/零空间|定义 Dirichlet/Neumann/周期组合、压力参考和 RHS 去均值策略|P3-001,P4-001|BC/RHS → solvable system|`PoissonSolver.C:134+`|常数压力不改速度；兼容性条件被记录|`BC(3)==-10` 语义需以 case 复核|未开始|不得盲目全域减均值|
-|P4-003|Cartesian 求解器|评估并实现一个固定版本的 `MacProjector` 或 MLMG+自写修正路径|P4-001,P4-002|RHS/BC → Phi|目标 `Projection.*`|残差、迭代数和 CPU/MPI 可复现|API/离散位置不匹配|未开始|二选一先完成，记录版本/理由|
+|P4-003|Cartesian 求解器|评估并实现一个固定版本的 `MacProjector` 或 MLMG+自写修正路径|P4-001,P4-002|RHS/BC → Phi|目标 `Projection.*`|残差、迭代数和 CPU/MPI 可复现|API 面速度与 `Ucont` 积分通量语义不匹配|未开始|若用 MacProjector，显式实现并测试 $U/A\leftrightarrow u_n$ adapter；二选一记录版本/理由|
 |P4-004|速度修正|按相同 face metric/系数修正 Ucont，并同步 Ucat|P4-003,P2-003|Phi/U* → U(n+1)|`PoissonSolver.C:2352+`|投影后 div 降至容差；质量守恒|符号、dt 系数、边界 face|未开始|必须与 P4-001 使用同一离散|
 |P4-005|曲线算子决策|用现有 `PoissonLHS`/RHS/Projection 比对 19 点项、对称性、零空间和可选实现|P4-001,P0-005|metric/stencil → design record|`PoissonSolver.C:891-1598,2352+`|明确 custom operator、deferred correction 或临时 PETSc/HYPRE 对照的门槛|将 19 点曲线算子直接替换 Cartesian 算子|未开始|这是设计门，非生产实现承诺|
 
@@ -153,7 +154,7 @@ P0 基线/接口
 |---|---|
 |P0 基线与接口|环境、case、字段/单位/索引/BC/压力基准和全部比较容差可重跑、可追溯。|
 |P1 基础框架|固定 AMReX 版本的 CMake 构建通过；单/多 rank 字段、ghost、日志和空 I/O 测试通过；无物理算法的边界明确。|
-|P2 字段与网格|cell/face IndexType、时间层、单位和转换在多 Box/MPI 制造场通过；Cartesian 网格语义固定。|
+|P2 字段与网格|cell/face IndexType、时间层、体积通量单位、转换、唯一面归约和 ghost 在多 Box/MPI 制造场通过；只冻结 Cartesian 数据/代数语义，不包含 CFD 方程验收。|
 |P3 边界与数据流|每个目标 BC 的物理 ghost、halo、入口/出口净通量与调用顺序均有逐面测试。|
 |P4 压力投影|Cartesian RHS、BC、零空间、solve、face 修正共用离散；投影后散度/质量/MPI 指标达标；曲线路径单独有设计结论。|
 |P5 RHS 与推进|对流、粘性、metric（如启用）、LES 和推进法在制造解/基准 case 达到预设收敛、守恒、CFL 和时间层要求。|
@@ -179,5 +180,5 @@ P0 基线/接口
 1. 执行 `P0-003`：锁定并实测 PETSc/HYPRE/MPI 与 AMReX/CMake 构建环境，补齐可复现命令。
 2. 执行 `P0-004` 与 `P0-005`：选定至少一个固定 Cartesian 基准，冻结 `Ucont/Ucat/P/Nvert`、`Aj`、BC、压力基准和 restart 指标。
 3. 执行 `P1-002`、`P1-003`：配置编译当前 `amrex_port`，以 1/多 MPI rank 验证多 Box periodic ghost；确认仍无物理算法。
-4. 执行 `P2-001` 至 `P2-005`：完成类型化 MAC/cell 字段与布局制造解，再进入物理 BC。
-5. 执行 `P3-001` 至 `P4-005`：先固定实际 case 的边界/零空间，再建立独立 Cartesian 投影与曲线算子设计门。
+4. 复核 P2 review 后 CPU/MPI/CUDA 的短 contract 结果；只把 P2 称为“Cartesian 数据/变换/布局契约完成”。
+5. 执行 `P3-001` 至 `P4-005`：先固定实际 case 的边界/零空间，再建立独立 Cartesian 投影与曲线算子设计门；不得用 P2 derived divergence 代替投影或守恒验收。

@@ -1,6 +1,6 @@
 # VFS-Wind 到 AMReX 迁移方案
 
-> 审阅校正（实现边界）：AMReX 提供 `Geometry/BoxArray/DistributionMapping/MultiFab`、`MFIter`、ghost 填充、MLMG、I/O 和 EB/AMR 基础设施，但不会自动保持本代码的曲线 metric、IBM 插值、压力零空间、守恒或稳定性。仓库已有未编译的 `amrex_port/` 单层数据布局骨架；它不含 RHS、投影、物理 BC、IBM、FSI 或 I/O，不能视为算法已移植。下文 API 是建议的适配目标。
+> 审阅校正（2026-08-21）：AMReX 提供 `Geometry/BoxArray/DistributionMapping/MultiFab`、`MFIter`、ghost、MLMG、I/O 和 EB/AMR 基础设施，但不会自动保持曲线 metric、IBM 插值、压力零空间、守恒或稳定性。`amrex_port/` 已通过 P2 的单层 Cartesian 字段、体积通量变换、metric 元数据及多 Box/MPI contract regression；它仍不含 RHS、投影、物理 BC、IBM、FSI、AMR 或可恢复 I/O，不能视为 CFD 求解器。
 
 本文面向 VFS-Wind 当前基于 PETSc DMDA/HYPRE 的结构化曲线网格求解器，说明如何把核心算法迁移到 AMReX 生态。目标不是逐行翻译旧代码，而是在保持 `Ucont/Ucat/P/Nvert` 等数值语义可追踪的前提下，逐步替换为 AMReX 原生的数据结构、AMR 层级、几何多重网格和 GPU-friendly kernel。
 
@@ -11,6 +11,12 @@
 - 优先使用 AMReX 的 `MultiFab`、`MFIter`、`MLMG`、`FluxRegister` 和 regrid 机制；只有在 AMReX 抽象不能表达 VFS sharp-interface IBM 或特殊曲线坐标算子时，才保留自定义实现。
 - 每个阶段都要有独立验证算例，避免在 AMR、曲线坐标和 FSI 同时开启时才暴露基础离散错误。
 
+当前阶段边界：P2 的 “PASS” 只表示数据布局和制造场代数契约通过。
+`Ucont` 已冻结为与 legacy 一致的积分面体积通量
+$\widehat U_f=\mathbf u_f\cdot\mathbf A_f$；它不是 `MacProjector` 通常接收的
+face-normal velocity。P3 物理边界、P4 投影/守恒、P5 RHS/时间收敛与曲线 metric
+均未实现或验证。
+
 ## 1. 架构映射
 
 ### 1.1 主要组件对应关系
@@ -19,10 +25,10 @@
 |---|---|---|
 | PETSc DMDA structured grid | `BoxArray` + `DistributionMapping` + `Geometry` | AMReX native structured AMR |
 | PETSc Vec (scalar/vector fields) | `MultiFab` | Multiple components per cell |
-| Contravariant fluxes `Ucont` | `MultiFab` with face-centered data | Use `FaceLinear`/`IndexType` |
+| Contravariant fluxes `Ucont` | `MultiFab` with face-centered data | 用方向化 `IndexType`；数值为积分面通量 |
 | CurvGrid metrics (`Csi`, `Eta`, `Zet`) | cell/face `MultiFab` metric fields | 位置由离散式决定；面通量所需 metric 不可仅以 cell 数据替代 |
 | Poisson solver (HYPRE/GMRES+AMG) | `MLMG` (geometric multigrid) | Use EB-aware if needed |
-| Ghost exchange (`DMGlobalToLocal`) | `FillBoundary` + `FillPatch` | AMReX handles automatically |
+| Ghost exchange (`DMGlobalToLocal`) | `FillBoundary` + `FillPatch` | 只负责通信/周期/coarse-fine；物理 ghost 仍需 BC functor |
 | PointProbe / PlaneExtraction | `amrex::ParticleContainer` or custom | Simple interpolation kernel |
 | IB geometry (triangular mesh) | `amrex::EB2` (Embedded Boundary) | OR custom IB on `MultiFab` |
 
@@ -55,7 +61,7 @@ VFS 中 `CurvGrid` 同时承担网格读入、边界类型、DMDA 创建、metri
 
 单元中心变量：
 
-- `P`、`Phi`、`rho`、`mu`、`levelset`、`Cs`、`nu_t`、`Nvert` 存储为 cell-centered `MultiFab`。
+- 当前路径的 `P`、`Phi`、`Nvert` 存为 cell-centered `MultiFab`；`rho/mu/levelset/Cs/nu_t` 是后续可选字段，不是当前源码/P2 已实现字段。
 - `Ucat` 可存为 cell-centered 3-component `MultiFab`，用于对流插值、LES、输出和探针。
 
 面变量：
@@ -64,17 +70,15 @@ VFS 中 `CurvGrid` 同时承担网格读入、边界类型、DMDA 创建、metri
 - $U^1$ 存在 x-face index type，$U^2$ 存在 y-face index type，$U^3$ 存在 z-face index type。
 - 若需要保留曲线坐标面面积向量，可为每个方向存储 face-centered metric，例如 `face_metric[dir]` 的 3 个 component。
 
-这样可以让散度和投影写成 AMReX 原生 MAC 形式：
+若 `Ucont` 存积分面通量，Cartesian 单元散度必须写成净通量除以体积：
 
 $$
-(\nabla_\xi \cdot U)_{i,j,k}
-=
-\frac{U^1_{i+1/2,j,k}-U^1_{i-1/2,j,k}}{\Delta \xi^1}
-+
-\frac{U^2_{i,j+1/2,k}-U^2_{i,j-1/2,k}}{\Delta \xi^2}
-+
-\frac{U^3_{i,j,k+1/2}-U^3_{i,j,k-1/2}}{\Delta \xi^3}.
+(\nabla\cdot\mathbf u)_{i,j,k}
+=\frac{(U^x_{i+1/2}-U^x_{i-1/2})+(U^y_{j+1/2}-U^y_{j-1/2})+(U^z_{k+1/2}-U^z_{k-1/2})}{\Delta x\,\Delta y\,\Delta z}.
 $$
+
+若某个 AMReX API 要求 face velocity，则必须显式使用
+$u_{n,f}=U_f/A_f$ 的 adapter；不能让同一数组在不同调用点暗中切换语义。
 
 ### 1.3 Poisson 求解器选择
 
@@ -97,9 +101,9 @@ $$
 $$
 \mathcal{L}\phi
 =
-J\frac{\partial}{\partial \xi^m}
+J_\xi\frac{\partial}{\partial \xi^m}
 \left(
-\frac{g^{mk}}{J}\frac{\partial \phi}{\partial \xi^k}
+\frac{g^{mk}}{J_\xi}\frac{\partial \phi}{\partial \xi^k}
 \right),
 \qquad
 g^{mk}=\nabla \xi^m \cdot \nabla \xi^k.
@@ -155,9 +159,11 @@ VFS 自定义 sharp-interface IB 更适合以下场景：
 
 VFS 的 `Csi/Eta/Zet` 可在 AMReX 中拆为以下 `MultiFab`：
 
-- `metric_cc[level]`：cell-centered，9 个 component，存储 $\xi^i_l=\partial \xi^i/\partial x_l$。
-- `jac_cc[level]`：cell-centered，1 个 component，存储 $J$ 或 $1/J$，命名必须明确。
-- `metric_fc[dir][level]`：face-centered，建议存储该 face 所需的面积向量或 contravariant metric。
+- `area_cofactor_cc[level]`：cell-centered，9 个 component，存储 legacy
+  `Csi/Eta/Zet` 对应的 $a^i_l=(1/J_\xi)\,\partial\xi^i/\partial x_l$；不要误名为裸 $\nabla\xi^i$。
+- `inverse_mapping_jacobian_cc[level]`：cell-centered，1 个 component，存储
+  $J_\xi=\det(\partial\xi/\partial x)$；物理体积因子是 $1/J_\xi$。
+- `area_cofactor_fc[dir][level]`：face-centered，存储该方向压力修正和 `Ucont` 所需的有向面积余因子。
 
 若只把 metric 存在 cell center，面通量计算时要插值到 face。为了避免每个 kernel 重复插值，建议在 `MetricData::BuildFaceMetrics()` 中预计算 face metric。曲线网格静止时只需初始化一次；动网格或 FSI deforming mesh 才需要更新。
 
@@ -176,10 +182,12 @@ AMReX 的 `IndexType` 应和变量物理位置一致：
 
 #### 逆变速度变换
 
-从笛卡尔速度到逆变通量：
+先区分逆变速度 $q^i$ 和积分面通量 $\widehat U^i$：
 
 $$
-U^i=\mathbf{u}\cdot \nabla \xi^i.
+q^i=\mathbf u\cdot\nabla\xi^i,
+\qquad
+\widehat U^i=\mathbf u\cdot\mathbf a^i=\frac{q^i}{J_\xi}.
 $$
 
 有限体积实现中建议存储穿过 face 的体积通量：
@@ -189,10 +197,12 @@ $$
 =
 \left(\mathbf{u}_f \cdot \mathbf{A}^i_f\right),
 \qquad
-\mathbf{A}^i_f=\frac{1}{J_f}\nabla \xi^i_f.
+\mathbf{A}^i_f=\frac{1}{J_{\xi,f}}\nabla \xi^i_f.
 $$
 
-其中 $\mathbf{u}_f$ 由 `Ucat` 插值得到，$\mathbf{A}^i_f$ 来自 face metric。压力投影也应直接修正 face 通量：
+其中 $\mathbf{u}_f$ 由 `Ucat` 插值得到，$\mathbf{A}^i_f$ 来自 face metric。
+P2 Cartesian 实现取 $\mathbf A^x=(\Delta y\Delta z,0,0)$ 等。
+压力投影也应直接修正 face 通量：
 
 $$
 \hat{U}^{i,n+1}_f
@@ -226,7 +236,9 @@ AMReX-native 时间步可以组织为：
 
 AMReX 提供的投影器主要面向 Cartesian MAC 速度：
 
-- `MacProjector`：适合修正 face-centered velocity，使 face divergence 为零。迁移 `Ucont` 的第一选择。
+- `MacProjector`：适合修正 face-centered velocity。若保留 legacy 积分通量
+  `Ucont`，必须在接口处做 $U/A\leftrightarrow u_n$ 转换并证明投影前后采用同一
+  face area/volume 离散，不能直接把 `Ucont` 当速度传入。
 - `NodalProjector`：适合 cell-centered velocity projection，压力 correction 在 nodal 上。若后续采用 collocated velocity，并通过 nodal gradient 修正，可以评估。
 - 自定义 projector：曲线坐标、非正交 metric、VFS 19 点 Poisson 或 IBM mask 压缩自由度需要自定义。
 
@@ -744,7 +756,10 @@ Phase 5：
 - FSI/波浪：wave-structure interaction、actuator disk 推力曲线。
 - 指标：质量损失、自由面高度、结构能量、推力/功率守恒。
 
-所有测试都应至少跑 CPU MPI 和一个 GPU 后端配置。回归阈值应区分 bitwise 和 norm-based：AMReX GPU reduction 不应要求逐位一致，但应要求物理误差和守恒量在容差内。
+发布前的数值测试应至少覆盖 CPU MPI 和一个 GPU 后端。P0--P2 的 contract
+test 只检查构建、布局、通信和制造场代数，可用精确或紧容差断言；它不产生
+物理误差、守恒或收敛结论。后续 CFD 数值测试应使用 norm-based 容差，GPU
+归约不要求逐位一致。
 
 ### 4.7 实施注意事项
 
