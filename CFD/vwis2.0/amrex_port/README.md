@@ -122,3 +122,28 @@ not consumed by a Poisson operator, and divergence is diagnostic—not a pressur
 RHS. See `inputs/p3_cartesian_boundary.in` and the P3 design/test record in
 `_Docs/`; no pressure projection, momentum RHS, time advancement, curvilinear
 metric, IBM/FSI, or complete CFD path is implied.
+
+## P3 host verification on 2026-08-24
+
+The current WSL2 host reused locked AMReX 26.04 install caches but configured
+the port in new build directories. Evidence is deliberately split by stage:
+
+- CPU configure/compile/link and CTest passed (7/7) in
+  `/tmp/vwis-p3-host-20260824-cpu-make`.
+- MPI configure/compile/link passed in `/tmp/vwis-p3-host-20260824-mpi` against
+  the OpenMPI 4.1.6 AMReX package. Both `mpiexec --oversubscribe -n 2` and a
+  loopback-constrained retry were blocked before `MPI_Init`: the execution
+  environment denied `socket()` and PMIx could not start its listener. This is
+  not a P3 multi-rank runtime pass and no application code was entered.
+- CUDA 12.6.85 configure and nvcc compilation passed for the cached
+  `sm_75` AMReX package. The verbose build explicitly produced
+  `cmake_device_link.o` and linked the executable. `nvidia-smi` reported that
+  GPU access was blocked, no NVIDIA/WSL device node was visible, and both P3
+  CTest and direct runtime stopped during AMReX CUDA initialization with CUDA
+  error 35. This is compile/device-link evidence only, not a CUDA runtime pass.
+
+The exact commands and error boundaries are recorded in
+`_Docs/AMReX_P3_边界与诊断设计及测试_20260824.md`. A host session that permits
+OpenMPI sockets is still required for the 2-rank result, and a host with a
+visible NVIDIA device and compatible driver is required for the final CUDA
+runtime result.
