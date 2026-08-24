@@ -53,4 +53,14 @@ if (BUILD_TESTING)
              COMMAND vwis_amrex_skeleton ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p2_contract.in)
     add_test(NAME vwis_amrex_boundary_face_contract
              COMMAND vwis_amrex_skeleton ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p2_boundary_face.in)
+    add_test(NAME vwis_amrex_p3_cartesian_boundary
+             COMMAND vwis_amrex_skeleton ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p3_cartesian_boundary.in)
+    add_test(NAME vwis_amrex_p3_legacy_supported
+             COMMAND vwis_amrex_skeleton ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p3_legacy_supported.in)
+    add_test(NAME vwis_amrex_p3_legacy_rejected
+             COMMAND vwis_amrex_skeleton ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p3_legacy_rejected.in)
+    # The source error text is also pinned by static_contract_check.sh.  CTest's
+    # WILL_FAIL inverts the nonzero process status; combining it with
+    # PASS_REGULAR_EXPRESSION has version-dependent inversion semantics.
+    set_tests_properties(vwis_amrex_p3_legacy_rejected PROPERTIES WILL_FAIL TRUE)
 endif()

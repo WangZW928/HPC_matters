@@ -1,0 +1,14 @@
+# Same minimal path through the auditable legacy integer adapter:
+# [i-,i+,j-,j+,k-,k+] = inlet,outlet,wall,wall,symmetry,symmetry.
+vwis.n_cell = 16 12 8
+vwis.max_grid_size = 4
+vwis.nghost = 2
+vwis.dt = 1.0e-3
+vwis.is_periodic = 0 0 0
+vwis.run_p3_boundary_checks = 1
+
+vwisbcs.enabled = 1
+vwisbcs.legacy_codes = 5 4 1 1 3 3
+vwisbcs.inlet_profile = uniform
+vwisbcs.inlet_target_flux = 0.75
+vwisbcs.pressure = 0.0 1.0 0.0 0.0 0.0 0.0

@@ -6,9 +6,9 @@
 
 |状态|数量|说明|
 |---|---:|---|
-|已完成|7|P0-001/002 与 P2-001--005 的限定工程契约；P2 完成不代表 CFD 求解器完成|
-|进行中|8|P0 配置/基准/接口及 P1 骨架、构建、halo、BC、I/O 均已有部分工程证据；没有 CFD 数值验收|
-|未开始|38|其余物理实现、数值验证、AMR/IBM/FSI、I/O 和发布任务|
+|已完成|8|P0-001/002、P2-001--005 与 P3-001 的限定工程契约；不代表 CFD 求解器完成|
+|进行中|11|P0/P1 既有部分证据及 P3-002--004 实现；P3 已有 CPU runtime，MPI/CFD 数值验收仍缺|
+|未开始|34|其余物理实现、数值验证、AMR/IBM/FSI、I/O 和发布任务|
 |合计|53|按下列任务 ID 计数|
 
 ### 当前已完成的真实项与证据边界
@@ -19,6 +19,7 @@
 - `P0-004/P0-005`：已形成 provisional 字段/时间层/BC/datum/I/O 契约；P2 review 已从 legacy 冻结 `Ucont=Ucat·面面积余因子` 的体积通量语义及 `Aj=det(∂ξ/∂x)`，但没有 case/压力基准/BC 表/输出，P0-005 仍不能签字完成。
 - `P1-001`：`amrex_port` 已有 `Initialize/Finalize`、`ParmParse`、`Geometry`、`BoxArray`、`DistributionMapping`、cell/face `MultiFab`、字段注册、`MFIter`/GPU-safe `ParallelFor`、`FillBoundary`、`BCRec` 元数据、日志/计时和 schema-only metadata。CPU MPI 与单 rank CUDA contract 已运行通过；`advance_one_step()` 仍是 no-op，故只能标记为“进行中”。
 - `P2-001--005`：限定为单层均匀 Cartesian 数据/变换/布局契约。`Ucont[d]` 是积分面体积通量 $u_d A_d$，`Ucat` 是 cell 速度；散度回归使用净面通量/单元体积。唯一面求和用 `OwnerMask/sum_unique`，face ghost 仅覆盖 inter-Box/MPI/周期，非周期 domain face 的邻接单元复制只是 P2 外推闭合，不是物理 BC。CPU/MPI 与单卡 CUDA 历史结果须以 P2 review 后的定向复测记录为准；这些都不是 P3/P4/P5 数值验收。
+- `P3-001`：已从旧 `BcsUtility/CurvGrid` 抽取 1/3/4/5 与独立 periodic 的证据，建立逐面 named/legacy adapter；旧 0/2/6/8/10/11/12/13/14/-1/-2 明确拒绝。P3-002--004 已有代码、CPU CTest 7/7 PASS 和 inputs，但 MPI runtime 尚未完成，故保持进行中；详见 `_Docs/AMReX_P3_边界与诊断设计及测试_20260824.md`。
 
 ## 关键路径与门禁
 
@@ -74,10 +75,10 @@ P0 基线/接口
 
 |ID|模块|任务描述|依赖|I/O|文件|验收|风险|状态|备注|
 |---|---|---|---|---|---|---|---|---|---|
-|P3-001|BC 分类|把旧 BC 整数码与每个面速度/压力/标量条件逐项映射，标出未支持项|P0-005,P1-004|BC 文件 → 显式 BC 表|`BcsUtility.C:672-1406`,`Integrator.C`|每个已用 case 无隐式默认分支|入口/出口与压力条件耦合|未开始|含入口、出口、无滑移、滑移、周期、对称|
-|P3-002|ghost 流程|实现周期/非周期 `FillBoundary`、物理 ghost 填充和调用顺序|P2-005,P3-001|fields+BC → valid ghost|目标 `Boundary.*`|逐面制造解和跨 rank halo 一致|误把 FillBoundary 用作物理 BC|未开始|多层 FillPatch 留 P9|
-|P3-003|流量 BC|实现入口流量/平面输入与出口压力/通量约束的最小 Cartesian 路径|P3-002|profile/target flux → face Ucont|`BcsUtility.C`,`FlowSolver.C`|全局净通量、面 profile 和压力 datum 达容差|旧 case 特定分支|未开始|先实现 P0 基准实际所需子集|
-|P3-004|一致性诊断|在每个阶段核算 halo、边界面、全局质量通量和 ghost freshness|P3-002,P2-005|fields → diagnostic report|目标 `Diagnostics.*`|错误注入能被检测；MPI reductions 正确|只报 interior divergence 掩盖边界/IBM|未开始|P4/P5/P6 必接入|
+|P3-001|BC 分类|把旧 BC 整数码与每个面速度/压力/标量条件逐项映射，标出未支持项|P0-005,P1-004|BC 文件 → 显式 BC 表|`BcsUtility.C:672-1406`,`Integrator.C`、`amrex_port/src/*`、P3 设计记录|每个已用 case 无隐式默认分支|入口/出口与压力条件耦合|已完成|旧 1/3/4/5 和独立 periodic 有显式映射；新 named slip 不冒充旧码；0/2/6/8/10/11/12/13/14/-1/-2 显式拒绝；无旧 case，4/5 仅承诺文档中的 Cartesian 子集|
+|P3-002|ghost 流程|实现周期/非周期 `FillBoundary`、物理 ghost 填充和调用顺序|P2-005,P3-001|fields+BC → valid ghost|`amrex_port/src/VwisAmrExSolver.*`、`inputs/p3_*`|逐面制造解和跨 rank halo 一致|误把 FillBoundary 用作物理 BC|进行中|已分离 halo 与 physical fill，固定 OverrideSync/FillBoundary→physical→diagnostics，并有 epoch stale 拒绝；CPU CTest 7/7 PASS，MPI runtime 待补；多层 FillPatch 留 P9|
+|P3-003|流量 BC|实现入口流量/平面输入与出口压力/通量约束的最小 Cartesian 路径|P3-002|profile/target flux → face Ucont|`amrex_port/src/VwisAmrExSolver.*`、`inputs/p3_cartesian_boundary.in`|全局净通量、面 profile 和压力 datum 达容差|旧 case 特定分支|进行中|实现 uniform/linear-plane MPI 全局归一化、fixed pressure ghost、可选等流量出口；不是压力投影/datum 求解；CPU CTest PASS，MPI runtime 待补|
+|P3-004|一致性诊断|在每个阶段核算 halo、边界面、全局质量通量和 ghost freshness|P3-002,P2-005|fields → diagnostic report|`amrex_port/src/VwisAmrExSolver.*`、`inputs/p3_*`|错误注入能被检测；MPI reductions 正确|只报 interior divergence 掩盖边界/IBM|进行中|实现 stage epoch、boundary owner-unique flux、全域 divergence integral/Linf、显式 sum/max MPI reduction 和 stale 注错；无 IBM；CPU CTest PASS，MPI runtime 待补|
 
 ### P4 压力投影
 

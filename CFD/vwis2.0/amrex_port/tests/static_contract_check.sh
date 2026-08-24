@@ -2,7 +2,7 @@
 set -euo pipefail
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 port="$root/amrex_port"
-required=("$port/CMakeLists.txt" "$port/CMakePresets.json" "$port/amrex_version.lock" "$port/inputs/p1_smoke.in" "$port/inputs/p1_multibox.in" "$port/inputs/p1_contract.in" "$port/inputs/p2_contract.in" "$port/inputs/p2_boundary_face.in" "$port/src/VwisAmrExSolver.H" "$port/src/VwisAmrExSolver.cpp")
+required=("$port/CMakeLists.txt" "$port/CMakePresets.json" "$port/amrex_version.lock" "$port/inputs/p1_smoke.in" "$port/inputs/p1_multibox.in" "$port/inputs/p1_contract.in" "$port/inputs/p2_contract.in" "$port/inputs/p2_boundary_face.in" "$port/inputs/p3_cartesian_boundary.in" "$port/inputs/p3_legacy_supported.in" "$port/inputs/p3_legacy_rejected.in" "$port/src/VwisAmrExSolver.H" "$port/src/VwisAmrExSolver.cpp")
 for file in "${required[@]}"; do test -f "$file"; done
 rg -q 'find_package\(AMReX CONFIG QUIET\)' "$port/CMakeLists.txt"
 rg -q 'AMReXConfig.cmake was not found' "$port/CMakeLists.txt"
@@ -25,8 +25,15 @@ rg -q 'derived divergence' "$port/src/VwisAmrExSolver.cpp"
 rg -q 'constant Ucat/Ucont volume-flux contract failed' "$port/src/VwisAmrExSolver.cpp"
 rg -q 'base runtime contract: PASS' "$port/src/VwisAmrExSolver.cpp"
 rg -q 'P2-003/004/005: PASS' "$port/src/VwisAmrExSolver.cpp"
+rg -q 'enum class CartesianBC' "$port/src/VwisAmrExSolver.H"
+rg -q 'fill_physical_ghost_cells' "$port/src/VwisAmrExSolver.cpp"
+rg -q 'stale ghost read' "$port/src/VwisAmrExSolver.cpp"
+rg -q 'ReduceRealSum' "$port/src/VwisAmrExSolver.cpp"
+rg -q 'ReduceRealMax' "$port/src/VwisAmrExSolver.cpp"
+rg -q 'P3-001/002/003/004: PASS' "$port/src/VwisAmrExSolver.cpp"
+rg -q 'unsupported legacy BC integer' "$port/src/main.cpp"
 if rg -n 'MacProjector|MLMG|PoissonSolver|ComputeRHS|RHSSolver' "$port/src"; then
   echo 'P1 source unexpectedly references a physics solver' >&2
   exit 1
 fi
-echo 'static P0-P2 AMReX contract check: PASS'
+echo 'static P0-P3 AMReX contract check: PASS'
