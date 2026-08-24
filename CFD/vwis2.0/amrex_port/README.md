@@ -35,6 +35,15 @@ bash amrex_port/tests/static_contract_check.sh
 
 ## P0--P3 data and lifecycle contract
 
+The implementation is organized by responsibility: `CartesianBoundaryConfig.*`
+owns input parsing and legacy-code mapping, `VwisAmrExBoundary.cpp` owns
+physical ghosts and boundary-face fluxes, and `VwisAmrExContracts.cpp` owns
+runtime checks, reductions, diagnostics, and schema output.  The solver header
+and `VwisAmrExSolver.cpp` retain the data owner, lifecycle, halo exchange, and
+Cartesian face/cell transforms.  Boundary kernels copy scalar configuration
+into fixed-size GPU value arrays before launch; host strings and containers are
+never captured by device lambdas.
+
 `Geometry`, `BoxArray`, and `DistributionMapping` define one Cartesian level.
 `P`, `Phi`, `Nvert`, `Ucat`, and `Ucat_old` are cell-centred. `Ucont`,
 `Ucont_old`, and `Ucont_older` are three separate one-component face-centred

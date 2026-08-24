@@ -1,6 +1,8 @@
 #ifndef VWIS_AMREX_SOLVER_H_
 #define VWIS_AMREX_SOLVER_H_
 
+#include "CartesianBoundaryConfig.H"
+
 #include <AMReX_Array.H>
 #include <AMReX_BCRec.H>
 #include <AMReX_BoxArray.H>
@@ -16,26 +18,6 @@
 
 /** Physical staggering of a registered field; fields are never implicitly converted. */
 enum class FieldLocation { Cell, XFace, YFace, ZFace };
-
-/** P3 single-level Cartesian physical-boundary semantics. */
-enum class CartesianBC { Periodic, NoSlipWall, SlipWall, Symmetry, Inflow, Outflow };
-
-struct BoundarySideSpec {
-    CartesianBC velocity = CartesianBC::Periodic;
-    int legacy_code = -999; // -999 means a new named Cartesian BC, not a legacy code.
-    amrex::Real pressure = 0.0; // fixed only for Outflow; otherwise homogeneous Neumann.
-};
-
-struct CartesianBoundaryConfig {
-    amrex::Array<BoundarySideSpec, 2 * AMREX_SPACEDIM> sides{}; // lo,hi per direction
-    std::string inlet_profile = "uniform"; // uniform or linear_plane
-    amrex::Real inlet_target_flux = 1.0;    // positive volume entering the domain
-    amrex::Real profile_offset = 1.0;
-    amrex::Real profile_slope_0 = 0.0;
-    amrex::Real profile_slope_1 = 0.0;
-    bool constrain_outlet_flux = true;
-    bool enabled = false;
-};
 
 struct P3Diagnostics {
     std::uint64_t valid_epoch = 0;

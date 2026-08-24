@@ -33,11 +33,17 @@ if (AMReX_CUDA)
     enable_language(CUDA)
 endif()
 
-add_executable(vwis_amrex_skeleton src/main.cpp src/VwisAmrExSolver.cpp)
+set(VWIS_AMREX_SOURCES
+    src/main.cpp
+    src/CartesianBoundaryConfig.cpp
+    src/VwisAmrExSolver.cpp
+    src/VwisAmrExBoundary.cpp
+    src/VwisAmrExContracts.cpp)
+add_executable(vwis_amrex_skeleton ${VWIS_AMREX_SOURCES})
 target_link_libraries(vwis_amrex_skeleton PRIVATE AMReX::amrex)
 target_compile_features(vwis_amrex_skeleton PRIVATE cxx_std_17)
 if (AMReX_CUDA)
-    set_source_files_properties(src/main.cpp src/VwisAmrExSolver.cpp PROPERTIES LANGUAGE CUDA)
+    set_source_files_properties(${VWIS_AMREX_SOURCES} PROPERTIES LANGUAGE CUDA)
     # AMReX 26.04 CUDA archives are built with relocatable device code; the
     # application must perform the final device link or registration symbols
     # from the AMReX archive remain unresolved.
