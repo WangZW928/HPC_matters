@@ -95,4 +95,4 @@ cd "$BUILD"
 
 三维运行前需确认 `nvcc`、OpenVDB、TBB、Boost 和 NVIDIA 驱动；若只验证二维，也必须先处理顶层 CUDA 强依赖。默认实验可能耗时很长，建议先用 `timeout` 做启动/首帧 smoke test，并将完整运行单独记录。
 
-本次环境探测结果（2026-08-24）：宿主机有 `/usr/bin/cmake`、`/usr/bin/g++`，但没有 `nvcc`、`nvidia-smi`、TBB/OpenVDB 的可用 pkg-config 条目。直接配置命令已执行，失败于顶层 `project(Covector CXX CUDA)` 的 CUDA 编译器/默认架构检测，因此尚未进入编译和运行阶段。完整日志位于临时文件 `/tmp/CovectorFluids-build-configure.log`；具备 CUDA Toolkit、OpenVDB、TBB、Boost 和 NVIDIA 驱动的机器上可直接重跑上述命令。
+本次 Codex 会话探测结果（2026-08-24）：宿主机实际安装了 `/usr/local/cuda-12.6/bin/nvcc`，但 Codex 会话的 `PATH` 没有包含该目录；显式设置 `CUDA_HOME=/usr/local/cuda-12.6` 和 `PATH=$CUDA_HOME/bin:$PATH` 后，CMake 已成功识别 CUDA 12.6。随后配置在自定义 `FindTBB.cmake` 阶段失败，提示缺少 `TBB_LIBRARIES`/`TBB_INCLUDE_DIRS`；当前会话还未发现可用的 OpenVDB/TBB 系统安装，且 `nvidia-smi` 命令不可用。因此此前“宿主机没有 CUDA”的说法不准确，准确结论是“当时 Codex 会话未把 CUDA 暴露给 PATH，且依赖库仍未定位”。日志分别位于 `/tmp/CovectorFluids-build-configure.log` 和 `/tmp/CovectorFluids-build-cuda-configure.log`。用户在自己的完整开发环境中应显式设置 CUDA 路径并提供 TBB/OpenVDB/CUDA 驱动，再重跑上述命令。
