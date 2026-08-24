@@ -1,0 +1,79 @@
+Example Implementations for Incompressible Schroedinger Flow (ISF)
+------------------------------------------------------------------
+
+Our Houdini files (.hip files) can be found in the folder "houdini/". They produce all ISF simulations shown in the submitted paper and video. We did remove the fancy rendering modes and replaced them with a simple particle preview rendering mode. This was done for clarity to focus on the simulation algorithm in the submitted code.
+We also provide example MATLAB codes for ISF simulation in the folder "matlab/".
+
+GENERAL NOTES
+-------------
+- Our example hip files run on Houdini 15. A non-commercial version is available for free from SideFX (www.sidefx.com).
+- All example hip files can be opened and played (begin animation) directly. No compilation is needed.
+- In Houdini, ISF subroutines such as Schroedinger equation solver and complex number multiplications are implemented using Houdini's shading language VEX. We collect subroutine functions into header files "ISF.h", "TorusDEC.h", "Util.h" under "houdini/include/" directory.
+- For MATLAB part, all example scripts (example_jet.m, example_leapfrog.m) can be execute directly without further package installation.
+
+=====================
+
+MATLAB PROGRAM
+--------------
+- Our MATLAB program runs on MATLAB 2011 or later versions.
+- To run the program, run script "example_jet" or "example_leapfrog" under the "matlab/" directory.
+- Core routines for ISF simulation are implemented in the class m-files "ISF.m" and "TorusDEC.m".  Run "doc ISF" and "doc TorusDEC" for details.
+- Resulting fluid simulation is visualized by advected particles. Routines related to particles advection are implemented in the class m-file "Particles.m".
+
+=====================
+
+HOUDINI PROGRAM
+---------------
+- Our Houdini files include all ISF simulations shown in the submitted paper and video.
+- Our Houdini files run on Houdini 15 for both commercial and non-commercial versions. Free non-commercial version is available on www.sidefx.com for Windows, Mac and Linux platforms.
+- To run an example program, open the application Houdini FX (with non-commercial license installed).  Warnings are expected opening our hip files using non-commercial license.  File->Open and open one of our example .hip files. Click "Play Animation Forward" bottom found on the bottom left.
+- Example .hip files, "include" folder, and "models" folder have to be put in the same directory.
+- To run Houdini, 4GB RAM is required and 8GB RAM is recommended.
+- A 3-button mouse is recommended for viewport navigation (spacebar + mouse drag) in Houdini and view details of a network node (middle click hold).
+
+HOUDINI FILE DESCRIPTIONS
+-------------------------
+The description and expected dynamics of the resulting simulations from the hip files can be found in the submitted video (see video time code) and paper (see figures).
+
+- example_leapfrog.hip          (00:05) (Fig. 4)
+- example_oblique_collision.hip (00:39) (Fig.14)
+- example_trefoil.hip           (01:17) (Fig. 5)
+- example_ink_collision.hip     (01:42) (Fig. 6)
+- example_jet.hip               (02:18) (Fig. 7)
+- example_von_karman.hip        (02:48) (Fig.15)
+- example_flow_past_sphere.hip  (03:41) (Fig. 8)
+- example_moving_obstacle.hip   (03:56) (Fig. 9)
+- example_buoyant_jet.hip       (04:09) (Fig.10)
+- example_cigarette.hip         (04:24) 
+- example_dryice.hip            (04:48) (Fig. 1)
+
+Each of above hip files share a similar structure in Houdini network. In the "/obj/" network one finds the following nodes:
+
+- fluid -- the geometry node (called SOP) which computes the ISF simulation.  Turn on visibility of this node to see the isosurface |psi_1|^2-|psi_2|^2=0 (Sec. 4.5 in the paper). 
+
+- particles -- to be viewed. It creates particles, reads the computed velocity from the "fluid" SOP, and advects particles.
+
+- particle_geo -- the geometry on which the particle is seeded.
+
+Some hip files may include:
+
+- nozzle -- the geometry of the nozzle of a jet simulation.
+
+- obstacle -- the geometry of an obstacle.
+
+PARAMETERS
+----------
+A tab "Fluid Parameters" can be found after clicking on the "fluid" SOP. It includes sliders for the reduced Planck constant "hbar", computation domain size and resolution (number of grid divisions of the longest axis and use a cubic lattice). Depending on which example hip file there may be parameter for jet velocity, vortex ring position, etc.
+
+A tab "Particle Parameters" can be found after clicking on the "particles" SOP. The field "N particles" is the number of particles either
+  (a) created at the first frame
+  (b) added in every frame 
+depending on the example hip file.
+The field "Render Size" controls the appearance of particles only in "Render View" and creates no effect in "Scene View".
+
+In "example_moving_obstacle.hip" the velocity of the moving obstacle is controlled on the "obstacle" SOP.
+
+
+IMPLEMENTATION DETAILS
+----------------------
+One can double click the "fluid" SOP and view the computation network. One finds "Fluid_Solver" node, which is the main iteration. Many nodes are "Volume Wrangle" nodes in which we write VEX code, Houdini's shading language.  Core subroutine functions are packed into header files in "houdini/include" folder included in many of the Volume Wrangle nodes.
