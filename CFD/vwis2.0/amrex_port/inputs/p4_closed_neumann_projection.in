@@ -1,0 +1,13 @@
+# P4 closed all-Neumann pressure problem. All velocity boundaries are explicit
+# no-penetration walls; the compatible RHS is solved with a zero-mean Phi gauge.
+vwis.n_cell = 24 16 12
+vwis.max_grid_size = 6
+vwis.nghost = 2
+vwis.dt = 0.125
+vwis.projection_time_coefficient = 1.0
+vwis.is_periodic = 0 0 0
+vwis.run_p4_projection_checks = 1
+
+vwisbcs.enabled = 1
+vwisbcs.lo = noslip noslip noslip
+vwisbcs.hi = noslip noslip noslip

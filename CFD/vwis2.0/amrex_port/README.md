@@ -1,11 +1,12 @@
-# VWiS AMReX P0--P3 Cartesian contract
+# VWiS AMReX P0--P4 Cartesian projection contract
 
 `amrex_port/` is independent of the original `vwis2.0/` PETSc/HYPRE solver.
-It is a single-level Cartesian data/runtime framework, not a CFD solver.
-`advance_one_step()` only validates a positive `dt` and exchanges same-level
-halos and reapplies configured P3 boundaries; it implements no RHS, pressure
-solve/projection, time integration, LES, IBM/EB, FSI, curvilinear metric, AMR,
-plotfile payload, or checkpoint payload.
+It is a single-level Cartesian data/runtime framework with a narrow pressure
+projection, not a complete CFD solver. `project_cartesian()` forms a pressure
+RHS from integrated face flux, solves a Cartesian cell-centred Poisson problem
+with MLMG, corrects face flux, and synchronizes `Ucat`. `advance_one_step()` is
+still a no-op: there is no momentum RHS, time integration, LES, IBM/EB, FSI,
+curvilinear metric/operator, AMR, plotfile payload, or checkpoint payload.
 
 ## Version and configuration contract
 
@@ -33,7 +34,7 @@ the result as exploratory. Without AMReX, run:
 bash amrex_port/tests/static_contract_check.sh
 ```
 
-## P0--P3 data and lifecycle contract
+## P0--P4 data and lifecycle contract
 
 The implementation is organized by responsibility: `CartesianBoundaryConfig.*`
 owns input parsing and legacy-code mapping, `VwisAmrExBoundary.cpp` owns
@@ -57,8 +58,8 @@ an ambiguous velocity/flux field.
 `n`, `n-1`, and `n-2` allocation preserves the old `Ucont/Ucont_o/Ucont_rm1`
 shape for a later integrator but P2 never rotates or updates them. `Phi` is a
 workspace, not a pressure time layer. `Nvert` is a legacy IBM classification
-placeholder, not an AMReX EB volume fraction. Pressure datum is unset: only P4
-can choose null-space removal or a physical reference after case-specific BC review.
+placeholder, not an AMReX EB volume fraction. P4 gives correction pressure an
+explicit datum policy below; deferred legacy cases still need case review.
 
 `fill_ghost_cells()` performs `OverrideSync` plus inter-Box/MPI/periodic
 `FillBoundary`; it never supplies non-periodic physical ghosts.
@@ -117,11 +118,51 @@ Walls/symmetry set normal boundary flux to zero. P3 diagnostics report freshness
 epochs, every physical boundary-face flux, their global sum, and the global
 net-flux/cell-volume divergence identity with explicit MPI reductions.
 
-This is boundary/data-flow infrastructure only. The fixed outlet pressure is
-not consumed by a Poisson operator, and divergence is diagnostic—not a pressure
-RHS. See `inputs/p3_cartesian_boundary.in` and the P3 design/test record in
-`_Docs/`; no pressure projection, momentum RHS, time advancement, curvilinear
-metric, IBM/FSI, or complete CFD path is implied.
+The P3 tests remain boundary/data-flow tests. P4 consumes the same boundary
+classification only when explicitly requested by a P4 input; P3 itself still
+does not advance physical state.
+
+## P4 Cartesian pressure projection
+
+`Ucont[d]` remains integrated normal volume flux, never face velocity. Cell
+divergence is net integrated face flux divided once by cell volume. With
+positive `projection_time_coefficient=alpha`, P4 uses
+
+```text
+rhs = (alpha/dt) div(Ucont*)
+L(Phi) = rhs
+Ucont[d] <- Ucont[d] - (dt/alpha) A[d] grad_d(Phi)
+```
+
+AMReX `MLPoisson`/MLMG exposes its signed operator face flux through
+`getFluxes`; the adapter applies that sign and multiplies by Cartesian face
+area before updating `Ucont`. No AMReX API receives integrated flux as ordinary
+velocity. `P` is incremented by `Phi`, then `Ucat` is reconstructed from the
+corrected integrated face flux.
+
+Periodic sides use periodic pressure BC. Inflow, wall, slip, and symmetry use
+homogeneous Neumann correction pressure, so their prescribed normal flux is
+unchanged. A fixed-pressure outflow uses homogeneous Dirichlet `Phi` and is the
+only physical boundary whose normal flux may be corrected. P3's optional
+pre-projection outlet total-flux constraint is deliberately not reimposed after
+projection. Supported physical combinations are exactly one inflow plus one
+outflow, or a closed no-penetration domain; other combinations are rejected.
+
+Fully periodic and closed all-Neumann problems are singular. P4 validates that
+the assembled RHS mean is zero within roundoff, disables MLMG's automatic
+solvability repair, rejects incompatible data, and removes only the converged
+`Phi` mean to choose a gauge. It never silently subtracts the RHS mean. A
+Dirichlet outflow supplies the datum for a nonsingular solve.
+
+The P4 CTests cover periodic and closed singular systems (including an
+incompatible-RHS rejection probe and constant-pressure/no-velocity-change
+check) plus the supported P3 inflow/outflow path. These are manufactured
+Cartesian projection tests, not full CFD or time-integration validation.
+
+The legacy curvilinear Poisson matrix contains non-orthogonal cross terms and a
+19-point stencil. `MLPoisson` is not a replacement for it. The curved-metric
+operator choice remains deferred until metric fields, cross-term discretization,
+boundary treatment, and a validation case exist.
 
 ## P3 host verification on 2026-08-24
 
@@ -147,3 +188,11 @@ The exact commands and error boundaries are recorded in
 OpenMPI sockets is still required for the 2-rank result, and a host with a
 visible NVIDIA device and compatible driver is required for the final CUDA
 runtime result.
+
+## P4 host verification on 2026-08-26
+
+The P4 design, exact commands, solver norms, and MPI evidence boundary are
+recorded in `_Docs/AMReX_P4_Cartesian压力投影设计及测试_20260826.md`. CPU clean
+configure/build and CTest pass against locked AMReX 26.04. MPI is attempted
+separately and is not called a runtime pass if PMIx/socket restrictions prevent
+entry into the application.

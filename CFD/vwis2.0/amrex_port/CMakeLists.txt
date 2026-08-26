@@ -20,7 +20,7 @@ if (DEFINED AMReX_VERSION AND NOT AMReX_VERSION VERSION_EQUAL VWIS_AMREX_EXPECTE
     if (VWIS_AMREX_ALLOW_VERSION_MISMATCH)
         message(WARNING "AMReX ${AMReX_VERSION} differs from locked ${VWIS_AMREX_EXPECTED_VERSION}; exploratory build only.")
     else()
-        message(FATAL_ERROR "Found AMReX ${AMReX_VERSION}, but P0-P2 locks ${VWIS_AMREX_EXPECTED_VERSION}. Use the locked package or set VWIS_AMREX_ALLOW_VERSION_MISMATCH=ON for an unvalidated exploratory build.")
+        message(FATAL_ERROR "Found AMReX ${AMReX_VERSION}, but P0-P4 locks ${VWIS_AMREX_EXPECTED_VERSION}. Use the locked package or set VWIS_AMREX_ALLOW_VERSION_MISMATCH=ON for an unvalidated exploratory build.")
     endif()
 elseif (NOT DEFINED AMReX_VERSION)
     message(WARNING "AMReX did not export AMReX_VERSION; record its revision before treating a build as evidence.")
@@ -38,6 +38,7 @@ set(VWIS_AMREX_SOURCES
     src/CartesianBoundaryConfig.cpp
     src/VwisAmrExSolver.cpp
     src/VwisAmrExBoundary.cpp
+    src/VwisAmrExProjection.cpp
     src/VwisAmrExContracts.cpp)
 add_executable(vwis_amrex_skeleton ${VWIS_AMREX_SOURCES})
 target_link_libraries(vwis_amrex_skeleton PRIVATE AMReX::amrex)
@@ -65,6 +66,12 @@ if (BUILD_TESTING)
              COMMAND vwis_amrex_skeleton ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p3_legacy_supported.in)
     add_test(NAME vwis_amrex_p3_legacy_rejected
              COMMAND vwis_amrex_skeleton ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p3_legacy_rejected.in)
+    add_test(NAME vwis_amrex_p4_periodic_projection
+             COMMAND vwis_amrex_skeleton ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p4_periodic_projection.in)
+    add_test(NAME vwis_amrex_p4_closed_neumann_projection
+             COMMAND vwis_amrex_skeleton ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p4_closed_neumann_projection.in)
+    add_test(NAME vwis_amrex_p4_inflow_outflow_projection
+             COMMAND vwis_amrex_skeleton ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p4_inflow_outflow_projection.in)
     # The source error text is also pinned by static_contract_check.sh.  CTest's
     # WILL_FAIL inverts the nonzero process status; combining it with
     # PASS_REGULAR_EXPRESSION has version-dependent inversion semantics.

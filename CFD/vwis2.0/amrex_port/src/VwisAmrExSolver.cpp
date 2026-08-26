@@ -56,11 +56,14 @@ VwisAmrExSolver::VwisAmrExSolver(
     m_nvert.define(m_ba, m_dm, 1, m_nghost);
     m_ucat.define(m_ba, m_dm, AMREX_SPACEDIM, m_nghost);
     m_ucat_old.define(m_ba, m_dm, AMREX_SPACEDIM, m_nghost);
+    m_projection_rhs.define(m_ba, m_dm, 1, 0);
+    m_projection_bc.define(m_ba, m_dm, 1, 1);
     for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
         amrex::BoxArray face_ba = amrex::convert(m_ba, amrex::IntVect::TheDimensionVector(dir));
         m_ucont[dir].define(face_ba, m_dm, 1, m_nghost);
         m_ucont_old[dir].define(face_ba, m_dm, 1, m_nghost);
         m_ucont_older[dir].define(face_ba, m_dm, 1, m_nghost);
+        m_phi_operator_flux[dir].define(face_ba, m_dm, 1, 0);
     }
     register_fields();
     register_metric_metadata();
@@ -132,7 +135,10 @@ void VwisAmrExSolver::initialize()
         m_ucont[dir].setVal(0.0);
         m_ucont_old[dir].setVal(0.0);
         m_ucont_older[dir].setVal(0.0);
+        m_phi_operator_flux[dir].setVal(0.0);
     }
+    m_projection_rhs.setVal(0.0);
+    m_projection_bc.setVal(0.0);
     mark_valid_modified();
     if (m_boundary.enabled) apply_boundary_pipeline("initialize");
     else fill_ghost_cells();
@@ -173,7 +179,7 @@ void VwisAmrExSolver::fill_ghost_cells()
 
 void VwisAmrExSolver::advance_one_step(amrex::Real dt)
 {
-    if (dt <= 0.0) throw std::runtime_error("vwis.dt must be positive even for the P3 no-op");
+    if (dt <= 0.0) throw std::runtime_error("vwis.dt must be positive even for the P4 framework no-op");
     const amrex::Real start = amrex::second();
     if (m_boundary.enabled) apply_boundary_pipeline("noop-step");
     else fill_ghost_cells();
@@ -181,6 +187,11 @@ void VwisAmrExSolver::advance_one_step(amrex::Real dt)
 }
 
 void VwisAmrExSolver::sync_ucat_from_ucont()
+{
+    sync_ucat_from_ucont_impl(true);
+}
+
+void VwisAmrExSolver::sync_ucat_from_ucont_impl(bool reapply_boundary_flux)
 {
     // Face valid regions overlap at Box boundaries.  OverrideSync first makes
     // the AMReX owner authoritative, then FillBoundary supplies stencil ghosts.
@@ -202,7 +213,13 @@ void VwisAmrExSolver::sync_ucat_from_ucont()
         }
     }
     mark_valid_modified();
-    if (m_boundary.enabled) apply_boundary_pipeline("sync-ucat-from-ucont");
+    if (m_boundary.enabled) {
+        fill_ghost_cells();
+        fill_physical_ghost_cells_impl(reapply_boundary_flux);
+        (void)p3_diagnostics("sync-ucat-from-ucont", true);
+    } else {
+        fill_ghost_cells();
+    }
 }
 
 void VwisAmrExSolver::sync_ucont_from_ucat()

@@ -28,6 +28,14 @@ struct P3Diagnostics {
     amrex::Real max_abs_divergence = 0.0;
 };
 
+struct ProjectionDiagnostics {
+    amrex::Real max_divergence_before = 0.0;
+    amrex::Real max_divergence_after = 0.0;
+    amrex::Real rhs_mean = 0.0;
+    amrex::Real final_residual = 0.0;
+    bool singular = false;
+};
+
 /**
  * P0--P2 field contract. `ghost_cells` is allocated same-level halo width;
  * ghost reads require fill_ghost_cells() after a valid-region write.  The
@@ -53,12 +61,13 @@ struct MetricSpec {
 };
 
 /**
- * Single-level Cartesian P0--P3 data owner. MultiFabs remain owned here for the
+ * Single-level Cartesian P0--P4 data owner. MultiFabs remain owned here for the
  * complete solver lifetime, while tile Array4 views never escape an MFIter.
  * Thus DistributionMapping is the sole MPI ownership authority; valid cells
  * may be written independently and only fill_ghost_cells() exchanges halos.
- * P3 adds only physical ghost/boundary flux plumbing.  No momentum, pressure
- * projection/RHS, time integration, LES, IBM, or FSI algorithm exists.
+ * P4 adds a single-level Cartesian pressure projection of integrated face
+ * volume flux. No momentum RHS, time integration, curvilinear operator, LES,
+ * IBM, or FSI algorithm exists.
  */
 class VwisAmrExSolver {
 public:
@@ -81,7 +90,7 @@ public:
     void fill_physical_ghost_cells();
     /** Required order: same-level/MPI/periodic halo, then physical ghosts/faces. */
     void apply_boundary_pipeline(char const* stage);
-    /** P1 placeholder with an explicit positive-dt contract; it does not rotate time layers. */
+    /** Framework no-op with an explicit positive-dt contract; it does not rotate time layers. */
     void advance_one_step(amrex::Real dt);
     /** Exercise base cell layout, initialization, periodic halo, and physical-BC limitation contracts. */
     void run_runtime_contract_checks();
@@ -93,6 +102,10 @@ public:
     void run_p2_transform_layout_checks();
     /** Verify P3 classification, cell/face physical ghosts, flux, and stale-ghost diagnostics. */
     void run_p3_boundary_contract_checks();
+    /** Solve the P4 Cartesian pressure correction and project integrated face fluxes. */
+    ProjectionDiagnostics project_cartesian(amrex::Real dt, amrex::Real time_coefficient = 1.0);
+    /** Manufactured checks for the configured periodic, closed, or inflow/outflow pressure policy. */
+    void run_p4_projection_contract_checks(amrex::Real dt, amrex::Real time_coefficient = 1.0);
     /** Globally reduced P3 boundary/divergence/freshness report; diagnostic only, never a RHS. */
     P3Diagnostics p3_diagnostics(char const* stage, bool require_fresh = true) const;
     /** IO-rank layout/schema diagnostics, safe after initialization or a no-op step. */
@@ -105,10 +118,15 @@ private:
     void register_metric_metadata();
     void define_boundary_metadata();
     void validate_boundary_config() const;
+    void validate_projection_boundary_policy() const;
     void mark_valid_modified();
     void require_ghosts_fresh(char const* consumer) const;
     amrex::Real boundary_flux(int dir, bool high) const;
     amrex::Real inlet_profile_integral(int dir, bool high) const;
+    void fill_physical_ghost_cells_impl(bool impose_boundary_flux);
+    void sync_ucat_from_ucont_impl(bool reapply_boundary_flux);
+    void compute_cartesian_divergence(amrex::MultiFab& divergence) const;
+    amrex::Real validate_singular_rhs_compatibility(amrex::MultiFab const& rhs) const;
 
     amrex::Geometry m_geom;
     amrex::BoxArray m_ba;
@@ -120,11 +138,14 @@ private:
     amrex::MultiFab m_nvert;
     amrex::MultiFab m_ucat;
     amrex::MultiFab m_ucat_old;
+    amrex::MultiFab m_projection_rhs;
+    amrex::MultiFab m_projection_bc;
 
     // MAC face IndexType: each field has one normal volume-flux component.
     amrex::Array<amrex::MultiFab, AMREX_SPACEDIM> m_ucont;
     amrex::Array<amrex::MultiFab, AMREX_SPACEDIM> m_ucont_old;
     amrex::Array<amrex::MultiFab, AMREX_SPACEDIM> m_ucont_older;
+    amrex::Array<amrex::MultiFab, AMREX_SPACEDIM> m_phi_operator_flux;
     std::vector<FieldSpec> m_fields;
     std::vector<MetricSpec> m_metrics;
     std::vector<amrex::BCRec> m_cell_bcs;

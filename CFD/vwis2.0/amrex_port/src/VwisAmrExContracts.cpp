@@ -417,7 +417,7 @@ void VwisAmrExSolver::run_p3_boundary_contract_checks()
 
 void VwisAmrExSolver::diagnostics() const
 {
-    amrex::Print() << "VWiS AMReX P3 skeleton: boxes=" << m_ba.size()
+    amrex::Print() << "VWiS AMReX P4 Cartesian sub-contract: boxes=" << m_ba.size()
                    << ", ranks=" << amrex::ParallelDescriptor::NProcs()
                    << ", ghosts=" << m_nghost
                    << ", dx=" << m_dx[0] << "," << m_dx[1] << "," << m_dx[2]
@@ -443,10 +443,10 @@ void VwisAmrExSolver::write_metadata_manifest(std::string const& path) const
 {
     if (!amrex::ParallelDescriptor::IOProcessor()) return;
     std::ofstream output(path);
-    if (!output) throw std::runtime_error("cannot write P3 metadata manifest: " + path);
-    output << "{\n  \"schema\": \"vwis-amrex-p3-boundary-contract-v1\",\n"
+    if (!output) throw std::runtime_error("cannot write P4 metadata manifest: " + path);
+    output << "{\n  \"schema\": \"vwis-amrex-p4-cartesian-projection-contract-v1\",\n"
            << "  \"payload_written\": false,\n"
-           << "  \"note\": \"Not a plotfile or checkpoint; no restart payload exists through P3.\",\n"
+           << "  \"note\": \"Not a plotfile or checkpoint; no restart payload exists through P4.\",\n"
            << "  \"fields\": [\n";
     for (std::size_t i = 0; i < m_fields.size(); ++i) {
         auto const& field = m_fields[i];
@@ -467,5 +467,6 @@ void VwisAmrExSolver::write_metadata_manifest(std::string const& path) const
                << (i + 1 == m_metrics.size() ? "\n" : ",\n");
     }
     output << "  ],\n"
-           << "  \"advance_one_step\": \"no-op\"\n}\n";
+           << "  \"advance_one_step\": \"no-op\",\n"
+           << "  \"projection\": \"single-level Cartesian MLPoisson/MLMG; explicit call only\"\n}\n";
 }

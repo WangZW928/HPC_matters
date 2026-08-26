@@ -1,0 +1,9 @@
+# P4 singular periodic manufactured projection. The pressure RHS must already
+# have zero mean; P4 rejects rather than silently repairs incompatible data.
+vwis.n_cell = 24 16 12
+vwis.max_grid_size = 6
+vwis.nghost = 2
+vwis.dt = 0.125
+vwis.projection_time_coefficient = 1.5
+vwis.is_periodic = 1 1 1
+vwis.run_p4_projection_checks = 1

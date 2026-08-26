@@ -2,7 +2,7 @@
 set -euo pipefail
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 port="$root/amrex_port"
-required=("$port/CMakeLists.txt" "$port/CMakePresets.json" "$port/amrex_version.lock" "$port/inputs/p1_smoke.in" "$port/inputs/p1_multibox.in" "$port/inputs/p1_contract.in" "$port/inputs/p2_contract.in" "$port/inputs/p2_boundary_face.in" "$port/inputs/p3_cartesian_boundary.in" "$port/inputs/p3_legacy_supported.in" "$port/inputs/p3_legacy_rejected.in" "$port/src/CartesianBoundaryConfig.H" "$port/src/CartesianBoundaryConfig.cpp" "$port/src/VwisAmrExSolver.H" "$port/src/VwisAmrExSolver.cpp" "$port/src/VwisAmrExBoundary.cpp" "$port/src/VwisAmrExContracts.cpp")
+required=("$port/CMakeLists.txt" "$port/CMakePresets.json" "$port/amrex_version.lock" "$port/inputs/p1_smoke.in" "$port/inputs/p1_multibox.in" "$port/inputs/p1_contract.in" "$port/inputs/p2_contract.in" "$port/inputs/p2_boundary_face.in" "$port/inputs/p3_cartesian_boundary.in" "$port/inputs/p3_legacy_supported.in" "$port/inputs/p3_legacy_rejected.in" "$port/inputs/p4_periodic_projection.in" "$port/inputs/p4_closed_neumann_projection.in" "$port/inputs/p4_inflow_outflow_projection.in" "$port/src/CartesianBoundaryConfig.H" "$port/src/CartesianBoundaryConfig.cpp" "$port/src/VwisAmrExSolver.H" "$port/src/VwisAmrExSolver.cpp" "$port/src/VwisAmrExBoundary.cpp" "$port/src/VwisAmrExProjection.cpp" "$port/src/VwisAmrExContracts.cpp")
 for file in "${required[@]}"; do test -f "$file"; done
 rg -q 'find_package\(AMReX CONFIG QUIET\)' "$port/CMakeLists.txt"
 rg -q 'AMReXConfig.cmake was not found' "$port/CMakeLists.txt"
@@ -12,7 +12,7 @@ rg -q 'm_cell_volume' "$port/src/VwisAmrExSolver.H"
 rg -q 'm_face_area' "$port/src/VwisAmrExSolver.H"
 rg -q 'm_ucont_older' "$port/src/VwisAmrExSolver.H"
 rg -q 'amrex::BCRec' "$port/src/VwisAmrExSolver.H"
-rg -q 'AMREX_GPU_DEVICE' "$port/src/VwisAmrExSolver.cpp" "$port/src/VwisAmrExBoundary.cpp" "$port/src/VwisAmrExContracts.cpp"
+rg -q 'AMREX_GPU_DEVICE' "$port/src/VwisAmrExSolver.cpp" "$port/src/VwisAmrExBoundary.cpp" "$port/src/VwisAmrExProjection.cpp" "$port/src/VwisAmrExContracts.cpp"
 rg -q 'payload_written' "$port/src/VwisAmrExContracts.cpp"
 rg -q 'run_runtime_contract_checks' "$port/src/VwisAmrExContracts.cpp"
 rg -q 'sync_ucat_from_ucont' "$port/src/VwisAmrExSolver.cpp"
@@ -32,8 +32,12 @@ rg -q 'ReduceRealSum' "$port/src/VwisAmrExBoundary.cpp" "$port/src/VwisAmrExCont
 rg -q 'ReduceRealMax' "$port/src/VwisAmrExContracts.cpp"
 rg -q 'P3-001/002/003/004: PASS' "$port/src/VwisAmrExContracts.cpp"
 rg -q 'unsupported legacy BC integer' "$port/src/CartesianBoundaryConfig.cpp"
-if rg -n 'MacProjector|MLMG|PoissonSolver|ComputeRHS|RHSSolver' "$port/src"; then
-  echo 'P1 source unexpectedly references a physics solver' >&2
-  exit 1
-fi
-echo 'static P0-P3 AMReX contract check: PASS'
+rg -q 'AMReX_MLPoisson.H' "$port/src/VwisAmrExProjection.cpp"
+rg -q 'net face flux divided by Cartesian cell volume' "$port/src/VwisAmrExProjection.cpp"
+rg -q 'm_face_area\[dir\]' "$port/src/VwisAmrExProjection.cpp"
+rg -q 'no automatic mean subtraction is permitted' "$port/src/VwisAmrExProjection.cpp"
+rg -q 'LinOpBCType::Dirichlet' "$port/src/VwisAmrExProjection.cpp"
+rg -q 'LinOpBCType::Neumann' "$port/src/VwisAmrExProjection.cpp"
+rg -Fq 'sync_ucat_from_ucont_impl(false)' "$port/src/VwisAmrExProjection.cpp"
+rg -q 'P4 Cartesian projection contract: PASS' "$port/src/VwisAmrExProjection.cpp"
+echo 'static P0-P4 AMReX contract check: PASS'

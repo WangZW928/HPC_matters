@@ -25,6 +25,8 @@ int main(int argc, char* argv[])
         bool run_contract_checks = false;
         bool run_p2_transform_checks = false;
         bool run_p3_boundary_checks = false;
+        bool run_p4_projection_checks = false;
+        amrex::Real projection_time_coefficient = 1.0;
         std::string metadata_file;
         pp.query("max_grid_size", max_grid_size);
         pp.query("nghost", nghost);
@@ -32,6 +34,8 @@ int main(int argc, char* argv[])
         pp.query("run_contract_checks", run_contract_checks);
         pp.query("run_p2_transform_checks", run_p2_transform_checks);
         pp.query("run_p3_boundary_checks", run_p3_boundary_checks);
+        pp.query("run_p4_projection_checks", run_p4_projection_checks);
+        pp.query("projection_time_coefficient", projection_time_coefficient);
         pp.query("metadata_file", metadata_file);
 
         amrex::RealBox physical_domain(
@@ -50,12 +54,16 @@ int main(int argc, char* argv[])
         if (run_p3_boundary_checks) {
             solver.run_p3_boundary_contract_checks();
         }
-        // Explicit P3 no-op: no physical state is advanced.
+        if (run_p4_projection_checks) {
+            solver.run_p4_projection_contract_checks(dt, projection_time_coefficient);
+        }
+        // Explicit P4 framework no-op: projection tests are separate and no
+        // momentum/time state is advanced here.
         solver.advance_one_step(dt);
         if (!metadata_file.empty()) solver.write_metadata_manifest(metadata_file);
         solver.diagnostics();
     } catch (std::exception const& error) {
-        amrex::Print() << "VWiS AMReX P3 error: " << error.what() << "\n";
+        amrex::Print() << "VWiS AMReX P4 error: " << error.what() << "\n";
         status = 1;
     }
     amrex::Finalize();

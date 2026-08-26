@@ -6,9 +6,9 @@
 
 |状态|数量|说明|
 |---|---:|---|
-|已完成|8|P0-001/002、P2-001--005 与 P3-001 的限定工程契约；不代表 CFD 求解器完成|
-|进行中|11|P0/P1 既有部分证据及 P3-002--004 实现；P3 已有 CPU runtime，MPI/CFD 数值验收仍缺|
-|未开始|34|其余物理实现、数值验证、AMR/IBM/FSI、I/O 和发布任务|
+|已完成|9|P0-001/002、P2-001--005、P3-001 与 P4-005 的限定工程/设计契约；不代表 CFD 求解器完成|
+|进行中|15|P0/P1、P3-002--004 与 P4-001--004；P4 已有 CPU runtime，MPI/CFD 数值验收仍缺|
+|未开始|29|其余物理实现、数值验证、AMR/IBM/FSI、I/O 和发布任务|
 |合计|53|按下列任务 ID 计数|
 
 ### 当前已完成的真实项与证据边界
@@ -20,6 +20,8 @@
 - `P1-001`：`amrex_port` 已有 `Initialize/Finalize`、`ParmParse`、`Geometry`、`BoxArray`、`DistributionMapping`、cell/face `MultiFab`、字段注册、`MFIter`/GPU-safe `ParallelFor`、`FillBoundary`、`BCRec` 元数据、日志/计时和 schema-only metadata。CPU MPI 与单 rank CUDA contract 已运行通过；`advance_one_step()` 仍是 no-op，故只能标记为“进行中”。
 - `P2-001--005`：限定为单层均匀 Cartesian 数据/变换/布局契约。`Ucont[d]` 是积分面体积通量 $u_d A_d$，`Ucat` 是 cell 速度；散度回归使用净面通量/单元体积。唯一面求和用 `OwnerMask/sum_unique`，face ghost 仅覆盖 inter-Box/MPI/周期，非周期 domain face 的邻接单元复制只是 P2 外推闭合，不是物理 BC。CPU/MPI 与单卡 CUDA 历史结果须以 P2 review 后的定向复测记录为准；这些都不是 P3/P4/P5 数值验收。
 - `P3-001`：已从旧 `BcsUtility/CurvGrid` 抽取 1/3/4/5 与独立 periodic 的证据，建立逐面 named/legacy adapter；旧 0/2/6/8/10/11/12/13/14/-1/-2 明确拒绝。2026-08-24 clean 复测为 CPU CTest 7/7 PASS、MPI configure/build/link PASS、CUDA compile/device-link/link PASS；MPI 因执行环境禁止 PMIx socket、CUDA 因设备/驱动不可见而在进入应用代码前 BLOCKED，不能记作 runtime PASS。P3-002--004 保持进行中；详见 `_Docs/AMReX_P3_边界与诊断设计及测试_20260824.md`。
+- `P4-001--004`：已实现单层均匀 Cartesian 的积分面通量散度/RHS、显式 pressure BC/compatibility/datum、AMReX `MLPoisson`/MLMG 求解、带面积适配的 face correction 和 `Ucat` 同步。2026-08-26 locked 26.04 CPU CTest 10/10 PASS；周期、封闭 Neumann、入口/定压出口制造测试的散度均降至约 $10^{-10}$ 或更低。MPI build/link 与 runtime 边界见 P4 记录；没有动量/时间推进或 CFD case，因此仍为进行中。
+- `P4-005`：已明确选择“Cartesian `MLPoisson` 仅作为 P4 基线，legacy 曲线非正交 19 点算子延期决策”；禁止把两者视为替换关系。曲线 metric、交叉项、自定义算子/延迟修正和验证 case 留 P5 原型，故设计门完成但曲线实现未开始。
 
 ## 关键路径与门禁
 
@@ -84,11 +86,11 @@ P0 基线/接口
 
 |ID|模块|任务描述|依赖|I/O|文件|验收|风险|状态|备注|
 |---|---|---|---|---|---|---|---|---|---|
-|P4-001|散度/RHS|从积分 face `Ucont` 以净通量/体积计算 Cartesian 散度和 pressure RHS，冻结符号/时间系数|P3-004|U* → div/RHS|`FlowSolver.C:133+`,`PoissonSolver.C:209+`|解析场 L2/L∞、全域通量恒等式、积分 RHS 可解性通过|把 volume flux 再除 dx；旧诊断跳过边界/IBM 邻域|未开始|P2 derived divergence 只是 stencil regression；曲线 19 点算子不在此任务替换|
-|P4-002|压力 BC/零空间|定义 Dirichlet/Neumann/周期组合、压力参考和 RHS 去均值策略|P3-001,P4-001|BC/RHS → solvable system|`PoissonSolver.C:134+`|常数压力不改速度；兼容性条件被记录|`BC(3)==-10` 语义需以 case 复核|未开始|不得盲目全域减均值|
-|P4-003|Cartesian 求解器|评估并实现一个固定版本的 `MacProjector` 或 MLMG+自写修正路径|P4-001,P4-002|RHS/BC → Phi|目标 `Projection.*`|残差、迭代数和 CPU/MPI 可复现|API 面速度与 `Ucont` 积分通量语义不匹配|未开始|若用 MacProjector，显式实现并测试 $U/A\leftrightarrow u_n$ adapter；二选一记录版本/理由|
-|P4-004|速度修正|按相同 face metric/系数修正 Ucont，并同步 Ucat|P4-003,P2-003|Phi/U* → U(n+1)|`PoissonSolver.C:2352+`|投影后 div 降至容差；质量守恒|符号、dt 系数、边界 face|未开始|必须与 P4-001 使用同一离散|
-|P4-005|曲线算子决策|用现有 `PoissonLHS`/RHS/Projection 比对 19 点项、对称性、零空间和可选实现|P4-001,P0-005|metric/stencil → design record|`PoissonSolver.C:891-1598,2352+`|明确 custom operator、deferred correction 或临时 PETSc/HYPRE 对照的门槛|将 19 点曲线算子直接替换 Cartesian 算子|未开始|这是设计门，非生产实现承诺|
+|P4-001|散度/RHS|从积分 face `Ucont` 以净通量/体积计算 Cartesian 散度和 pressure RHS，冻结符号/时间系数|P3-004|U* → div/RHS|`FlowSolver.C:133+`,`PoissonSolver.C:209+`|解析场 L2/L∞、全域通量恒等式、积分 RHS 可解性通过|把 volume flux 再除 dx；旧诊断跳过边界/IBM 邻域|进行中|实现 $rhs=(\alpha/dt)\,div(U^*)$；CPU 制造场通过，MPI/CFD case 尚缺；曲线 19 点不在此替换|
+|P4-002|压力 BC/零空间|定义 Dirichlet/Neumann/周期组合、压力参考和 RHS 去均值策略|P3-001,P4-001|BC/RHS → solvable system|`PoissonSolver.C:134+`|常数压力不改速度；兼容性条件被记录|`BC(3)==-10` 语义需以 case 复核|进行中|周期/封闭 Neumann 显式验 RHS mean 并拒绝不兼容，不减 RHS 均值；只去 converged Phi 均值选 gauge；定压出口为 Phi=0 Dirichlet|
+|P4-003|Cartesian 求解器|评估并实现一个固定版本的 `MacProjector` 或 MLMG+自写修正路径|P4-001,P4-002|RHS/BC → Phi|目标 `Projection.*`|残差、迭代数和 CPU/MPI 可复现|API 面速度与 `Ucont` 积分通量语义不匹配|进行中|选择 locked 26.04 `MLPoisson`/MLMG + 自写 correction；`getFluxes` operator flux 经显式面积适配，CPU PASS，MPI runtime 待环境|
+|P4-004|速度修正|按相同 face metric/系数修正 Ucont，并同步 Ucat|P4-003,P2-003|Phi/U* → U(n+1)|`PoissonSolver.C:2352+`|投影后 div 降至容差；质量守恒|符号、dt 系数、边界 face|进行中|同一 face/volume 离散，修正 Ucont 后同步 Ucat；不重新覆盖 pressure-outlet correction；CPU 三类 BC PASS|
+|P4-005|曲线算子决策|用现有 `PoissonLHS`/RHS/Projection 比对 19 点项、对称性、零空间和可选实现|P4-001,P0-005|metric/stencil → design record|`PoissonSolver.C:891-1598,2352+`|明确 custom operator、deferred correction 或临时 PETSc/HYPRE 对照的门槛|将 19 点曲线算子直接替换 Cartesian 算子|已完成|P4 只选 Cartesian `MLPoisson` 基线；曲线 19 点交叉 metric 需 P5 自定义算子/deferred correction 原型及 case 后再定，不以 Cartesian 路径替换|
 
 ### P5 动量 RHS 与时间推进
 

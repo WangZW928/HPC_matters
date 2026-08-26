@@ -79,9 +79,6 @@ void VwisAmrExSolver::validate_boundary_config() const
     if (m_boundary.inlet_profile != "uniform" && m_boundary.inlet_profile != "linear_plane") {
         throw std::runtime_error("vwisbcs.inlet_profile must be uniform or linear_plane");
     }
-    if (!(m_boundary.inlet_target_flux > 0.0)) {
-        throw std::runtime_error("vwisbcs.inlet_target_flux must be positive (magnitude entering domain)");
-    }
     int inlet_count = 0;
     int outlet_count = 0;
     for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
@@ -96,8 +93,13 @@ void VwisAmrExSolver::validate_boundary_config() const
             outlet_count += kind == CartesianBC::Outflow;
         }
     }
-    if (inlet_count != 1 || outlet_count != 1) {
-        throw std::runtime_error("P3 minimal flux path requires exactly one inflow and one outflow side");
+    if ((inlet_count == 1 || outlet_count == 1) &&
+        (!(m_boundary.inlet_target_flux > 0.0))) {
+        throw std::runtime_error("vwisbcs.inlet_target_flux must be positive (magnitude entering domain)");
+    }
+    if (!((inlet_count == 1 && outlet_count == 1) ||
+          (inlet_count == 0 && outlet_count == 0))) {
+        throw std::runtime_error("Cartesian boundary path requires one inflow and one outflow, or a closed no-penetration domain");
     }
 }
 
@@ -128,6 +130,11 @@ amrex::Real VwisAmrExSolver::boundary_flux(int dir, bool high) const
 }
 
 void VwisAmrExSolver::fill_physical_ghost_cells()
+{
+    fill_physical_ghost_cells_impl(true);
+}
+
+void VwisAmrExSolver::fill_physical_ghost_cells_impl(bool impose_boundary_flux)
 {
     if (!m_boundary.enabled) {
         throw std::runtime_error("physical ghost fill requested without vwisbcs.enabled=1");
@@ -180,9 +187,14 @@ void VwisAmrExSolver::fill_physical_ghost_cells()
                 const int kind = kinds[2 * boundary_dir + side];
                 const amrex::Real interior = value(source[0], source[1], source[2], comp);
                 if (role == 2) { value(i,j,k,comp) = interior; return; } // Nvert classifier: zero-gradient only.
-                if (role == 1) { // pressure/Phi
+                if (role == 1) { // accumulated pressure
                     value(i,j,k,comp) = kind == static_cast<int>(CartesianBC::Outflow)
                         ? 2.0 * pressures[2 * boundary_dir + side] - interior : interior;
+                    return;
+                }
+                if (role == 3) { // pressure correction: homogeneous Dirichlet at pressure outlet
+                    value(i,j,k,comp) = kind == static_cast<int>(CartesianBC::Outflow)
+                        ? -interior : interior;
                     return;
                 }
                 // Ucat: inlet profile is imposed consistently from boundary Ucont below;
@@ -205,51 +217,54 @@ void VwisAmrExSolver::fill_physical_ghost_cells()
             });
         }
     };
-    fill_cell(m_p, 1); fill_cell(m_phi, 1); fill_cell(m_nvert, 2);
+    fill_cell(m_p, 1); fill_cell(m_phi, 3); fill_cell(m_nvert, 2);
     fill_cell(m_ucat, 0); fill_cell(m_ucat_old, 0);
 
     // First make every physical normal boundary face authoritative. Inflow is
     // a globally normalized plane profile; constrained outflow has equal and
     // opposite outward flux. Wall/symmetry normal flux is exactly zero.
-    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
-        const amrex::Box face_domain = amrex::convert(domain, amrex::IntVect::TheDimensionVector(dir));
-        for (int side = 0; side < 2; ++side) {
-            const bool high = side != 0;
-            const auto kind = m_boundary.sides[2 * dir + side].velocity;
-            if (kind == CartesianBC::Periodic) continue;
-            amrex::Real profile_scale = 0.0;
-            if (kind == CartesianBC::Inflow) {
-                profile_scale = inlet_scales[2 * dir + side];
-            }
-            const int boundary_index = high ? face_domain.bigEnd(dir) : face_domain.smallEnd(dir);
-            const int linear = m_boundary.inlet_profile == "linear_plane";
-            const amrex::Real offset = m_boundary.profile_offset;
-            const amrex::Real slope0 = m_boundary.profile_slope_0;
-            const amrex::Real slope1 = m_boundary.profile_slope_1;
-            const amrex::Real area = m_face_area[dir];
-            const auto problo = m_geom.ProbLoArray();
-            const auto dx = m_geom.CellSizeArray();
-            const int td0 = (dir + 1) % AMREX_SPACEDIM;
-            const int td1 = (dir + 2) % AMREX_SPACEDIM;
-            const amrex::Real outflow_density = m_boundary.inlet_target_flux /
-                (static_cast<amrex::Real>(domain.length(td0) * domain.length(td1)));
-            const bool constrain_outlet = m_boundary.constrain_outlet_flux;
-            for (amrex::MFIter mfi(m_ucont[dir], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-                auto const flux = m_ucont[dir].array(mfi);
-                amrex::ParallelFor(mfi.validbox(), [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-                    const int index[AMREX_SPACEDIM] = {AMREX_D_DECL(i,j,k)};
-                    if (index[dir] != boundary_index) return;
-                    if (kind == CartesianBC::Inflow) {
-                        const amrex::Real x0 = problo[td0] + (static_cast<amrex::Real>(index[td0]) + 0.5) * dx[td0];
-                        const amrex::Real x1 = problo[td1] + (static_cast<amrex::Real>(index[td1]) + 0.5) * dx[td1];
-                        const amrex::Real weight = offset + linear * (slope0 * x0 + slope1 * x1);
-                        flux(i,j,k) = (high ? -1.0 : 1.0) * profile_scale * weight * area;
-                    } else if (kind == CartesianBC::Outflow && constrain_outlet) {
-                        flux(i,j,k) = (high ? 1.0 : -1.0) * outflow_density;
-                    } else if (kind != CartesianBC::Outflow) {
-                        flux(i,j,k) = 0.0;
-                    }
-                });
+    if (impose_boundary_flux) {
+        for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+            const amrex::Box face_domain =
+                amrex::convert(domain, amrex::IntVect::TheDimensionVector(dir));
+            for (int side = 0; side < 2; ++side) {
+                const bool high = side != 0;
+                const auto kind = m_boundary.sides[2 * dir + side].velocity;
+                if (kind == CartesianBC::Periodic) continue;
+                amrex::Real profile_scale = 0.0;
+                if (kind == CartesianBC::Inflow) {
+                    profile_scale = inlet_scales[2 * dir + side];
+                }
+                const int boundary_index = high ? face_domain.bigEnd(dir) : face_domain.smallEnd(dir);
+                const int linear = m_boundary.inlet_profile == "linear_plane";
+                const amrex::Real offset = m_boundary.profile_offset;
+                const amrex::Real slope0 = m_boundary.profile_slope_0;
+                const amrex::Real slope1 = m_boundary.profile_slope_1;
+                const amrex::Real area = m_face_area[dir];
+                const auto problo = m_geom.ProbLoArray();
+                const auto dx = m_geom.CellSizeArray();
+                const int td0 = (dir + 1) % AMREX_SPACEDIM;
+                const int td1 = (dir + 2) % AMREX_SPACEDIM;
+                const amrex::Real outflow_density = m_boundary.inlet_target_flux /
+                    (static_cast<amrex::Real>(domain.length(td0) * domain.length(td1)));
+                const bool constrain_outlet = m_boundary.constrain_outlet_flux;
+                for (amrex::MFIter mfi(m_ucont[dir], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+                    auto const flux = m_ucont[dir].array(mfi);
+                    amrex::ParallelFor(mfi.validbox(), [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+                        const int index[AMREX_SPACEDIM] = {AMREX_D_DECL(i,j,k)};
+                        if (index[dir] != boundary_index) return;
+                        if (kind == CartesianBC::Inflow) {
+                            const amrex::Real x0 = problo[td0] + (static_cast<amrex::Real>(index[td0]) + 0.5) * dx[td0];
+                            const amrex::Real x1 = problo[td1] + (static_cast<amrex::Real>(index[td1]) + 0.5) * dx[td1];
+                            const amrex::Real weight = offset + linear * (slope0 * x0 + slope1 * x1);
+                            flux(i,j,k) = (high ? -1.0 : 1.0) * profile_scale * weight * area;
+                        } else if (kind == CartesianBC::Outflow && constrain_outlet) {
+                            flux(i,j,k) = (high ? 1.0 : -1.0) * outflow_density;
+                        } else if (kind != CartesianBC::Outflow) {
+                            flux(i,j,k) = 0.0;
+                        }
+                    });
+                }
             }
         }
     }
