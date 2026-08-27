@@ -10,8 +10,6 @@
 - 不同 stream 里的操作在条件允许时可以重叠执行
 - 常见可重叠对象包括：kernel、`cudaMemcpyAsync`、部分同步较少的 GPU 工作
 
-一句话理解：
-
 `stream` 不是性能指标，而是组织和调度 GPU 工作的机制。
 
 ## 2. 为什么要用 stream
@@ -24,7 +22,7 @@
 2. 一边算第 0 块数据
 3. 一边回传上一块结果
 
-这样就有机会把“拷贝”和“计算”重叠起来。
+这样就有机会把“拷贝”和“计算”重叠起来，从而节省计算时间。
 
 ## 3. 什么是锁页内存
 
@@ -33,7 +31,7 @@
 - `pinned memory`
 - `page-locked memory`
 
-它的含义是：这块主机内存不会被操作系统随意换页到磁盘，所以 GPU/驱动可以更稳定地直接访问它。
+它的含义是：这块主机内存（在CPU上，不在GPU上）不会被操作系统随意换页到磁盘，所以 GPU/驱动可以更稳定地直接访问它。
 
 在 CUDA 里，常见分配方式是：
 
@@ -44,11 +42,11 @@ cudaMallocHost(&h_ptr, bytes);
 
 为什么它重要：
 
-- 普通 `std::vector` 或 `new` 出来的 host 内存，通常是 pageable memory
+- 普通 `std::vector` 或 `new` 出来的 host 内存，通常是 pageable memory（即，非锁业的）
 - pageable memory 往往不能很好地支持真正高效的异步 H2D / D2H 拷贝
-- 如果想让 `cudaMemcpyAsync` 更有机会和 kernel 重叠，通常需要 pinned memory
+- 如果想让 `cudaMemcpyAsync` 更有机会和 kernel 重叠（在运行时间上），通常需要 pinned memory
 
-所以你在本项目的 [stream_bench.cu](/home/wangz/MyProject/HPC_matters/CUDA/cuda_stream_intro/src/stream_bench.cu) 里会看到：
+所以在本项目的 [stream_bench.cu](./src/stream_bench.cu) 里会看到：
 
 ```cpp
 cudaMallocHost(&host.a, total_bytes);
@@ -66,7 +64,7 @@ cudaMemcpyAsync(dst, src, bytes, cudaMemcpyHostToDevice, stream);
 
 它和普通 `cudaMemcpy` 的区别是：
 
-- `cudaMemcpy` 更像“这一步先做完，再往后走”
+- `cudaMemcpy` 更像是流水线上的顺序任务提交
 - `cudaMemcpyAsync` 是“把这项拷贝任务提交到某个 stream 队列里”
 
 这并不等于“它一定立刻并发执行”，是否真的重叠还取决于：
@@ -76,9 +74,9 @@ cudaMemcpyAsync(dst, src, bytes, cudaMemcpyHostToDevice, stream);
 - GPU 是否支持相应的 copy/compute overlap
 - 当前 workload 是否真的存在可重叠空间
 
-所以更准确地说：
+准确地说：
 
-`Async` 的意思是“异步提交”，不是“保证并发加速”。
+`Async` 的意思是“异步提交”，并不是“保证并发加速”。
 
 ## 5. 本项目做了什么
 
@@ -90,11 +88,11 @@ cudaMemcpyAsync(dst, src, bytes, cudaMemcpyHostToDevice, stream);
 核心目的是让你看到：
 
 - stream 的概念不是“让一个 kernel 更快”
-- 它更像是在优化整个流水线的并发与调度
+- 它更像是在优化整个流水线的并发与调度（并不等价于并行）
 
 ## 6. 调用逻辑
 
-对应 [stream_bench.cu](/home/wangz/MyProject/HPC_matters/CUDA/cuda_stream_intro/src/stream_bench.cu)，显式 stream 的典型流程是：
+对应 [stream_bench.cu](./src/stream_bench.cu)，显式 stream 的典型流程是：
 
 1. 创建 stream
 
@@ -177,7 +175,7 @@ python scripts/plot_results.py --input results/stream_benchmark.csv --outdir res
 
 如果 `two_streams` 更快，通常说明：
 
-- 你的 GPU 支持一定程度的 copy/compute overlap
+- 当前 GPU 支持一定程度的 copy/compute overlap
 - 当前 workload 的切分方式让并发有收益
 
 如果差异不明显，常见原因是：
@@ -186,6 +184,6 @@ python scripts/plot_results.py --input results/stream_benchmark.csv --outdir res
 - kernel 太轻，测量噪声大
 - 数据没有真正满足“可异步重叠”的条件
 
-## 11. 一句话记忆
+## 11. 总结
 
 `cudaStream` 是 GPU 工作队列；它的意义在于“安排并发”，不是“改变 kernel 算法本身”。

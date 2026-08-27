@@ -58,7 +58,8 @@ static void run_default_once(const HostBuffers& host,
                              int chunk_elems,
                              int blocks,
                              int threads,
-                             int iters) {
+                             int iters)
+{
     CUDA_CHECK(cudaMemcpy(dev.a0, host.a, chunk_bytes, cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(dev.b0, host.b, chunk_bytes, cudaMemcpyHostToDevice));
     vector_add<<<blocks, threads>>>(dev.a0, dev.b0, dev.c0, chunk_elems, iters);
@@ -78,7 +79,8 @@ static void run_two_streams_once(const HostBuffers& host,
                                  int threads,
                                  int iters,
                                  cudaStream_t s0,
-                                 cudaStream_t s1) {
+                                 cudaStream_t s1)
+{
     CUDA_CHECK(cudaMemcpyAsync(dev.a0, host.a, chunk_bytes, cudaMemcpyHostToDevice, s0));
     CUDA_CHECK(cudaMemcpyAsync(dev.b0, host.b, chunk_bytes, cudaMemcpyHostToDevice, s0));
     vector_add<<<blocks, threads, 0, s0>>>(dev.a0, dev.b0, dev.c0, chunk_elems, iters);
@@ -159,6 +161,7 @@ int main(int argc, char** argv) {
         CUDA_CHECK(cudaStreamSynchronize(s1));
     }
 
+    // one stream
     for (int r = 0; r < repeats; ++r) {
         CUDA_CHECK(cudaDeviceSynchronize());
         CUDA_CHECK(cudaEventRecord(start));
@@ -171,6 +174,7 @@ int main(int argc, char** argv) {
         default_times.push_back(ms);
     }
 
+    // two streams
     for (int r = 0; r < repeats; ++r) {
         CUDA_CHECK(cudaStreamSynchronize(s0));
         CUDA_CHECK(cudaStreamSynchronize(s1));

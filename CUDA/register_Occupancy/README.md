@@ -2,6 +2,8 @@
 
 本项目用于学习：**寄存器压力如何限制并发（occupancy），并影响性能**。
 
+> 本项目是寄存器与 Occupancy 主题的基础版实验。更完整的资源约束、occupancy 阶梯、cliff 和 register spilling 分析，请继续学习 `occupancy_vs_registers`。
+
 核心观点：
 
 - `registers per thread` 越高，单个 SM 可同时驻留的线程/warp 往往越少

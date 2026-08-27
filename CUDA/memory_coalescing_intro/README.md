@@ -1,19 +1,22 @@
 # Memory Coalescing Intro
 
-这个项目用最小实验说明 CUDA 里的 **global memory coalescing** 是什么，以及为什么 warp 内的访问模式会直接影响全局内存带宽。
+这个项目用最小实验尝试说明 CUDA 里的 **global memory coalescing** 是什么，以及为什么 warp 内的访问模式会直接影响全局内存带宽。
 
 ## 1. 什么是 memory coalescing
 
 在 NVIDIA GPU 上，线程通常以 warp 为单位执行。一个 warp 通常有 32 个线程。
 
-当一个 warp 内的线程访问 global memory 时，如果这些线程访问的是连续、相邻、对齐比较好的地址，硬件可以把这些访问合并成更少的 memory transaction。这种合并访问就叫 memory coalescing。
+当一个 warp 内的线程访问 global memory 时，如果这些线程访问的是连续、相邻、对齐比较好的地址，硬件可以把这些访问合并成更少的 memory transaction。这种合并访问就叫 memory coalescing，因为GPU架构在全局内存与CUDA core之间有L2 Cache，良好的内存合并能够减轻数据的LS成本，GPU的架构图见：
+
+![NVIDIA GPU 与 CPU 系统架构图](https://docs.nvidia.com/cuda/cuda-programming-guide/_images/gpu-cpu-system-diagram.png)
+
 
 直觉上：
 
 - 好的访问模式：`thread0 -> a[0]`, `thread1 -> a[1]`, `thread2 -> a[2]`
 - 差的访问模式：`thread0 -> a[0]`, `thread1 -> a[32]`, `thread2 -> a[64]`
 
-前者更容易高效利用内存带宽，后者会让一个 warp 的访问分散到更多 memory transaction 里。
+前者更容易高效利用Cache，后者会让一个 warp 的访问分散到更多 memory transaction 里，最差的情况下，每个lane都需要从global memory拿数据。
 
 ## 2. 本项目做什么
 
@@ -39,7 +42,7 @@ out[idx] = in[idx * stride];
 out[idx] = in[idx + offset];
 ```
 
-它用于观察“连续访问但起始地址偏移”时性能是否会变化。现代 GPU 对这种情况通常比大 stride 更宽容，但它仍然是理解对齐影响的好入口。
+它用于观察“连续访问但起始地址偏移”时性能是否会变化。现代 GPU 对这种情况通常比大 stride 更宽容，但它仍然是理解对齐影响的好入口 (注意，每个线程的访存还是连续的) 。
 
 ## 3. 项目结构
 
@@ -111,15 +114,7 @@ python scripts/plot_results.py --input results/memory_coalescing.csv --outdir re
 
 注意：这里的 bandwidth 是 requested bandwidth，不一定等于硬件实际 memory transaction 的总字节数。stride 变差时，requested bytes 没变，但实际 transaction 可能变多，所以 requested bandwidth 会下降。
 
-## 7. 你应该观察什么
 
-建议重点看：
+## 7. 总结
 
-- `stride = 1` 通常最快
-- stride 增大时，带宽一般下降
-- offset sweep 的变化通常比 stride sweep 小
-- 如果某些曲线不平滑，可能来自 cache、调度、测量噪声或 GPU 架构细节
-
-## 8. 一句话记忆
-
-Memory coalescing 的核心不是“访问 global memory 一定慢”，而是“warp 内线程要尽量一起访问连续地址”。
+Memory coalescing 的核心是“warp 内线程要尽量一起访问连续地址”。

@@ -8,19 +8,19 @@
 
 当前已有项目：
 
-- [warp_schedule/README.md](/home/wangz/MyProject/HPC_matters/CUDA/warp_schedule/README.md)
-- [register_Occupancy/README.md](/home/wangz/MyProject/HPC_matters/CUDA/register_Occupancy/README.md)
-- [cuda_graph_intro/README.md](/home/wangz/MyProject/HPC_matters/CUDA/cuda_graph_intro/README.md)
-- [cuda_stream_intro/README.md](/home/wangz/MyProject/HPC_matters/CUDA/cuda_stream_intro/README.md)
+- [warp_schedule/README.md](./warp_schedule/README.md)
+- [register_Occupancy/README.md](./register_Occupancy/README.md)（基础版 / Legacy）
+- [cuda_graph_intro/README.md](./cuda_graph_intro/README.md)
+- [cuda_stream_intro/README.md](./cuda_stream_intro/README.md)
 
 规划中的下一阶段项目：
 
-- [memory_coalescing_intro/README.md](/home/wangz/MyProject/HPC_matters/CUDA/memory_coalescing_intro/README.md)
-- [shared_memory_bank_conflict/README.md](/home/wangz/MyProject/HPC_matters/CUDA/shared_memory_bank_conflict/README.md)
-- [nsight_systems_intro/README.md](/home/wangz/MyProject/HPC_matters/CUDA/nsight_systems_intro/README.md)
-- [nsight_compute_intro/README.md](/home/wangz/MyProject/HPC_matters/CUDA/nsight_compute_intro/README.md)
-- [kernel_type_playground/README.md](/home/wangz/MyProject/HPC_matters/CUDA/kernel_type_playground/README.md)
-- [reduction_scan_intro/README.md](/home/wangz/MyProject/HPC_matters/CUDA/reduction_scan_intro/README.md)
+- [memory_coalescing_intro/README.md](./memory_coalescing_intro/README.md)
+- [shared_memory_bank_conflict/README.md](./shared_memory_bank_conflict/README.md)
+- [nsight_systems_intro/README.md](./nsight_systems_intro/README.md)
+- [nsight_compute_intro/README.md](./nsight_compute_intro/README.md)
+- [kernel_type_playground/README.md](./kernel_type_playground/README.md)
+- [reduction_scan_intro/README.md](./reduction_scan_intro/README.md)
 
 ## 1. 目前这 4 个部分在学什么
 
@@ -32,13 +32,15 @@
 - warp 数量变化为什么会影响 latency hiding
 - 为什么 occupancy 不是越高越好，而是“够用”更重要
 
-### 1.2 `register_Occupancy`
+### 1.2 `register_Occupancy`（基础版 / Legacy）
 
 这个项目帮助你理解：
 
 - `registers per thread` 会限制同时驻留的 warp / block 数
 - 寄存器压力上升为什么会压低 occupancy
 - 为什么“做了更多计算”不一定更快
+
+更完整的寄存器压力与 Occupancy 阶梯模型见 `occupancy_vs_registers`。
 
 ### 1.3 `cuda_graph_intro`
 
@@ -110,17 +112,17 @@
 
 我建议你按下面这个顺序推进，这样前一个项目建立的直觉，会自然成为后一个项目的前置知识。
 
-1. [memory_coalescing_intro/README.md](/home/wangz/MyProject/HPC_matters/CUDA/memory_coalescing_intro/README.md)
+1. [memory_coalescing_intro/README.md](./memory_coalescing_intro/README.md)
    先补 global memory 访问模式，因为这是 CUDA 性能分析里最核心的一层。
-2. [shared_memory_bank_conflict/README.md](/home/wangz/MyProject/HPC_matters/CUDA/shared_memory_bank_conflict/README.md)
+2. [shared_memory_bank_conflict/README.md](./shared_memory_bank_conflict/README.md)
    在理解 global memory 之后，再看 shared memory 为什么快、为什么也会因为访问模式不对而变慢。
-3. [nsight_systems_intro/README.md](/home/wangz/MyProject/HPC_matters/CUDA/nsight_systems_intro/README.md)
+3. [nsight_systems_intro/README.md](./nsight_systems_intro/README.md)
    这一步把你之前对 stream 和 overlap 的判断，从“现象观察”推进到“时间线验证”。
-4. [nsight_compute_intro/README.md](/home/wangz/MyProject/HPC_matters/CUDA/nsight_compute_intro/README.md)
+4. [nsight_compute_intro/README.md](./nsight_compute_intro/README.md)
    这一步把你对 occupancy、寄存器、stall 的理解和 profiler 指标真正对上号。
-5. [kernel_type_playground/README.md](/home/wangz/MyProject/HPC_matters/CUDA/kernel_type_playground/README.md)
+5. [kernel_type_playground/README.md](./kernel_type_playground/README.md)
    当你已经有 memory / profiler 基础后，再系统地区分不同瓶颈类型，会更稳。
-6. [reduction_scan_intro/README.md](/home/wangz/MyProject/HPC_matters/CUDA/reduction_scan_intro/README.md)
+6. [reduction_scan_intro/README.md](./reduction_scan_intro/README.md)
    最后进入更接近真实 HPC / DL 基元的并行模式，这是很自然的进阶。
 
 一句话总结这个顺序：

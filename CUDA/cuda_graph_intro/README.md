@@ -16,7 +16,6 @@ CUDA Graph 可以把“一串固定的 GPU 工作流（kernel/memcpy 等）”�
 
 - 计算步骤固定
 - 重复执行很多轮
-- 单步 kernel 比较短小
 
 ## 2. 本项目做了什么
 
@@ -31,7 +30,7 @@ CUDA Graph 可以把“一串固定的 GPU 工作流（kernel/memcpy 等）”�
 - `normal`：每轮都逐次 launch 这 3 个 kernel
 - `graph`：先 capture 一次，再每轮 `cudaGraphLaunch` replay
 
-最终输出每轮平均耗时（ms）并比较 speedup。
+最终输出每轮平均耗时（ms）并比较加速比。
 ## 3. CUDA Graph 调用逻辑（对应本项目代码）
 
 在 `src/graph_bench.cu` 里，Graph 路径的调用顺序是：
@@ -130,9 +129,9 @@ python scripts/plot_results.py --input results/graph_benchmark.csv --outdir resu
 - `results/graph_vs_normal.png`
 - `results/summary.txt`
 
-## 7. 你该怎么理解结果
+## 7. 结果解读
 
-如果 `graph` 更快，通常意味着你当前 workload 有明显 launch 开销可优化。
+如果 `graph` 更快，通常意味着当前 workload 有明显 launch 开销可优化。
 
 如果差异不大，常见原因是：
 
@@ -140,7 +139,7 @@ python scripts/plot_results.py --input results/graph_benchmark.csv --outdir resu
 - 重复次数不够高
 - 图里节点太少或工作流不够固定
 
-## 8. 一句话记忆
+## 8. 总结
 
-CUDA Graph 不是让单个 kernel 变“算得更快”，而是让一串固定 GPU 工作的“调度开销更低”。
+CUDA Graph 不是让单个 kernel 变“算得更快”，而是让一串固定 GPU 工作的“调度开销更低”，其效果在launch开销占比较大的情况下更为明显。
 

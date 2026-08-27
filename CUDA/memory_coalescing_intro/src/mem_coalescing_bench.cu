@@ -135,10 +135,10 @@ int main(int argc, char** argv) {
     const int threads = 256;
     const int blocks = (elements + threads - 1) / threads;
     const int max_offset = 32;
-    const int input_elements = elements * max_stride + max_offset + 1;
+    const int input_elements = elements * max_stride + max_offset + 1;// Protect Data load
     const size_t input_bytes = static_cast<size_t>(input_elements) * sizeof(float);
     const size_t output_bytes = static_cast<size_t>(elements) * sizeof(float);
-    const double requested_bytes = static_cast<double>(elements) * sizeof(float) * 2.0;
+    const double requested_bytes = static_cast<double>(elements) * sizeof(float) * 2.0; // load and store
 
     std::vector<float> h_input(input_elements, 1.0f);
     for (int i = 0; i < input_elements; ++i) {
@@ -155,7 +155,7 @@ int main(int argc, char** argv) {
 
     std::vector<int> strides;
     for (int s = 1; s <= max_stride; s *= 2) {
-        strides.push_back(s);
+        strides.push_back(s); // 1,2,4,8,16,32~2^5
     }
     if (strides.back() != max_stride) {
         strides.push_back(max_stride);

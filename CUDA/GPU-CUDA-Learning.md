@@ -2,7 +2,7 @@
 
 ## Overview：这个目录是什么
 
-`Projects/HPC_matters/CUDA/` 是一组面向 CUDA 性能理解的实验项目。它的学习哲学不是“背 API”，而是持续建立这条链路：
+`Projects/HPC_matters/CUDA/` 是一组面向 CUDA 性能理解的实验项目。其目的是为了持续建立这条链路：
 
 ```text
 代码写法 -> GPU 硬件行为 -> 可测量的性能结果 -> profiler 证据
@@ -16,26 +16,30 @@
 - `scripts/plot_results.py`：画图和汇总
 - `README.md`：解释概念、运行方式和结果解读
 
-本指南覆盖 10 个核心学习项目：`cuda_stream_intro`、`cuda_graph_intro`、`memory_coalescing_intro`、`shared_memory_bank_conflict`、`register_Occupancy`、`warp_schedule`、`nsight_systems_intro`、`nsight_compute_intro`、`reduction_scan_intro`、`kernel_type_playground`。
+本指南覆盖 12 个核心学习项目：`cuda_stream_intro`、`cuda_graph_intro`、`memory_coalescing_intro`、`shared_memory_bank_conflict`、`register_Occupancy`（基础版 / Legacy）、`occupancy_vs_registers`、`warp_schedule`、`nsight_systems_intro`、`nsight_compute_intro`、`reduction_scan_intro`、`kernel_type_playground`、`nccl_intro`。
 
-## 推荐学习地图
+## 学习顺序
 
-1. `cuda_stream_intro`：先理解 GPU 工作队列和异步拷贝
-2. `cuda_graph_intro`：理解固定工作流的 launch 开销优化
-3. `memory_coalescing_intro`：进入 global memory 访问模式
-4. `shared_memory_bank_conflict`：理解 shared memory 不是无限快
-5. `register_Occupancy`：学习寄存器压力如何限制并发
-6. `warp_schedule`：学习 warp 数量和 latency hiding
-7. `nsight_systems_intro`：用时间线验证 stream/graph/overlap
-8. `nsight_compute_intro`：用硬件指标解释单 kernel
-9. `kernel_type_playground`：按瓶颈类型选择优化策略
-10. `reduction_scan_intro`：进入真实并行算法基元
+1. [`cuda_stream_intro`](./cuda_stream_intro/README.md)：理解 GPU 工作队列和异步拷贝
+2. [`cuda_graph_intro`](./cuda_graph_intro/README.md)：理解固定工作流的 launch 开销优化
+3. [`memory_coalescing_intro`](./memory_coalescing_intro/README.md)：理解 global memory 访问模式
+4. [`shared_memory_bank_conflict`](./shared_memory_bank_conflict/README.md)：理解 shared memory 的bank存储
+5. [`register_Occupancy`（基础版 / Legacy）](./register_Occupancy/README.md)：入门学习寄存器压力如何限制并发
+6. [`occupancy_vs_registers`](./occupancy_vs_registers/README.md)：系统分析寄存器压力、Occupancy 阶梯、资源 cliff 与 spilling
+7. [`warp_schedule`](./warp_schedule/README.md)：学习 warp 数量和 latency hiding
+8. [`nsight_systems_intro`](./nsight_systems_intro/README.md)：用时间线验证 stream/graph/overlap
+9. [`nsight_compute_intro`](./nsight_compute_intro/README.md)：用硬件指标解释single kernel
+10. [`kernel_type_playground`](./kernel_type_playground/README.md)：按瓶颈类型选择优化策略
+11. [`reduction_scan_intro`](./reduction_scan_intro/README.md)：真实的并行算法sample
+12. [`nccl_intro`](./nccl_intro/README.md)：学习多 GPU 集合通信基础
 
 ## 第一章：运行时机制 Runtime
 
 ### 1. cuda_stream_intro
 
 概念：`cudaStream` 是提交 GPU 工作的队列。同一个 stream 内顺序执行，不同 stream 在条件允许时可重叠。
+
+官网内容见：https://docs.nvidia.com/cuda/cuda-programming-guide/02-basics/asynchronous-execution.html
 
 核心代码：
 
@@ -56,15 +60,17 @@ cudaMemcpyAsync(host.out, dev.c0, bytes, cudaMemcpyDeviceToHost, s0);
 - `cuda_stream_intro/results/stream_benchmark.csv`
 - `cuda_stream_intro/results/stream_vs_default.png`
 
-你应该学会：
+数值实验对比了默认一个stream和2个stream处理同问题的效率差异（RTX 4060），直观结论：
 
-- 默认 stream 为什么容易串行
-- 两个 chunk 如何让 copy/compute 有机会重叠
-- 为什么要用 Nsight Systems 验证 overlap
+![默认一个 stream 与两个 stream 的性能对比](./cuda_stream_intro/results/stream_vs_default.png)
+
+
 
 ### 2. cuda_graph_intro
 
 概念：CUDA Graph 把固定 GPU 工作流 capture 成图，然后反复 replay，降低多次 launch 的 CPU 调度开销。
+
+官网内容见：https://docs.nvidia.com/cuda/cuda-programming-guide/04-special-topics/cuda-graphs.html
 
 核心代码：
 
@@ -89,30 +95,27 @@ cudaGraphLaunch(graph_exec, s);
 - `cuda_graph_intro/results/graph_benchmark.csv`
 - `cuda_graph_intro/results/graph_vs_normal.png`
 
-你应该学会：
+数值实验对比了默认无graph和进行graph优化处理同问题的效率差异（RTX 4060），直观结论：
 
-- capture、instantiate、launch replay 的生命周期
-- launch overhead 和 kernel runtime 的区别
-- 何时选择 graph，何时不用
+![默认执行与 CUDA Graph 优化的性能对比（RTX 4060）](./cuda_graph_intro/results/graph_vs_normal.png)
+
 
 ## 第二章：内存层次 Memory
 
 ### 3. memory_coalescing_intro
 
-概念：global memory coalescing 决定一个 warp 的内存访问能否合并成少量内存事务。
+概念：global memory coalescing 决定一个 warp 的内存访问能否合并访问，从而减少成内存的LS成本。
 
 核心代码：
 
 ```cpp
 out[idx] = in[idx * stride] * 1.000001f + 1.0f;
-out[idx] = in[idx + offset] * 1.000001f + 1.0f;
 ```
 
 关键洞察：
 
 - stride=1 通常最容易合并访问
-- stride 变大，请求元素数不变，但实际内存事务可能增加
-- offset 影响对齐，可能造成额外 transaction
+- stride 变大，请求元素数不变，但实际内存访问成本可能增加
 
 已有 benchmark 结果位置：
 
@@ -120,15 +123,13 @@ out[idx] = in[idx + offset] * 1.000001f + 1.0f;
 - `memory_coalescing_intro/results/bandwidth_vs_stride.png`
 - `memory_coalescing_intro/results/bandwidth_vs_offset.png`
 
-你应该学会：
+数值实验对比了不同stride对lane的LS效率差异（RTX 4060），直观结论：
 
-- 区分 requested bandwidth 和实际硬件事务
-- 为什么 AoS/SoA 数据布局会影响 GPU 性能
-- 用 Nsight Compute 验证 memory throughput 和 load efficiency
+![不同 stride 对 lane 级内存访问效率的影响（RTX 4060）](./memory_coalescing_intro/results/bandwidth_vs_stride.png)
 
 ### 4. shared_memory_bank_conflict
 
-概念：shared memory 在 SM 内，低延迟，但按 bank 组织。一个 warp 内多个线程访问同一 bank 的不同地址，可能产生 bank conflict。
+概念：shared memory 在 SM 内，低延迟，但按 bank 组织。一个 warp 内多个线程访问（包括读和写）同一 bank 的不同地址，可能产生 bank conflict。
 
 核心代码：
 
@@ -151,7 +152,7 @@ acc += vsmem[index];
 - `shared_memory_bank_conflict/results/runtime_vs_stride.png`
 - `shared_memory_bank_conflict/results/estimated_conflict_degree.png`
 
-你应该学会：
+学习：
 
 - bank conflict 的基本模型
 - 为什么理论冲突度和实测时间不一定线性对应
@@ -159,7 +160,7 @@ acc += vsmem[index];
 
 ## 第三章：计算资源 Compute
 
-### 5. register_Occupancy
+### 5. register_Occupancy（基础版 / Legacy）
 
 概念：每个 thread 使用的寄存器越多，SM 能同时驻留的 block/warp 可能越少，理论 occupancy 下降。
 
@@ -185,11 +186,13 @@ for (int k = 0; k < HIGH_REG_TMP_SIZE; ++k) {
 - `register_Occupancy/results/sweep_occupancy_vs_regs.png`
 - `register_Occupancy/results/sweep_runtime_vs_regs.png`
 
-你应该学会：
+学习：
 
 - 用 `cudaFuncGetAttributes` 看 `numRegs`
 - 用 occupancy API 估算 active blocks/SM
 - 把寄存器、occupancy、runtime 三者放在一起判断
+
+这是寄存器与 Occupancy 主题的入门版。进阶实验 `occupancy_vs_registers` 会进一步比较不同 block size，建立资源限制导致的 Occupancy 阶梯，并演示 `__launch_bounds__` 引发 register spilling 的性能代价。
 
 ### 6. warp_schedule
 
@@ -215,7 +218,7 @@ for (int i = 0; i < iters; ++i) {
 - `warp_schedule/results/throughput_heatmap.png`
 - `warp_schedule/results/top10_configs.csv`
 
-你应该学会：
+学习：
 
 - block size 不是风格问题，而是调度和资源配置问题
 - 用热力图观察 blocks/SM 与 warps/block 的组合
@@ -240,7 +243,7 @@ nsys profile --trace=cuda,osrt,nvtx --output=results/stream_overlap \
 - 看 CUDA API 行可以发现 CPU 侧同步和 launch 间隔
 - 看 GPU rows 可以发现 copy engine、kernel、stream 是否并发
 
-你应该学会：
+学习：
 
 - 打开 `.nsys-rep` 并定位 CUDA timeline
 - 判断 two streams 是否真的 overlap
@@ -263,7 +266,7 @@ ncu --set full --target-processes all --kernel-name-base demangled \
 - memory throughput 要和 load/store efficiency、transaction 数一起看
 - roofline 帮你判断 compute-bound、memory-bound 或其他瓶颈
 
-你应该学会：
+学习：
 
 - 区分 theoretical occupancy 和 achieved occupancy
 - 用 stall reasons 解释 runtime 差异
@@ -304,7 +307,7 @@ launch_overhead_kernel<<<1, 1>>>(d_tiny);
 - `kernel_type_playground/results/block_size_sweep.png`
 - `kernel_type_playground/results/graph_compare.png`
 
-你应该学会：
+学习：
 
 - 先分类，再优化
 - 同一个 block size 对不同 kernel 影响不同
@@ -340,7 +343,7 @@ for (int offset = 16; offset > 0; offset >>= 1) {
 - `reduction_scan_intro/results/runtime_compare.png`
 - `reduction_scan_intro/results/bandwidth_compare.png`
 
-你应该学会：
+学习：
 
 - tree reduction 的结构
 - Blelloch scan 的 upsweep/downsweep
