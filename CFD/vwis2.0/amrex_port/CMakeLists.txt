@@ -39,6 +39,9 @@ set(VWIS_AMREX_SOURCES
     src/VwisAmrExSolver.cpp
     src/VwisAmrExBoundary.cpp
     src/VwisAmrExProjection.cpp
+    src/VwisAmrExAdvection.cpp
+    src/VwisAmrExViscosity.cpp
+    src/VwisAmrExTime.cpp
     src/VwisAmrExContracts.cpp)
 add_executable(vwis_amrex_skeleton ${VWIS_AMREX_SOURCES})
 target_link_libraries(vwis_amrex_skeleton PRIVATE AMReX::amrex)
@@ -72,8 +75,25 @@ if (BUILD_TESTING)
              COMMAND vwis_amrex_skeleton ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p4_closed_neumann_projection.in)
     add_test(NAME vwis_amrex_p4_inflow_outflow_projection
              COMMAND vwis_amrex_skeleton ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p4_inflow_outflow_projection.in)
+    add_test(NAME vwis_amrex_p5_periodic_advection_coarse
+             COMMAND vwis_amrex_skeleton ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p5_periodic_advection_16.in)
+    add_test(NAME vwis_amrex_p5_periodic_advection_fine
+             COMMAND vwis_amrex_skeleton ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p5_periodic_advection_32.in)
+    add_test(NAME vwis_amrex_p5_boundary_multibox_advection
+             COMMAND vwis_amrex_skeleton ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p5_boundary_multibox_advection.in)
+    add_test(NAME vwis_amrex_p5_periodic_viscous_coarse
+             COMMAND vwis_amrex_skeleton ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p5_periodic_viscous_16.in)
+    add_test(NAME vwis_amrex_p5_periodic_viscous_fine
+             COMMAND vwis_amrex_skeleton ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p5_periodic_viscous_32.in)
+    add_test(NAME vwis_amrex_p5_boundary_multibox_viscous
+             COMMAND vwis_amrex_skeleton ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p5_boundary_multibox_viscous.in)
+    add_test(NAME vwis_amrex_p5_explicit_time
+             COMMAND vwis_amrex_skeleton ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p5_explicit_time.in)
+    add_test(NAME vwis_amrex_p5_explicit_cfl_rejected
+             COMMAND vwis_amrex_skeleton ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p5_explicit_cfl_rejected.in)
     # The source error text is also pinned by static_contract_check.sh.  CTest's
     # WILL_FAIL inverts the nonzero process status; combining it with
     # PASS_REGULAR_EXPRESSION has version-dependent inversion semantics.
-    set_tests_properties(vwis_amrex_p3_legacy_rejected PROPERTIES WILL_FAIL TRUE)
+    set_tests_properties(vwis_amrex_p3_legacy_rejected vwis_amrex_p5_explicit_cfl_rejected
+                         PROPERTIES WILL_FAIL TRUE)
 endif()

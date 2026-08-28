@@ -1,0 +1,8 @@
+# P5-002 constant-coefficient Cartesian diffusion, coarse periodic manufactured field.
+vwis.n_cell = 16 8 8
+vwis.max_grid_size = 4
+vwis.nghost = 2
+vwis.is_periodic = 1 1 1
+vwis.dt = 1.0e-3
+vwis.viscosity = 0.125
+vwis.run_p5_viscous_checks = 1

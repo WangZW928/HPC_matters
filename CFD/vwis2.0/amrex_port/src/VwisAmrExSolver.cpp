@@ -56,6 +56,7 @@ VwisAmrExSolver::VwisAmrExSolver(
     m_nvert.define(m_ba, m_dm, 1, m_nghost);
     m_ucat.define(m_ba, m_dm, AMREX_SPACEDIM, m_nghost);
     m_ucat_old.define(m_ba, m_dm, AMREX_SPACEDIM, m_nghost);
+    m_ucat_older.define(m_ba, m_dm, AMREX_SPACEDIM, m_nghost);
     m_projection_rhs.define(m_ba, m_dm, 1, 0);
     m_projection_bc.define(m_ba, m_dm, 1, 1);
     for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
@@ -79,6 +80,7 @@ void VwisAmrExSolver::register_fields()
         {"Nvert", FieldLocation::Cell, 1, m_nghost, "legacy IBM classification code; not EB volume fraction", "n", "Nvert", "cell-owned"},
         {"Ucat", FieldLocation::Cell, AMREX_SPACEDIM, m_nghost, "legacy nondimensional Cartesian velocity", "n", "Ux,Uy,Uz", "cell-owned"},
         {"Ucat_old", FieldLocation::Cell, AMREX_SPACEDIM, m_nghost, "legacy nondimensional Cartesian velocity", "n-1", "Ux,Uy,Uz", "cell-owned"},
+        {"Ucat_older", FieldLocation::Cell, AMREX_SPACEDIM, m_nghost, "legacy nondimensional Cartesian velocity", "n-2", "Ux,Uy,Uz", "cell-owned"},
     };
     for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
         std::string axis(1, static_cast<char>('x' + dir));
@@ -121,6 +123,7 @@ void VwisAmrExSolver::initialize()
         auto const nvert = m_nvert.array(mfi);
         auto const ucat = m_ucat.array(mfi);
         auto const ucat_old = m_ucat_old.array(mfi);
+        auto const ucat_older = m_ucat_older.array(mfi);
         amrex::ParallelFor(mfi.validbox(), [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
             p(i, j, k) = 0.0;
             phi(i, j, k) = 0.0;
@@ -128,6 +131,7 @@ void VwisAmrExSolver::initialize()
             for (int comp = 0; comp < AMREX_SPACEDIM; ++comp) {
                 ucat(i, j, k, comp) = 0.0;
                 ucat_old(i, j, k, comp) = 0.0;
+                ucat_older(i, j, k, comp) = 0.0;
             }
         });
     }
@@ -139,6 +143,9 @@ void VwisAmrExSolver::initialize()
     }
     m_projection_rhs.setVal(0.0);
     m_projection_bc.setVal(0.0);
+    m_time = 0.0;
+    m_step = 0;
+    m_history_depth = 1;
     mark_valid_modified();
     if (m_boundary.enabled) apply_boundary_pipeline("initialize");
     else fill_ghost_cells();
@@ -166,6 +173,7 @@ void VwisAmrExSolver::fill_ghost_cells()
     m_nvert.FillBoundary(m_geom.periodicity());
     m_ucat.FillBoundary(m_geom.periodicity());
     m_ucat_old.FillBoundary(m_geom.periodicity());
+    m_ucat_older.FillBoundary(m_geom.periodicity());
     for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
         m_ucont[dir].OverrideSync(m_geom.periodicity());
         m_ucont_old[dir].OverrideSync(m_geom.periodicity());
@@ -175,15 +183,6 @@ void VwisAmrExSolver::fill_ghost_cells()
         m_ucont_older[dir].FillBoundary(m_geom.periodicity());
     }
     m_halo_epoch = m_valid_epoch;
-}
-
-void VwisAmrExSolver::advance_one_step(amrex::Real dt)
-{
-    if (dt <= 0.0) throw std::runtime_error("vwis.dt must be positive even for the P4 framework no-op");
-    const amrex::Real start = amrex::second();
-    if (m_boundary.enabled) apply_boundary_pipeline("noop-step");
-    else fill_ghost_cells();
-    m_last_noop_seconds = amrex::second() - start;
 }
 
 void VwisAmrExSolver::sync_ucat_from_ucont()

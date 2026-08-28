@@ -1,0 +1,14 @@
+# P5-001 constant through-flow across multiple boxes and physical boundaries.
+vwis.n_cell = 16 8 8
+vwis.max_grid_size = 4
+vwis.nghost = 2
+vwis.is_periodic = 0 0 0
+vwis.dt = 1.0e-3
+vwis.run_p5_advection_checks = 1
+
+vwisbcs.enabled = 1
+vwisbcs.lo = inflow noslip noslip
+vwisbcs.hi = outflow noslip noslip
+vwisbcs.inlet_profile = uniform
+vwisbcs.inlet_target_flux = 1.0
+vwisbcs.constrain_outlet_flux = 1

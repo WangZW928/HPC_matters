@@ -1,12 +1,17 @@
-# VWiS AMReX P0--P4 Cartesian projection contract
+# VWiS AMReX P0--P5-004 Cartesian contract
 
 `amrex_port/` is independent of the original `vwis2.0/` PETSc/HYPRE solver.
 It is a single-level Cartesian data/runtime framework with a narrow pressure
-projection, not a complete CFD solver. `project_cartesian()` forms a pressure
+projection and conservative advective/viscous RHS, not a complete CFD solver. `project_cartesian()` forms a pressure
 RHS from integrated face flux, solves a Cartesian cell-centred Poisson problem
-with MLMG, corrects face flux, and synchronizes `Ucat`. `advance_one_step()` is
-still a no-op: there is no momentum RHS, time integration, LES, IBM/EB, FSI,
-curvilinear metric/operator, AMR, plotfile payload, or checkpoint payload.
+with MLMG, corrects face flux, and synchronizes `Ucat`.
+`compute_cartesian_advection_rhs()` and `compute_cartesian_viscous_rhs()` form
+the P5-001 convective and P5-002 constant-coefficient viscous parts of the
+momentum RHS. P5-004 adds a provisional explicit Euler predictor followed by
+the P4 projection, with explicit `n/n-1/n-2` state rotation. This is not the
+legacy SNES residual solve and does not implement semi-implicit or BDF2
+advancement. There is still no LES, IBM/EB, FSI, curvilinear metric/operator,
+AMR, plotfile payload, or checkpoint/restart payload.
 
 ## Version and configuration contract
 
@@ -163,6 +168,88 @@ The legacy curvilinear Poisson matrix contains non-orthogonal cross terms and a
 19-point stencil. `MLPoisson` is not a replacement for it. The curved-metric
 operator choice remains deferred until metric fields, cross-term discretization,
 boundary treatment, and a validation case exist.
+
+## P5-001 Cartesian advective RHS
+
+For each Cartesian face direction `d` and transported velocity component `m`,
+the face momentum flux and cell RHS are
+
+```text
+F[d,m] = Ucont[d] * 0.5 * (Ucat[L,m] + Ucat[R,m])
+RHS_adv[m] = -sum_d(F[d,m]_hi - F[d,m]_lo) / cell_volume
+```
+
+This is the Cartesian form comparable to the legacy `RHSSolver.C`
+`-second_order` branch, whose stored inviscid face flux has the minus sign
+inside the flux before taking face differences. `Ucont` remains integrated
+volume flux; it is not divided by `dx` and the conservative divergence divides
+once by cell volume. Shared faces retain the existing `OverrideSync` ownership
+rule, and the kernel reads `Ucat` only after periodic/inter-Box halos and, when
+configured, physical ghosts have been filled.
+
+The P5 CTests use a fully periodic multi-Box manufactured field
+`U=(0.75,sin(2*pi*x),0)` at 16 and 32 x cells, plus a constant physical
+inflow/constrained-outflow multi-Box case. They check the exact discrete
+second-order stencil, continuous manufactured error, zero RHS for constant
+advected components, and zero RHS for constant boundary through-flow. This is
+not a curvilinear equivalent, time advance, LES, or IBM path.
+
+## P5-002 Cartesian viscous RHS
+
+For constant kinematic viscosity `nu`, the cell-centred Cartesian operator is
+
+```text
+RHS_visc[m] = nu * (Dxx(Ucat[m]) + Dyy(Ucat[m]) + Dzz(Ucat[m]))
+```
+
+The implementation uses the second-order centred three-point stencil and reads
+`Ucat` only after the existing periodic/inter-Box halo and physical no-slip
+ghost pipeline. Non-periodic directions require explicit `vwisbcs`; variable
+viscosity, curvilinear metrics, IBM/EB and time integration remain out of scope.
+
+The P5-002 CPU tests cover the exact discrete periodic manufactured eigenvalue
+on 16 and 32 cells, global momentum conservation, negative kinetic-energy rate,
+and no-slip boundary flux balance on a multi-Box domain. With locked AMReX
+26.04, the clean CPU build and all 16 CTests pass; this is not MPI/CUDA runtime
+or full CFD time-integration validation.
+
+## P5-004 explicit Cartesian time baseline
+
+The selected executable baseline is
+
+```text
+U* = U^n + dt * (RHS_adv(U^n) + RHS_visc(U^n))
+U^(n+1) = project(U*, projection_time_coefficient=1)
+```
+
+Before overwriting the current state, both `Ucat` and every `Ucont[d]` rotate
+from `(n,n-1)` to `(n-1,n-2)`. The solver then records `time`, `step`, and a
+history depth capped at three. The explicit guard requires both the conservative
+advective CFL estimate `sum_d(dt*max(abs(Ucat_d))/dx_d)` and diffusion number
+`2*nu*dt*sum_d(1/dx_d^2)` to be at most one. These limits catch clearly invalid
+steps; they are not a nonlinear stability proof for centred advection.
+
+The periodic manufactured regression uses the divergence-free shear
+`U=(0,sin(2*pi*x),0)`. Its advective RHS and pressure correction are zero, so
+the full predictor/project path reduces to an exactly known semi-discrete
+diffusion eigenmode. Runs with `dt=1e-3` and `dt/2` to `t=8e-3` give a temporal
+error ratio near two, while also checking momentum drift, post-projection
+divergence, and exact history rotation. A second expected-failure test exercises
+the diffusion-number rejection.
+
+On 2026-08-28 the locked 26.04 CPU clean build and complete suite passed 18/18;
+the measured coarse/fine temporal error ratio was `2.002575751`. MPI build/link
+passed, but 2-rank execution was blocked by the host PMIx socket restriction.
+See `_Docs/AMReX_P5-004_时间推进设计及测试_20260828.md` for exact commands,
+restart limitations, and the distinction from CFD validation.
+
+The legacy `Integrator::SolveFunction` remains materially different: its
+reachable `timeCoeff=1` branch is a nonlinear SNES residual with current and old
+RHS weighted by one half, while its BDF2-shaped branch is unreachable because
+`UData::getTimeCoeff()` returns `1.0`. P5-004 does not erase that distinction;
+the semi-implicit/BDF2 solver decision remains P5-005 work. Metadata explicitly
+states that it is not a checkpoint, so restart continuity of the three time
+layers remains blocked on checkpoint payload support.
 
 ## P3 host verification on 2026-08-24
 

@@ -417,14 +417,16 @@ void VwisAmrExSolver::run_p3_boundary_contract_checks()
 
 void VwisAmrExSolver::diagnostics() const
 {
-    amrex::Print() << "VWiS AMReX P4 Cartesian sub-contract: boxes=" << m_ba.size()
+    amrex::Print() << "VWiS AMReX P5 Cartesian sub-contract: boxes=" << m_ba.size()
                    << ", ranks=" << amrex::ParallelDescriptor::NProcs()
                    << ", ghosts=" << m_nghost
                    << ", dx=" << m_dx[0] << "," << m_dx[1] << "," << m_dx[2]
                    << ", cell_volume=" << m_cell_volume
                    << ", max(|P|)=" << m_p.norm0(0, 0, true)
+                   << ", time=" << m_time << ", step=" << m_step
+                   << ", history_depth=" << m_history_depth
                    << ", init_s=" << m_initialize_seconds
-                   << ", noop_s=" << m_last_noop_seconds << "\n";
+                   << ", advance_s=" << m_last_advance_seconds << "\n";
     for (auto const& field : m_fields) {
         amrex::Print() << "  field " << field.name << " location=" << location_name(field.location)
                        << " nComp=" << field.components << " nGrow=" << field.ghost_cells
@@ -443,10 +445,10 @@ void VwisAmrExSolver::write_metadata_manifest(std::string const& path) const
 {
     if (!amrex::ParallelDescriptor::IOProcessor()) return;
     std::ofstream output(path);
-    if (!output) throw std::runtime_error("cannot write P4 metadata manifest: " + path);
-    output << "{\n  \"schema\": \"vwis-amrex-p4-cartesian-projection-contract-v1\",\n"
+    if (!output) throw std::runtime_error("cannot write P5 metadata manifest: " + path);
+    output << "{\n  \"schema\": \"vwis-amrex-p5-cartesian-contract-v1\",\n"
            << "  \"payload_written\": false,\n"
-           << "  \"note\": \"Not a plotfile or checkpoint; no restart payload exists through P4.\",\n"
+           << "  \"note\": \"Not a plotfile or checkpoint; P5-004 history cannot be restarted from this metadata.\",\n"
            << "  \"fields\": [\n";
     for (std::size_t i = 0; i < m_fields.size(); ++i) {
         auto const& field = m_fields[i];
@@ -467,6 +469,8 @@ void VwisAmrExSolver::write_metadata_manifest(std::string const& path) const
                << (i + 1 == m_metrics.size() ? "\n" : ",\n");
     }
     output << "  ],\n"
-           << "  \"advance_one_step\": \"no-op\",\n"
-           << "  \"projection\": \"single-level Cartesian MLPoisson/MLMG; explicit call only\"\n}\n";
+           << "  \"time_state\": {\"time\": " << m_time << ", \"step\": " << m_step
+           << ", \"history_depth\": " << m_history_depth << "},\n"
+           << "  \"advance_one_step\": \"provisional explicit Euler RHS plus Cartesian projection; not legacy SNES\",\n"
+           << "  \"projection\": \"single-level Cartesian MLPoisson/MLMG; used by the provisional explicit baseline\"\n}\n";
 }

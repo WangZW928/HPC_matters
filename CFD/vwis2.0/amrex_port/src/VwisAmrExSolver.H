@@ -36,6 +36,12 @@ struct ProjectionDiagnostics {
     bool singular = false;
 };
 
+struct TimeStepDiagnostics {
+    amrex::Real advective_cfl = 0.0;
+    amrex::Real diffusive_number = 0.0;
+    amrex::Real projection_time_coefficient = 1.0;
+};
+
 /**
  * P0--P2 field contract. `ghost_cells` is allocated same-level halo width;
  * ghost reads require fill_ghost_cells() after a valid-region write.  The
@@ -61,13 +67,14 @@ struct MetricSpec {
 };
 
 /**
- * Single-level Cartesian P0--P4 data owner. MultiFabs remain owned here for the
+ * Single-level Cartesian P0--P5 data owner. MultiFabs remain owned here for the
  * complete solver lifetime, while tile Array4 views never escape an MFIter.
  * Thus DistributionMapping is the sole MPI ownership authority; valid cells
  * may be written independently and only fill_ghost_cells() exchanges halos.
  * P4 adds a single-level Cartesian pressure projection of integrated face
- * volume flux. No momentum RHS, time integration, curvilinear operator, LES,
- * IBM, or FSI algorithm exists.
+ * volume flux. P5 adds conservative Cartesian advective and constant-
+ * coefficient viscous RHS operators and a minimal explicit fractional step; no variable viscosity,
+ * curvilinear operator, LES, IBM, or FSI exists.
  */
 class VwisAmrExSolver {
 public:
@@ -90,8 +97,10 @@ public:
     void fill_physical_ghost_cells();
     /** Required order: same-level/MPI/periodic halo, then physical ghosts/faces. */
     void apply_boundary_pipeline(char const* stage);
-    /** Framework no-op with an explicit positive-dt contract; it does not rotate time layers. */
-    void advance_one_step(amrex::Real dt);
+    /** Provisional explicit Euler predictor plus Cartesian projection; not legacy SNES. */
+    void advance_one_step(amrex::Real dt, amrex::Real viscosity = 0.1);
+    /** Conservative explicit-step diagnostics; limits are guards, not a nonlinear stability proof. */
+    TimeStepDiagnostics time_step_diagnostics(amrex::Real dt, amrex::Real viscosity) const;
     /** Exercise base cell layout, initialization, periodic halo, and physical-BC limitation contracts. */
     void run_runtime_contract_checks();
     /** Recover Cartesian velocity by averaging adjacent face volume-flux densities. */
@@ -106,9 +115,20 @@ public:
     ProjectionDiagnostics project_cartesian(amrex::Real dt, amrex::Real time_coefficient = 1.0);
     /** Manufactured checks for the configured periodic, closed, or inflow/outflow pressure policy. */
     void run_p4_projection_contract_checks(amrex::Real dt, amrex::Real time_coefficient = 1.0);
+    /** Conservative Cartesian -div(Ucont[d] * face_average(Ucat)) / cell volume. */
+    void compute_cartesian_advection_rhs(amrex::MultiFab& rhs);
+    /** Constant and smooth manufactured P5-001 checks, including configured physical boundaries. */
+    void run_p5_advection_contract_checks();
+    /** Uniform Cartesian constant-coefficient nu*Laplacian(Ucat), component-wise. */
+    void compute_cartesian_viscous_rhs(amrex::MultiFab& rhs, amrex::Real viscosity);
+    /** P5-002 periodic manufactured/conservation or physical-boundary multi-Box checks. */
+    void run_p5_viscous_contract_checks(amrex::Real viscosity);
+    /** P5-004 periodic temporal-order, conservation, divergence, CFL, and history checks. */
+    void run_p5_time_contract_checks(amrex::Real dt, amrex::Real final_time,
+                                     amrex::Real viscosity);
     /** Globally reduced P3 boundary/divergence/freshness report; diagnostic only, never a RHS. */
     P3Diagnostics p3_diagnostics(char const* stage, bool require_fresh = true) const;
-    /** IO-rank layout/schema diagnostics, safe after initialization or a no-op step. */
+    /** IO-rank layout/schema diagnostics, safe after initialization or a completed step. */
     void diagnostics() const;
     /** Write schema-only metadata; this never writes a plotfile/restart payload. */
     void write_metadata_manifest(std::string const& path) const;
@@ -138,6 +158,7 @@ private:
     amrex::MultiFab m_nvert;
     amrex::MultiFab m_ucat;
     amrex::MultiFab m_ucat_old;
+    amrex::MultiFab m_ucat_older;
     amrex::MultiFab m_projection_rhs;
     amrex::MultiFab m_projection_bc;
 
@@ -155,7 +176,10 @@ private:
     amrex::Real m_cell_volume = 0.0;
     int m_nghost;
     amrex::Real m_initialize_seconds = 0.0;
-    amrex::Real m_last_noop_seconds = 0.0;
+    amrex::Real m_last_advance_seconds = 0.0;
+    amrex::Real m_time = 0.0;
+    std::uint64_t m_step = 0;
+    int m_history_depth = 1;
     std::uint64_t m_valid_epoch = 0;
     std::uint64_t m_halo_epoch = 0;
     std::uint64_t m_physical_epoch = 0;
