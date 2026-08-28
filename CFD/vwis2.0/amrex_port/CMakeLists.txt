@@ -42,10 +42,14 @@ set(VWIS_AMREX_SOURCES
     src/VwisAmrExAdvection.cpp
     src/VwisAmrExViscosity.cpp
     src/VwisAmrExTime.cpp
+    src/VwisAmrExCheckpoint.cpp
     src/VwisAmrExContracts.cpp)
 add_executable(vwis_amrex_skeleton ${VWIS_AMREX_SOURCES})
 target_link_libraries(vwis_amrex_skeleton PRIVATE AMReX::amrex)
 target_compile_features(vwis_amrex_skeleton PRIVATE cxx_std_17)
+target_compile_definitions(vwis_amrex_skeleton PRIVATE
+    VWIS_AMREX_LOCKED_VERSION="${VWIS_AMREX_EXPECTED_VERSION}"
+    VWIS_AMREX_LOCKED_GIT_SHA="9219ba416b7ba2073dd1b12bf19fdce27391f17b")
 if (AMReX_CUDA)
     set_source_files_properties(${VWIS_AMREX_SOURCES} PROPERTIES LANGUAGE CUDA)
     # AMReX 26.04 CUDA archives are built with relocatable device code; the
@@ -91,6 +95,19 @@ if (BUILD_TESTING)
              COMMAND vwis_amrex_skeleton ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p5_explicit_time.in)
     add_test(NAME vwis_amrex_p5_explicit_cfl_rejected
              COMMAND vwis_amrex_skeleton ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p5_explicit_cfl_rejected.in)
+    add_test(NAME vwis_amrex_p8_restart_consistency
+             COMMAND ${CMAKE_COMMAND}
+                -Dexe=$<TARGET_FILE:vwis_amrex_skeleton>
+                -Dinput=${CMAKE_CURRENT_SOURCE_DIR}/inputs/p8_restart.in
+                -Dwork=${CMAKE_CURRENT_BINARY_DIR}/p8_restart_consistency
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/p8_restart_consistency.cmake)
+    add_test(NAME vwis_amrex_p8_strict_rejection
+             COMMAND ${CMAKE_COMMAND}
+                -Dexe=$<TARGET_FILE:vwis_amrex_skeleton>
+                -Dinput=${CMAKE_CURRENT_SOURCE_DIR}/inputs/p8_checkpoint_write.in
+                -Drestart_input=${CMAKE_CURRENT_SOURCE_DIR}/inputs/p8_checkpoint_restart.in
+                -Dwork=${CMAKE_CURRENT_BINARY_DIR}/p8_strict_rejection
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/p8_strict_rejection.cmake)
     # The source error text is also pinned by static_contract_check.sh.  CTest's
     # WILL_FAIL inverts the nonzero process status; combining it with
     # PASS_REGULAR_EXPRESSION has version-dependent inversion semantics.

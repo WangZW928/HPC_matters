@@ -1,0 +1,10 @@
+# P8-001/P8-002 nonzero periodic trajectory, all three Ucat/Ucont layers.
+vwis.n_cell = 16 8 8
+vwis.max_grid_size = 4
+vwis.nghost = 2
+vwis.is_periodic = 1 1 1
+vwis.dt = 1.0e-3
+vwis.viscosity = 0.1
+vwis.run_p8_restart_checks = 1
+vwis.restart_total_steps = 8
+vwis.restart_checkpoint_step = 3

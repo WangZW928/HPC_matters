@@ -1,4 +1,4 @@
-# VWiS AMReX P0--P5-004 Cartesian contract
+# VWiS AMReX P0--P8-002 Cartesian contract
 
 `amrex_port/` is independent of the original `vwis2.0/` PETSc/HYPRE solver.
 It is a single-level Cartesian data/runtime framework with a narrow pressure
@@ -10,8 +10,11 @@ the P5-001 convective and P5-002 constant-coefficient viscous parts of the
 momentum RHS. P5-004 adds a provisional explicit Euler predictor followed by
 the P4 projection, with explicit `n/n-1/n-2` state rotation. This is not the
 legacy SNES residual solve and does not implement semi-implicit or BDF2
-advancement. There is still no LES, IBM/EB, FSI, curvilinear metric/operator,
-AMR, plotfile payload, or checkpoint/restart payload.
+advancement. P8-001/P8-002 now add a versioned single-level CPU
+checkpoint/restart payload using AMReX `VisMF`, including all three fluid time
+layers and strict Header validation. There is still no LES, IBM/EB, FSI,
+curvilinear metric/operator, AMR, plotfile/HDF5 output, MPI/GPU restart, or full
+CFD case validation.
 
 ## Version and configuration contract
 
@@ -75,8 +78,9 @@ write invalidates both freshness epochs. Long-lived temporaries must be
 class-owned; do not allocate an owning `MultiFab` inside `MFIter`.
 
 `write_metadata_manifest` writes rank-0 JSON schema only when
-`vwis.metadata_file` is set. `payload_written=false` makes clear it is not a
-plotfile, checkpoint, or restart result.
+`vwis.metadata_file` is set. The P8 checkpoint path is separate: it writes a
+versioned `Header` plus AMReX `VisMF` payloads. It is intentionally limited to
+one CPU rank and must not be confused with a plotfile or MPI restart.
 
 `p1_contract.in` invokes only the base runtime check: it checks the field
 schema and zero initialization, fills a global-index field over a multi-box
@@ -240,16 +244,40 @@ the diffusion-number rejection.
 On 2026-08-28 the locked 26.04 CPU clean build and complete suite passed 18/18;
 the measured coarse/fine temporal error ratio was `2.002575751`. MPI build/link
 passed, but 2-rank execution was blocked by the host PMIx socket restriction.
-See `_Docs/AMReX_P5-004_时间推进设计及测试_20260828.md` for exact commands,
-restart limitations, and the distinction from CFD validation.
+See `_Docs/AMReX_P5-004_时间推进设计及测试_20260828.md` for the time-step
+baseline and `_Docs/AMReX_P8-001_P8-002_checkpoint_restart_20260829.md` for
+checkpoint/restart commands, evidence, limitations, and the distinction from
+CFD validation.
 
 The legacy `Integrator::SolveFunction` remains materially different: its
 reachable `timeCoeff=1` branch is a nonlinear SNES residual with current and old
 RHS weighted by one half, while its BDF2-shaped branch is unreachable because
 `UData::getTimeCoeff()` returns `1.0`. P5-004 does not erase that distinction;
-the semi-implicit/BDF2 solver decision remains P5-005 work. Metadata explicitly
-states that it is not a checkpoint, so restart continuity of the three time
-layers remains blocked on checkpoint payload support.
+the semi-implicit/BDF2 solver decision remains P5-005 work. P8 now provides a
+separate restart payload for the validated single-level CPU path; it does not
+make the explicit integrator equivalent to legacy SNES or extend restart to
+MPI, GPU, metric, IBM, FSI, or AMR state.
+
+## P8-001/P8-002 checkpoint and restart
+
+The checkpoint directory contains a strict text `Header` and AMReX `VisMF`
+payloads. The Header records the schema/version, locked AMReX version and SHA,
+single-rank CPU scope, dimension/precision, domain/dx, boundary configuration,
+ghost width, component/layout contract, time/step/history depth, and the fixed
+field list. The payload stores `Ucat`, `Ucat_old`, `Ucat_older`, all three
+`Ucont` history layers, `P`, `Phi`, and `Nvert`.
+
+Restart validates the Header before reading any field. It rejects an invalid
+magic/version, unsupported rank/backend, dimension or precision mismatch,
+field/layout mismatch, wrong geometry or BC configuration, missing payload, or
+unexpected extra field. A real regression runs an uninterrupted trajectory and
+a checkpoint-at-K trajectory to N steps, then compares every persistent field,
+time, step, and history depth. The current CPU result is bitwise identical.
+
+On 2026-08-29, the locked CPU build in `build/amrex_port_p8` passed the static
+contract check, clean rebuild, both P8 tests, all 20 CTests, and `git diff
+--check`. MPI/GPU runtime and plotfile/HDF5 output remain outside this
+increment. Full evidence is recorded in the P8 report.
 
 ## P3 host verification on 2026-08-24
 

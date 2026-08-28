@@ -67,7 +67,7 @@ struct MetricSpec {
 };
 
 /**
- * Single-level Cartesian P0--P5 data owner. MultiFabs remain owned here for the
+ * Single-level Cartesian P0--P8 data owner. MultiFabs remain owned here for the
  * complete solver lifetime, while tile Array4 views never escape an MFIter.
  * Thus DistributionMapping is the sole MPI ownership authority; valid cells
  * may be written independently and only fill_ghost_cells() exchanges halos.
@@ -132,6 +132,14 @@ public:
     void diagnostics() const;
     /** Write schema-only metadata; this never writes a plotfile/restart payload. */
     void write_metadata_manifest(std::string const& path) const;
+    /** Write an AMReX VisMF checkpoint plus a strict, versioned Header manifest. */
+    void write_checkpoint(std::string const& path) const;
+    /** Restore every persistent Cartesian field and time layer from a strict checkpoint. */
+    void read_checkpoint(std::string const& path);
+    /** Real disk round-trip: uninterrupted N steps versus restart after K steps. */
+    void run_p8_restart_contract_checks(std::string const& path, amrex::Real dt,
+                                        int total_steps, int checkpoint_step,
+                                        amrex::Real viscosity);
 
 private:
     void register_fields();
