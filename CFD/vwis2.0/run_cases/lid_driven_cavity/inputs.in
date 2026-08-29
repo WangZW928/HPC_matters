@@ -1,0 +1,21 @@
+# Reproducible engineering demonstration: Re=U*L/nu=1*1/0.01=100.
+# The third dimension has one cell and is periodic, yielding a 2D-equivalent run.
+vwis.n_cell = 32 32 1
+# AMReX 26.04 thin-periodic-domain projection requires this conservative split;
+# the engineering record documents the observed larger-box failure mode.
+vwis.max_grid_size = 8
+vwis.nghost = 2
+vwis.is_periodic = 0 0 1
+vwis.dt = 5.0e-3
+vwis.run_steps = 2000
+vwis.viscosity = 1.0e-2
+vwis.run_lid_driven_cavity = 1
+vwis.metadata_file = raw/summary.json
+vwis.field_file = raw/final_field.csv
+vwis.centerline_file = raw/centerlines.csv
+vwis.history_file = raw/history.csv
+
+vwisbcs.enabled = 1
+vwisbcs.lo = noslip noslip ""
+vwisbcs.hi = noslip moving_wall ""
+vwisbcs.moving_wall_velocity = 1.0 0.0 0.0

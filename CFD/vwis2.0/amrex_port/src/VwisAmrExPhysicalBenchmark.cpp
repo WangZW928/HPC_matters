@@ -1,8 +1,5 @@
 #include "VwisAmrExSolver.H"
 
-#include <AMReX_Gpu.H>
-#include <AMReX_MFIter.H>
-#include <AMReX_MFParallelFor.H>
 #include <AMReX_ParallelDescriptor.H>
 #include <AMReX_Print.H>
 
@@ -10,50 +7,6 @@
 #include <fstream>
 #include <limits>
 #include <stdexcept>
-
-namespace {
-amrex::Real global_sum(amrex::Real value)
-{
-    amrex::ParallelDescriptor::ReduceRealSum(value);
-    return value;
-}
-
-amrex::Real cell_plane_average(amrex::MultiFab const& field, amrex::Geometry const& geom,
-                               int direction, int index, int component)
-{
-    amrex::MultiFab plane(field.boxArray(), field.DistributionMap(), 1, 0);
-    plane.setVal(0.0);
-    for (amrex::MFIter mfi(plane, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-        auto const dst = plane.array(mfi);
-        auto const src = field.const_array(mfi);
-        amrex::ParallelFor(mfi.validbox(), [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-            const int coordinate = direction == 0 ? i : (direction == 1 ? j : k);
-            if (coordinate == index) dst(i,j,k) = src(i,j,k,component);
-        });
-    }
-    amrex::Gpu::streamSynchronize();
-    const amrex::Real sum = global_sum(plane.sum(0, true));
-    const amrex::Box& domain = geom.Domain();
-    const int count = domain.length((direction + 1) % AMREX_SPACEDIM) *
-                      domain.length((direction + 2) % AMREX_SPACEDIM);
-    return sum / static_cast<amrex::Real>(count);
-}
-
-amrex::Real center_value(amrex::MultiFab const& field, amrex::Box const& domain,
-                         int component)
-{
-    const int i = domain.smallEnd(0) + domain.length(0) / 2;
-    const int j = domain.smallEnd(1) + domain.length(1) / 2;
-    const int k = domain.smallEnd(2) + domain.length(2) / 2;
-    amrex::Real value = 0.0;
-    for (amrex::MFIter mfi(field, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-        if (mfi.validbox().contains(amrex::IntVect(AMREX_D_DECL(i,j,k)))) {
-            value = field.const_array(mfi)(i,j,k,component);
-        }
-    }
-    return global_sum(value);
-}
-} // namespace
 
 void VwisAmrExSolver::run_physical_benchmark(
     amrex::Real dt, int steps, amrex::Real viscosity, std::string const& report_path)
@@ -119,50 +72,75 @@ void VwisAmrExSolver::run_physical_benchmark(
     const amrex::Real cross_section = m_geom.ProbLength(1) * m_geom.ProbLength(2);
     const amrex::Real inlet_speed = m_boundary.inlet_target_flux / cross_section;
     amrex::Real total_step_seconds = 0.0;
+    UniformFlowDiagnostics time_sum{};
+    amrex::Real time_sum_section_u_in = 0.0;
+    amrex::Real time_sum_section_u_out = 0.0;
+    amrex::Real time_sum_center_u = 0.0;
+    amrex::Real time_sum_pressure_drop = 0.0;
     for (int step = 0; step < steps; ++step) {
         advance_one_step(dt, viscosity);
         total_step_seconds += m_last_advance_seconds;
-        amrex::MultiFab divergence(m_ba, m_dm, 1, 0);
-        compute_cartesian_divergence(divergence);
-        amrex::Real max_div = divergence.norm0(0, 0, true);
-        amrex::ParallelDescriptor::ReduceRealMax(max_div);
-        amrex::Real momentum[AMREX_SPACEDIM]{};
-        for (int comp = 0; comp < AMREX_SPACEDIM; ++comp)
-            momentum[comp] = global_sum(m_ucat.sum(comp, true) * m_cell_volume);
-        amrex::MultiFab kinetic(m_ba, m_dm, 1, 0);
-        for (amrex::MFIter mfi(m_ucat, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-            auto const u = m_ucat.const_array(mfi); auto const e = kinetic.array(mfi);
-            amrex::ParallelFor(mfi.validbox(), [=] AMREX_GPU_DEVICE (int i,int j,int k) noexcept {
-                e(i,j,k) = 0.5 * (u(i,j,k,0)*u(i,j,k,0) + u(i,j,k,1)*u(i,j,k,1) + u(i,j,k,2)*u(i,j,k,2));
-            });
+        const UniformFlowDiagnostics flow = uniform_flow_diagnostics();
+        const UniformPlaneStatistics inlet_section = uniform_plane_statistics(0, xlo);
+        const UniformPlaneStatistics outlet_section = uniform_plane_statistics(0, xhi);
+        amrex::Array<amrex::Real, AMREX_SPACEDIM> center_position{};
+        for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+            const int center_index = domain.smallEnd(dir) + domain.length(dir) / 2;
+            center_position[dir] = m_geom.ProbLo(dir) +
+                (static_cast<amrex::Real>(center_index - domain.smallEnd(dir)) + 0.5) * m_dx[dir];
         }
-        amrex::Gpu::streamSynchronize();
-        const amrex::Real energy = global_sum(kinetic.sum(0, true) * m_cell_volume);
-        const amrex::Real net_mass_flux = boundary_flux(0, false) + boundary_flux(0, true) +
-                                           boundary_flux(1, false) + boundary_flux(1, true);
-        const amrex::Real outlet_flow = boundary_flux(0, true);
-        const amrex::Real mean_u_in = cell_plane_average(m_ucat, m_geom, 0, xlo, 0);
-        const amrex::Real mean_u_out = cell_plane_average(m_ucat, m_geom, 0, xhi, 0);
-        const amrex::Real center_u = center_value(m_ucat, domain, 0);
-        const amrex::Real pressure_drop = cell_plane_average(m_p, m_geom, 0, xlo, 0) -
-                                           cell_plane_average(m_p, m_geom, 0, xhi, 0);
+        const UniformPointSample center = sample_uniform_point(center_position);
+        const amrex::Real mean_u_in = inlet_section.mean_velocity[0];
+        const amrex::Real mean_u_out = outlet_section.mean_velocity[0];
+        const amrex::Real center_u = center.velocity[0];
+        const amrex::Real pressure_drop = inlet_section.mean_pressure - outlet_section.mean_pressure;
+        time_sum.integrated_divergence += flow.integrated_divergence;
+        time_sum.max_abs_divergence += flow.max_abs_divergence;
+        time_sum.net_mass_flux += flow.net_mass_flux;
+        time_sum.outlet_flow += flow.outlet_flow;
+        time_sum.kinetic_energy += flow.kinetic_energy;
+        time_sum.pressure_mean += flow.pressure_mean;
+        for (int comp = 0; comp < AMREX_SPACEDIM; ++comp) time_sum.momentum[comp] += flow.momentum[comp];
+        time_sum_section_u_in += mean_u_in;
+        time_sum_section_u_out += mean_u_out;
+        time_sum_center_u += center_u;
+        time_sum_pressure_drop += pressure_drop;
         if (amrex::ParallelDescriptor::IOProcessor()) {
             if (step != 0) output << ",\n";
             output << "    {\"step\": " << step + 1 << ", \"time\": " << m_time
                    << ", \"step_seconds\": " << m_last_advance_seconds
-                   << ", \"post_projection_max_abs_divergence\": " << max_div
-                   << ", \"net_mass_flux\": " << net_mass_flux
-                   << ", \"outlet_flow\": " << outlet_flow
+                   << ", \"integrated_divergence\": " << flow.integrated_divergence
+                   << ", \"post_projection_max_abs_divergence\": " << flow.max_abs_divergence
+                   << ", \"net_mass_flux\": " << flow.net_mass_flux
+                   << ", \"outlet_flow\": " << flow.outlet_flow
                    << ", \"section_mean_u_in\": " << mean_u_in
                    << ", \"section_mean_u_out\": " << mean_u_out
                    << ", \"centerline_u\": " << center_u
                    << ", \"pressure_drop\": " << pressure_drop
-                   << ", \"momentum\": [" << momentum[0] << ", " << momentum[1] << ", " << momentum[2]
-                   << "], \"kinetic_energy\": " << energy << "}";
+                   << ", \"pressure_mean\": " << flow.pressure_mean
+                   << ", \"pressure_min\": " << flow.pressure_min
+                   << ", \"pressure_max\": " << flow.pressure_max
+                   << ", \"momentum\": [" << flow.momentum[0] << ", " << flow.momentum[1] << ", " << flow.momentum[2]
+                   << "], \"kinetic_energy\": " << flow.kinetic_energy << "}";
         }
     }
     if (amrex::ParallelDescriptor::IOProcessor()) {
-        output << "\n  ],\n  \"total_step_seconds\": " << total_step_seconds
+        const amrex::Real inverse_samples = 1.0 / static_cast<amrex::Real>(steps);
+        output << "\n  ],\n  \"time_average_method\": \"arithmetic mean of equally spaced post-step samples\",\n"
+               << "  \"time_averages\": {\"sample_count\": " << steps
+               << ", \"integrated_divergence\": " << time_sum.integrated_divergence * inverse_samples
+               << ", \"max_abs_divergence\": " << time_sum.max_abs_divergence * inverse_samples
+               << ", \"net_mass_flux\": " << time_sum.net_mass_flux * inverse_samples
+               << ", \"outlet_flow\": " << time_sum.outlet_flow * inverse_samples
+               << ", \"momentum\": [" << time_sum.momentum[0] * inverse_samples << ", "
+               << time_sum.momentum[1] * inverse_samples << ", " << time_sum.momentum[2] * inverse_samples
+               << "], \"kinetic_energy\": " << time_sum.kinetic_energy * inverse_samples
+               << ", \"pressure_mean\": " << time_sum.pressure_mean * inverse_samples
+               << ", \"section_mean_u_in\": " << time_sum_section_u_in * inverse_samples
+               << ", \"section_mean_u_out\": " << time_sum_section_u_out * inverse_samples
+               << ", \"centerline_u\": " << time_sum_center_u * inverse_samples
+               << ", \"pressure_drop\": " << time_sum_pressure_drop * inverse_samples << "},\n"
+               << "  \"total_step_seconds\": " << total_step_seconds
                << ",\n  \"validation_note\": \"physical run / not yet validated; no legacy or literature reference data available\"\n}\n";
     }
     amrex::Print() << "VWiS physical Cartesian channel run complete: report=" << report_path

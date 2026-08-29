@@ -42,6 +42,39 @@ struct TimeStepDiagnostics {
     amrex::Real projection_time_coefficient = 1.0;
 };
 
+/** P8-003 cell-containing point sample on the uniform Cartesian level. */
+struct UniformPointSample {
+    amrex::Array<int, AMREX_SPACEDIM> cell{};
+    amrex::Array<amrex::Real, AMREX_SPACEDIM> cell_center{};
+    amrex::Array<amrex::Real, AMREX_SPACEDIM> velocity{};
+    amrex::Real pressure = 0.0;
+    amrex::Real divergence = 0.0;
+};
+
+/** P8-003 area-weighted cell section summary plus collocated normal flow. */
+struct UniformPlaneStatistics {
+    int direction = 0;
+    int cell_index = 0;
+    amrex::Real coordinate = 0.0;
+    amrex::Long cell_count = 0;
+    amrex::Array<amrex::Real, AMREX_SPACEDIM> mean_velocity{};
+    amrex::Real mean_pressure = 0.0;
+    amrex::Real normal_flow = 0.0;
+};
+
+/** Globally reduced instantaneous integral/statistical diagnostics. */
+struct UniformFlowDiagnostics {
+    amrex::Real integrated_divergence = 0.0;
+    amrex::Real max_abs_divergence = 0.0;
+    amrex::Real net_mass_flux = 0.0;
+    amrex::Real outlet_flow = 0.0;
+    amrex::Array<amrex::Real, AMREX_SPACEDIM> momentum{};
+    amrex::Real kinetic_energy = 0.0;
+    amrex::Real pressure_mean = 0.0;
+    amrex::Real pressure_min = 0.0;
+    amrex::Real pressure_max = 0.0;
+};
+
 /**
  * P0--P2 field contract. `ghost_cells` is allocated same-level halo width;
  * ghost reads require fill_ghost_cells() after a valid-region write.  The
@@ -132,6 +165,12 @@ public:
     /** Run the physical Cartesian channel case; this is a run, not a validation claim. */
     void run_physical_benchmark(amrex::Real dt, int steps, amrex::Real viscosity,
                                 std::string const& report_path);
+    /** Run and export the CPU/single-rank 2D-equivalent lid-driven cavity demonstration. */
+    void run_lid_driven_cavity(amrex::Real dt, int steps, amrex::Real viscosity,
+                               std::string const& report_path,
+                               std::string const& field_path,
+                               std::string const& centerline_path,
+                               std::string const& history_path);
     /** Globally reduced P3 boundary/divergence/freshness report; diagnostic only, never a RHS. */
     P3Diagnostics p3_diagnostics(char const* stage, bool require_fresh = true) const;
     /** IO-rank layout/schema diagnostics, safe after initialization or a completed step. */
@@ -146,6 +185,18 @@ public:
     void run_p8_restart_contract_checks(std::string const& path, amrex::Real dt,
                                         int total_steps, int checkpoint_step,
                                         amrex::Real viscosity);
+    /** Sample the containing cell; the current P8-003 implementation is CPU/single-rank. */
+    UniformPointSample sample_uniform_point(
+        amrex::Array<amrex::Real, AMREX_SPACEDIM> const& position) const;
+    /** Reduce a cell plane and its collocated integrated normal face flux. */
+    UniformPlaneStatistics uniform_plane_statistics(int direction, int cell_index) const;
+    /** Write every cell on one section as deterministic CSV (not an AMReX plotfile). */
+    void write_uniform_plane_csv(std::string const& path, int direction, int cell_index) const;
+    /** Compute conservation, energy, momentum, and pressure statistics. */
+    UniformFlowDiagnostics uniform_flow_diagnostics() const;
+    /** Deterministic manufactured P8-003 sampling/statistics regression. */
+    void run_p8_sampling_statistics_contract(std::string const& report_path,
+                                             std::string const& plane_path);
 
 private:
     void register_fields();

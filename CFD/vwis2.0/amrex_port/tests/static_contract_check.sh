@@ -2,7 +2,8 @@
 set -euo pipefail
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 port="$root/amrex_port"
-required=("$port/CMakeLists.txt" "$port/CMakePresets.json" "$port/amrex_version.lock" "$port/inputs/p1_smoke.in" "$port/inputs/p1_multibox.in" "$port/inputs/p1_contract.in" "$port/inputs/p2_contract.in" "$port/inputs/p2_boundary_face.in" "$port/inputs/p3_cartesian_boundary.in" "$port/inputs/p3_legacy_supported.in" "$port/inputs/p3_legacy_rejected.in" "$port/inputs/p4_periodic_projection.in" "$port/inputs/p4_closed_neumann_projection.in" "$port/inputs/p4_inflow_outflow_projection.in" "$port/inputs/p5_periodic_advection_16.in" "$port/inputs/p5_periodic_advection_32.in" "$port/inputs/p5_boundary_multibox_advection.in" "$port/inputs/p5_periodic_viscous_16.in" "$port/inputs/p5_periodic_viscous_32.in" "$port/inputs/p5_boundary_multibox_viscous.in" "$port/inputs/p5_explicit_time.in" "$port/inputs/p0_cartesian_benchmark.in" "$port/inputs/p5_explicit_cfl_rejected.in" "$port/src/CartesianBoundaryConfig.H" "$port/src/CartesianBoundaryConfig.cpp" "$port/src/VwisAmrExSolver.H" "$port/src/VwisAmrExSolver.cpp" "$port/src/VwisAmrExBoundary.cpp" "$port/src/VwisAmrExProjection.cpp" "$port/src/VwisAmrExAdvection.cpp" "$port/src/VwisAmrExViscosity.cpp" "$port/src/VwisAmrExTime.cpp" "$port/src/VwisAmrExContracts.cpp" "$port/src/VwisAmrExBenchmark.cpp" "$port/tests/cartesian_benchmark.cmake")
+required=("$port/CMakeLists.txt" "$port/CMakePresets.json" "$port/amrex_version.lock" "$port/inputs/p1_smoke.in" "$port/inputs/p1_multibox.in" "$port/inputs/p1_contract.in" "$port/inputs/p2_contract.in" "$port/inputs/p2_boundary_face.in" "$port/inputs/p3_cartesian_boundary.in" "$port/inputs/p3_legacy_supported.in" "$port/inputs/p3_legacy_rejected.in" "$port/inputs/p4_periodic_projection.in" "$port/inputs/p4_closed_neumann_projection.in" "$port/inputs/p4_inflow_outflow_projection.in" "$port/inputs/p5_periodic_advection_16.in" "$port/inputs/p5_periodic_advection_32.in" "$port/inputs/p5_boundary_multibox_advection.in" "$port/inputs/p5_periodic_viscous_16.in" "$port/inputs/p5_periodic_viscous_32.in" "$port/inputs/p5_boundary_multibox_viscous.in" "$port/inputs/p5_explicit_time.in" "$port/inputs/p0_cartesian_benchmark.in" "$port/inputs/p5_explicit_cfl_rejected.in" "$port/inputs/p8_sampling_statistics.in" "$port/src/CartesianBoundaryConfig.H" "$port/src/CartesianBoundaryConfig.cpp" "$port/src/VwisAmrExSolver.H" "$port/src/VwisAmrExSolver.cpp" "$port/src/VwisAmrExBoundary.cpp" "$port/src/VwisAmrExProjection.cpp" "$port/src/VwisAmrExAdvection.cpp" "$port/src/VwisAmrExViscosity.cpp" "$port/src/VwisAmrExTime.cpp" "$port/src/VwisAmrExDiagnostics.cpp" "$port/src/VwisAmrExContracts.cpp" "$port/src/VwisAmrExBenchmark.cpp" "$port/tests/cartesian_benchmark.cmake" "$port/tests/p8_sampling_statistics.cmake")
+required+=("$port/inputs/p10_lid_cavity_sanity.in" "$port/src/VwisAmrExCavity.cpp" "$port/tests/lid_driven_cavity.cmake")
 for file in "${required[@]}"; do test -f "$file"; done
 rg -q 'find_package\(AMReX CONFIG QUIET\)' "$port/CMakeLists.txt"
 rg -q 'AMReXConfig.cmake was not found' "$port/CMakeLists.txt"
@@ -50,4 +51,12 @@ rg -q 'projection_time_coefficient = 1.0' "$port/src/VwisAmrExSolver.H"
 rg -q 'P5-004 explicit Euler time contract: PASS' "$port/src/VwisAmrExTime.cpp"
 rg -q 'explicit step rejected' "$port/src/VwisAmrExTime.cpp"
 rg -q 'not legacy SNES' "$port/src/VwisAmrExContracts.cpp"
-echo 'static P0-P5-004 AMReX contract check: PASS'
+rg -q 'sample_uniform_point' "$port/src/VwisAmrExSolver.H" "$port/src/VwisAmrExDiagnostics.cpp"
+rg -q 'uniform_plane_statistics' "$port/src/VwisAmrExSolver.H" "$port/src/VwisAmrExDiagnostics.cpp"
+rg -q 'vwis-uniform-diagnostics-v1' "$port/src/VwisAmrExDiagnostics.cpp"
+rg -q 'plotfile_compatible.*false' "$port/src/VwisAmrExDiagnostics.cpp"
+rg -q 'MovingWall' "$port/src/CartesianBoundaryConfig.H" "$port/src/CartesianBoundaryConfig.cpp"
+rg -q '2.0 \* moving_wall_velocity\[comp\] - interior' "$port/src/VwisAmrExBoundary.cpp"
+rg -q 'moving_wall_reconstruction_max_error' "$port/src/VwisAmrExCavity.cpp" "$port/tests/lid_driven_cavity.cmake"
+rg -q 'demonstration / engineering result; not CFD validation' "$port/src/VwisAmrExCavity.cpp"
+echo 'static P0-P8-003 plus cavity AMReX contract check: PASS'

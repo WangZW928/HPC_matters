@@ -91,6 +91,11 @@ void VwisAmrExSolver::validate_boundary_config() const
             }
             inlet_count += kind == CartesianBC::Inflow;
             outlet_count += kind == CartesianBC::Outflow;
+            if (kind == CartesianBC::MovingWall &&
+                m_boundary.moving_wall_velocity[dir] != 0.0) {
+                throw std::runtime_error(
+                    "vwisbcs.moving_wall_velocity must have zero normal component");
+            }
         }
     }
     if ((inlet_count == 1 || outlet_count == 1) &&
@@ -147,6 +152,10 @@ void VwisAmrExSolver::fill_physical_ghost_cells_impl(bool impose_boundary_flux)
     amrex::GpuArray<int, 2 * AMREX_SPACEDIM> kinds{};
     amrex::GpuArray<amrex::Real, 2 * AMREX_SPACEDIM> pressures{};
     amrex::GpuArray<amrex::Real, 2 * AMREX_SPACEDIM> inlet_scales{};
+    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> moving_wall_velocity{};
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+        moving_wall_velocity[dir] = m_boundary.moving_wall_velocity[dir];
+    }
     for (int slot = 0; slot < 2 * AMREX_SPACEDIM; ++slot) {
         kinds[slot] = static_cast<int>(m_boundary.sides[slot].velocity);
         pressures[slot] = m_boundary.sides[slot].pressure;
@@ -200,6 +209,8 @@ void VwisAmrExSolver::fill_physical_ghost_cells_impl(bool impose_boundary_flux)
                 // Ucat: inlet profile is imposed consistently from boundary Ucont below;
                 // only the normal component is nonzero in this minimal interface.
                 if (kind == static_cast<int>(CartesianBC::NoSlipWall)) value(i,j,k,comp) = -interior;
+                else if (kind == static_cast<int>(CartesianBC::MovingWall))
+                    value(i,j,k,comp) = 2.0 * moving_wall_velocity[comp] - interior;
                 else if (kind == static_cast<int>(CartesianBC::SlipWall) || kind == static_cast<int>(CartesianBC::Symmetry))
                     value(i,j,k,comp) = comp == boundary_dir ? -interior : interior;
                 else if (kind == static_cast<int>(CartesianBC::Inflow)) {
@@ -218,7 +229,7 @@ void VwisAmrExSolver::fill_physical_ghost_cells_impl(bool impose_boundary_flux)
         }
     };
     fill_cell(m_p, 1); fill_cell(m_phi, 3); fill_cell(m_nvert, 2);
-    fill_cell(m_ucat, 0); fill_cell(m_ucat_old, 0);
+    fill_cell(m_ucat, 0); fill_cell(m_ucat_old, 0); fill_cell(m_ucat_older, 0);
 
     // First make every physical normal boundary face authoritative. Inflow is
     // a globally normalized plane profile; constrained outflow has equal and
@@ -273,6 +284,7 @@ void VwisAmrExSolver::fill_physical_ghost_cells_impl(bool impose_boundary_flux)
         const amrex::Box face_domain = amrex::convert(domain, amrex::IntVect::TheDimensionVector(face_dir));
         const auto flo = face_domain.smallEnd();
         const auto fhi = face_domain.bigEnd();
+        const amrex::Real face_area = m_face_area[face_dir];
         for (amrex::MFIter mfi(mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
             auto const value = mf.array(mfi);
             amrex::ParallelFor(mfi.fabbox(), [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
@@ -287,6 +299,11 @@ void VwisAmrExSolver::fill_physical_ghost_cells_impl(bool impose_boundary_flux)
                 }
                 const int kind = kinds[2 * boundary_dir + side];
                 const amrex::Real interior = value(source[0],source[1],source[2]);
+                if (kind == static_cast<int>(CartesianBC::MovingWall)) {
+                    const amrex::Real wall_flux = moving_wall_velocity[face_dir] * face_area;
+                    value(i,j,k) = 2.0 * wall_flux - interior;
+                    return;
+                }
                 bool odd = kind == static_cast<int>(CartesianBC::NoSlipWall) ||
                            ((kind == static_cast<int>(CartesianBC::SlipWall) || kind == static_cast<int>(CartesianBC::Symmetry)) && face_dir == boundary_dir) ||
                            (kind == static_cast<int>(CartesianBC::Inflow) && face_dir != boundary_dir);

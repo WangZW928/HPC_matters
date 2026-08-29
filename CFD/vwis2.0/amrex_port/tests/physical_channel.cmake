@@ -18,14 +18,21 @@ foreach (required
     "\"case_type\": \"physical Cartesian plane channel\""
     "\"boundary_conditions\""
     "\"post_projection_max_abs_divergence\""
+    "\"integrated_divergence\""
     "\"net_mass_flux\""
     "\"outlet_flow\""
     "\"section_mean_u_out\""
     "\"centerline_u\""
     "\"pressure_drop\""
+    "\"pressure_mean\""
+    "\"pressure_min\""
+    "\"pressure_max\""
     "\"momentum\""
     "\"kinetic_energy\""
     "\"step_seconds\""
+    "\"time_average_method\""
+    "\"time_averages\""
+    "\"sample_count\": 40"
     "\"total_step_seconds\"")
   string(FIND "${json}" "${required}" found)
   if (found EQUAL -1)

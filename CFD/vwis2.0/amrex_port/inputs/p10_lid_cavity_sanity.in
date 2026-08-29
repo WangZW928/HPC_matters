@@ -1,0 +1,14 @@
+# Short deterministic schema/sanity check. This is not a CFD validation case.
+vwis.n_cell = 8 8 1
+vwis.max_grid_size = 4
+vwis.nghost = 2
+vwis.is_periodic = 0 0 1
+vwis.dt = 5.0e-3
+vwis.run_steps = 8
+vwis.viscosity = 1.0e-2
+vwis.run_lid_driven_cavity = 1
+
+vwisbcs.enabled = 1
+vwisbcs.lo = noslip noslip ""
+vwisbcs.hi = noslip moving_wall ""
+vwisbcs.moving_wall_velocity = 1.0 0.0 0.0

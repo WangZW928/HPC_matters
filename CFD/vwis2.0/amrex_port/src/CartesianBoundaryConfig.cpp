@@ -2,18 +2,20 @@
 
 #include <AMReX_ParmParse.H>
 
+#include <cmath>
 #include <stdexcept>
 
 namespace {
 CartesianBC named_bc(std::string const& name)
 {
     if (name == "noslip") return CartesianBC::NoSlipWall;
+    if (name == "moving_wall") return CartesianBC::MovingWall;
     if (name == "slip") return CartesianBC::SlipWall;
     if (name == "symmetry") return CartesianBC::Symmetry;
     if (name == "inflow") return CartesianBC::Inflow;
     if (name == "outflow") return CartesianBC::Outflow;
     throw std::runtime_error("unsupported vwisbcs named Cartesian BC '" + name +
-                             "' (supported: noslip, slip, symmetry, inflow, outflow)");
+                             "' (supported: noslip, moving_wall, slip, symmetry, inflow, outflow)");
 }
 
 CartesianBC legacy_bc(int code)
@@ -51,6 +53,15 @@ CartesianBoundaryConfig read_cartesian_boundary_config(
     pp.query("profile_slope_0", config.profile_slope_0);
     pp.query("profile_slope_1", config.profile_slope_1);
     pp.query("constrain_outlet_flux", config.constrain_outlet_flux);
+    amrex::Vector<amrex::Real> moving_velocity(
+        config.moving_wall_velocity.begin(), config.moving_wall_velocity.end());
+    pp.queryarr("moving_wall_velocity", moving_velocity, 0, AMREX_SPACEDIM);
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+        if (!std::isfinite(moving_velocity[dir])) {
+            throw std::runtime_error("vwisbcs.moving_wall_velocity must contain finite values");
+        }
+        config.moving_wall_velocity[dir] = moving_velocity[dir];
+    }
 
     amrex::Vector<amrex::Real> pressure(2 * AMREX_SPACEDIM, 0.0);
     pp.queryarr("pressure", pressure, 0, 2 * AMREX_SPACEDIM);
@@ -90,6 +101,7 @@ char const* cartesian_bc_name(CartesianBC bc) noexcept
     switch (bc) {
     case CartesianBC::Periodic: return "periodic";
     case CartesianBC::NoSlipWall: return "noslip";
+    case CartesianBC::MovingWall: return "moving_wall";
     case CartesianBC::SlipWall: return "slip";
     case CartesianBC::Symmetry: return "symmetry";
     case CartesianBC::Inflow: return "inflow";

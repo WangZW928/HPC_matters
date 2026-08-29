@@ -1,0 +1,26 @@
+{
+  "schema": "vwis-cavity-figure-manifest-v1",
+  "sources": [
+    "raw/summary.json",
+    "raw/final_field.csv",
+    "raw/centerlines.csv",
+    "raw/history.csv"
+  ],
+  "transformations": [
+    "reshape final cell-centred CSV rows to the recorded Ny by Nx grid",
+    "Matplotlib streamplot interpolation used only to integrate streamline paths",
+    "no field smoothing, filtering, averaging, or resampling",
+    "semilog display floors exact plotted zeros at 1e-30; raw values remain in history.csv"
+  ],
+  "centerline_method": "linear interpolation between adjacent cell centres to x=0.5 or y=0.5; no smoothing",
+  "matplotlib_version": "3.11.1",
+  "numpy_version": "2.5.1",
+  "outputs": [
+    "figures/velocity_streamlines.png",
+    "figures/velocity_streamlines.svg",
+    "figures/centerlines.png",
+    "figures/centerlines.svg",
+    "figures/time_history.png",
+    "figures/time_history.svg"
+  ]
+}

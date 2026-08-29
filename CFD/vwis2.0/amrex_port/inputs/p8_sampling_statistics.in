@@ -1,0 +1,6 @@
+# Exact P8-003 manufactured sampling/statistics contract; not CFD validation.
+vwis.n_cell = 4 3 2
+vwis.max_grid_size = 2
+vwis.nghost = 2
+vwis.is_periodic = 1 1 1
+vwis.run_p8_sampling_checks = 1

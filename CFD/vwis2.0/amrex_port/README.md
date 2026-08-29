@@ -1,4 +1,4 @@
-# VWiS AMReX P0--P8-002 Cartesian contract
+# VWiS AMReX P0--P8-003 Cartesian contract
 
 `amrex_port/` is independent of the original `vwis2.0/` PETSc/HYPRE solver.
 It is a single-level Cartesian data/runtime framework with a narrow pressure
@@ -14,7 +14,19 @@ advancement. P8-001/P8-002 now add a versioned single-level CPU
 checkpoint/restart payload using AMReX `VisMF`, including all three fluid time
 layers and strict Header validation. There is still no LES, IBM/EB, FSI,
 curvilinear metric/operator, AMR, plotfile/HDF5 output, MPI/GPU restart, or full
-CFD case validation.
+CFD case validation. P8-003 adds CPU/single-rank uniform-grid point probes,
+plane summaries/CSV extraction, reusable flow statistics, and equal-spacing
+post-step time averages in the physical channel report. These CSV/JSON files
+are diagnostics and are explicitly not AMReX plotfiles.
+
+The Cartesian boundary vocabulary also includes `moving_wall`, with
+`vwisbcs.moving_wall_velocity` defaulting to `1 0 0`. Its normal component
+must be zero. Cell ghosts use mirror Dirichlet data
+`Ughost=2*Uwall-Uinterior`, tangential face-flux ghosts use the same wall
+state after face-area scaling, and the physical normal face flux remains zero.
+Existing `noslip` behavior is unchanged. Checkpoint schema version 2 records
+and strictly checks the moving-wall vector in addition to the prior P8 state;
+the reader still accepts schema-v1 checkpoints that predate this field.
 
 ## Version and configuration contract
 
@@ -281,6 +293,43 @@ contract check, clean rebuild, both P8 tests, all 20 CTests, and `git diff
 --check`. MPI/GPU runtime and plotfile/HDF5 output remain outside this
 increment. Full evidence is recorded in the P8 report.
 
+## P8-003 uniform Cartesian sampling and statistics
+
+`VwisAmrExDiagnostics.cpp` provides a cell-containing physical-coordinate
+point probe, cell-plane statistics, deterministic plane CSV extraction, and an
+instantaneous diagnostic reduction. The diagnostic schema reports integrated
+and maximum absolute divergence, net physical-boundary mass flux, outlet flow,
+three-component momentum, kinetic energy, and pressure mean/minimum/maximum.
+Plane statistics report the mean velocity and pressure and the integrated
+normal flow on the plane's low face. Point values and plane rows are
+cell-centred; there is no interpolation in this increment.
+
+The exact `p8_sampling_statistics.in` contract uses a periodic `4x3x2`,
+multi-Box constant velocity field and indexed pressure field. It verifies the
+probe cell/value, a six-cell x section and CSV row count, zero divergence,
+section flow, momentum, kinetic energy, and pressure statistics within a
+roundoff-scaled tolerance. This is a manufactured contract test, not CFD
+validation. The physical-channel report reuses the APIs for every post-step
+record and adds arithmetic means over its 40 equally spaced samples.
+
+P8-003 remains deliberately single-level, uniform Cartesian, CPU, and one MPI
+rank. It has no AMR coverage arbitration, MPI gather/reduction contract, GPU
+runtime, interpolated probes, IBM force/moment or IBM-neighbour statistics.
+There is no plotfile writer: JSON and CSV outputs must not be presented as
+plotfile-compatible. The 2026-08-29 commands and results are recorded in
+`_Docs/AMReX_P8-003_采样统计诊断_20260829.md`.
+
+## Lid-driven cavity engineering demonstration
+
+`../run_cases/lid_driven_cavity/` contains a reproducible `32x32x1`, periodic-z
+square cavity at `Re=100`. It writes solver-native CSV/JSON diagnostics and
+Matplotlib PNG/SVG figures; it does not claim AMReX plotfile output or
+reference validation. The focused `vwis_amrex_lid_driven_cavity_sanity` CTest
+checks deterministic schemas, row counts, finite output, and the solver's hard
+post-projection divergence guard. The case record documents the explicit Euler
+limitation and an AMReX 26.04 thin-domain BoxArray restriction observed during
+the run.
+
 ## P3 host verification on 2026-08-24
 
 The current WSL2 host reused locked AMReX 26.04 install caches but configured
@@ -330,7 +379,8 @@ Run it with `ctest --test-dir build/amrex_port --output-on-failure -R
 vwis_amrex_physical_channel`. The runner writes `physical_channel.json`, with
 one record per step containing timing, post-projection divergence, net mass
 flux, momentum, kinetic energy, outlet flow, section means, centerline
-velocity, and pressure drop. The report status is deliberately
+velocity, pressure drop, and pressure statistics. It also writes arithmetic
+time averages over the equally spaced post-step records. The report status is deliberately
 `physical run / not yet validated` and `reference_available=false`: no legacy
 or literature reference data is available, so a passing CTest means only that
 the configured physical run and report contract completed.

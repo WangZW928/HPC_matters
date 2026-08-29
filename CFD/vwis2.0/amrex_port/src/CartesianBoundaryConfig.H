@@ -8,7 +8,7 @@
 #include <string>
 
 /** P3 single-level Cartesian physical-boundary semantics. */
-enum class CartesianBC { Periodic, NoSlipWall, SlipWall, Symmetry, Inflow, Outflow };
+enum class CartesianBC { Periodic, NoSlipWall, MovingWall, SlipWall, Symmetry, Inflow, Outflow };
 
 struct BoundarySideSpec {
     CartesianBC velocity = CartesianBC::Periodic;
@@ -24,6 +24,10 @@ struct CartesianBoundaryConfig {
     amrex::Real profile_slope_0 = 0.0;
     amrex::Real profile_slope_1 = 0.0;
     bool constrain_outlet_flux = true;
+    // Shared Cartesian velocity for named moving_wall sides. The normal
+    // component is required to be zero for every side that uses it.
+    amrex::Array<amrex::Real, AMREX_SPACEDIM> moving_wall_velocity{
+        AMREX_D_DECL(1.0, 0.0, 0.0)};
     bool enabled = false;
 };
 

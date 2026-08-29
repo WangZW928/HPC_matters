@@ -29,7 +29,7 @@
 
 namespace {
 
-constexpr int checkpoint_schema_version = 1;
+constexpr int checkpoint_schema_version = 2;
 constexpr char checkpoint_magic[] = "VWIS_AMREX_CARTESIAN_CHECKPOINT";
 
 struct Payload {
@@ -257,6 +257,10 @@ void VwisAmrExSolver::write_checkpoint(std::string const& path) const
            << "profile_slope_0 " << real_text(m_boundary.profile_slope_0) << '\n'
            << "profile_slope_1 " << real_text(m_boundary.profile_slope_1) << '\n'
            << "constrain_outlet_flux " << static_cast<int>(m_boundary.constrain_outlet_flux) << '\n'
+           << "moving_wall_velocity "
+           << real_text(m_boundary.moving_wall_velocity[0]) << ' '
+           << real_text(m_boundary.moving_wall_velocity[1]) << ' '
+           << real_text(m_boundary.moving_wall_velocity[2]) << '\n'
            << "payload_count " << payloads.size() << '\n';
     for (std::size_t index = 0; index < payloads.size(); ++index) {
         auto const& payload = payloads[index];
@@ -278,7 +282,11 @@ void VwisAmrExSolver::read_checkpoint(std::string const& path)
     std::filesystem::path root(path);
     StrictHeader header(root / "Header");
     header.exact(checkpoint_magic);
-    same_integer(header.value("schema_version"), checkpoint_schema_version, "schema_version");
+    const int disk_schema_version = static_cast<int>(
+        signed_integer(header.value("schema_version"), "schema_version"));
+    if (disk_schema_version != 1 && disk_schema_version != checkpoint_schema_version) {
+        reject("schema_version mismatch");
+    }
     same(header.value("amrex_release"), VWIS_AMREX_LOCKED_VERSION, "AMReX release");
     same(header.value("amrex_git_sha"), VWIS_AMREX_LOCKED_GIT_SHA, "AMReX git SHA");
     same(header.value("amrex_runtime_version"), amrex::Version(), "AMReX runtime version");
@@ -352,6 +360,11 @@ void VwisAmrExSolver::read_checkpoint(std::string const& path)
     same_real(header.value("profile_slope_1"), m_boundary.profile_slope_1, "profile slope 1");
     same_integer(header.value("constrain_outlet_flux"), static_cast<int>(m_boundary.constrain_outlet_flux),
                  "outlet flux constraint");
+    if (disk_schema_version >= 2) {
+        check_real_vector("moving_wall_velocity", {
+            m_boundary.moving_wall_velocity[0], m_boundary.moving_wall_velocity[1],
+            m_boundary.moving_wall_velocity[2]});
+    }
 
     std::vector<Payload> payloads = {
         {"P", "cell", 1, &m_p}, {"Phi", "cell", 1, &m_phi},
