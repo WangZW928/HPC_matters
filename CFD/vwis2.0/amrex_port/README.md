@@ -32,6 +32,8 @@ cmake --build build/amrex_port
 ctest --test-dir build/amrex_port --output-on-failure
 ./build/amrex_port/vwis_amrex_skeleton amrex_port/inputs/p1_smoke.in
 mpiexec -n 2 ./build/amrex_port/vwis_amrex_skeleton amrex_port/inputs/p1_multibox.in
+# Repeatable P0-004/P0-005 manufactured Cartesian benchmark; JSON is emitted by the runner.
+ctest --test-dir build/amrex_port -R vwis_amrex_cartesian_benchmark --output-on-failure
 ```
 
 The final MPI command is a test recipe, not a claimed result. For a different
@@ -311,3 +313,24 @@ recorded in `_Docs/AMReX_P4_Cartesian压力投影设计及测试_20260826.md`. C
 configure/build and CTest pass against locked AMReX 26.04. MPI is attempted
 separately and is not called a runtime pass if PMIx/socket restrictions prevent
 entry into the application.
+
+## Physical Cartesian channel benchmark
+
+`inputs/physical_channel.in` adds a physical, single-level Cartesian plane
+channel without changing the legacy `vwis2.0/` source. The domain is
+`[0,1]^3` with `32x16x4` cells and `dx=(0.03125,0.0625,0.25)`. The fluid starts
+at rest; `xlo` is a uniform inlet with target volume flux 1, `xhi` is a fixed
+pressure (`p=0`) outflow, `ylo/yhi` are no-slip walls, and `zlo/zhi` are
+periodic. With `nu=0.1`, `dt=2e-4`, 40 steps reach `t=0.008` and
+`Re=U_in H/nu=10` for `U_in=1`, `H=1`. No body force or manufactured source is
+used. This uses existing P3/P4 BC and projection paths; no benchmark-specific
+boundary capability was added.
+
+Run it with `ctest --test-dir build/amrex_port --output-on-failure -R
+vwis_amrex_physical_channel`. The runner writes `physical_channel.json`, with
+one record per step containing timing, post-projection divergence, net mass
+flux, momentum, kinetic energy, outlet flow, section means, centerline
+velocity, and pressure drop. The report status is deliberately
+`physical run / not yet validated` and `reference_available=false`: no legacy
+or literature reference data is available, so a passing CTest means only that
+the configured physical run and report contract completed.

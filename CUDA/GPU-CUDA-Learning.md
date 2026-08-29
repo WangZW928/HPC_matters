@@ -162,7 +162,7 @@ acc += vsmem[index];
 
 ### 5. register_Occupancy（基础版 / Legacy）
 
-概念：每个 thread 使用的寄存器越多，SM 能同时驻留的 block/warp 可能越少，理论 occupancy 下降。
+概念：每个 thread 使用的寄存器越多，寄存器文件可能越早成为 SM 的资源限制，使能同时驻留的 block/warp 变少，理论 occupancy 下降。occupancy 是 active warps 与硬件最大 active warps 的比值，不是单独追求的性能目标。[CUDA C++ Best Practices Guide](https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html#occupancy)
 
 核心代码：
 
@@ -176,9 +176,9 @@ for (int k = 0; k < HIGH_REG_TMP_SIZE; ++k) {
 
 关键洞察：
 
-- 寄存器是 SM 资源，线程越“胖”，并发越受限
-- occupancy 下降会削弱隐藏延迟的能力
-- 但 occupancy 不是越高越好，够用后继续提高可能收益很小
+- 寄存器是 SM 资源，线程越“胖”，并发可能越受限；实际阶梯还受 block size、shared memory 和架构分配粒度影响
+- 较低 occupancy 可能削弱隐藏访存或依赖延迟的能力，但更高 occupancy 不保证更快；寄存器复用、指令级并行和 spilling 也要一起看
+- `__launch_bounds__` 或 `--maxrregcount` 可能改变资源分配；若寄存器不足而 spilling 到 local memory，性能可能变差，需用实测确认
 
 已有 benchmark 结果位置：
 
@@ -186,17 +186,30 @@ for (int k = 0; k < HIGH_REG_TMP_SIZE; ++k) {
 - `register_Occupancy/results/sweep_occupancy_vs_regs.png`
 - `register_Occupancy/results/sweep_runtime_vs_regs.png`
 
+![寄存器使用量、Occupancy 与资源限制的关系](./occupancy_vs_registers/results/occupancy_analysis.svg)
+_图：`occupancy_vs_registers` 的已有分析图；用于观察资源限制导致的 occupancy 阶梯，不代表所有 GPU 或 kernel 的通用曲线。_
+
 学习：
 
-- 用 `cudaFuncGetAttributes` 看 `numRegs`
-- 用 occupancy API 估算 active blocks/SM
-- 把寄存器、occupancy、runtime 三者放在一起判断
+- 用 [`cudaFuncGetAttributes`](https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__KERNEL.html) 看 `numRegs`
+- 用 [`cudaOccupancyMaxActiveBlocksPerMultiprocessor`](https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__OCCUPANCY.html) 估算给定 block size/shared memory 下的 active blocks/SM；这是预测，不是实际运行时吞吐
+- 把寄存器、occupancy、spill 指标和 runtime 放在一起判断
 
-这是寄存器与 Occupancy 主题的入门版。进阶实验 `occupancy_vs_registers` 会进一步比较不同 block size，建立资源限制导致的 Occupancy 阶梯，并演示 `__launch_bounds__` 引发 register spilling 的性能代价。
+这是寄存器与 Occupancy 主题的入门版。进阶实验 `occupancy_vs_registers` 会进一步比较不同 block size，建立资源限制导致的 Occupancy 阶梯，并演示寄存器限制可能带来的 spilling 代价。
 
-### 6. warp_schedule
+### 6. occupancy_vs_registers
 
-概念：GPU 通过在 SM 上驻留多个 warp 来隐藏访存和流水线延迟。warp 数太少，调度器没有足够可运行 work。
+概念：Occupancy 计算是资源约束的交集：寄存器、shared memory、线程数、block 数等任一项都可能成为限制因素。它回答“最多能驻留多少”，不直接回答“kernel 有多快”。[CUDA Runtime Occupancy API](https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__OCCUPANCY.html)
+
+关键洞察：
+
+- 先看理论 occupancy 的限制来源，再看 achieved occupancy、eligible warps、stall 和吞吐是否真的受影响
+- 为了提高 occupancy 而强行压低寄存器数，可能引入 local-memory spilling；最佳点必须由目标 GPU、输入规模和 kernel 实测决定
+- 资源 cliff 是离散分配造成的阶梯现象，不应把某一架构上的阈值外推到另一架构
+
+### 7. warp_schedule
+
+概念：SM 调度器从可发射的 warp 中选择指令；当一个 warp 因内存依赖、同步或流水线资源暂时不能发射时，其他 eligible warp 有机会填补空档，从而隐藏延迟。[CUDA C++ Programming Guide：Hardware Multithreading](https://docs.nvidia.com/cuda/cuda-programming-guide/)
 
 核心代码：
 
@@ -208,9 +221,9 @@ for (int i = 0; i < iters; ++i) {
 
 关键洞察：
 
-- blocks/SM 和 warps/block 共同决定总 warp 数
-- warp 多不一定越好，资源压力和调度开销也会出现
-- latency hiding 是吞吐型 GPU 的核心机制
+- blocks/SM 和 warps/block 共同决定理论 active warps，但资源限制和同步会决定实际可运行/可发射的 warp
+- warp 多不一定越好；更多线程可能增加寄存器/shared memory 压力，且当瓶颈在带宽或指令吞吐时继续增加并发未必有收益
+- stall reason 是“warp 当时为什么不能发射”的分类，不是单独的根因证明；只有结合 scheduler issue、依赖链、内存请求和代码位置才能解释 runtime
 
 已有 benchmark 结果位置：
 
@@ -220,15 +233,15 @@ for (int i = 0; i < iters; ++i) {
 
 学习：
 
-- block size 不是风格问题，而是调度和资源配置问题
-- 用热力图观察 blocks/SM 与 warps/block 的组合
-- 识别“并发不足”和“资源过度占用”的区别
+- block size 既是调度参数，也是资源配置参数
+- 用热力图观察 blocks/SM 与 warps/block 的组合，不把单一峰值当成普适结论
+- 区分“没有足够 eligible warp”与“已有 warp 但某个执行/内存管线饱和”
 
 ## 第四章：性能分析 Profiling
 
-### 7. nsight_systems_intro
+### 8. nsight_systems_intro
 
-概念：Nsight Systems 看系统级时间线，适合分析 stream、memcpy、kernel launch、CPU/GPU 同步和 overlap。
+概念：Nsight Systems 观察程序级时间线，适合分析 CPU/GPU 工作、CUDA API、stream、memcpy、kernel launch、同步和 overlap。[Nsight Systems User Guide：CUDA Trace](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#cuda-trace)
 
 核心命令：
 
@@ -239,19 +252,22 @@ nsys profile --trace=cuda,osrt,nvtx --output=results/stream_overlap \
 
 关键洞察：
 
-- CSV 只能说明耗时变化，timeline 才能证明是否重叠
-- 看 CUDA API 行可以发现 CPU 侧同步和 launch 间隔
-- 看 GPU rows 可以发现 copy engine、kernel、stream 是否并发
+- CSV 可以发现耗时趋势，但只有时间线能直接检查任务的排队顺序和时间区间是否重叠；“异步提交”本身不等于“已经并发”
+- CUDA API 行可帮助定位 host 侧同步和 launch 间隔；GPU rows 可观察 kernel、copy engine 和 stream 的时间关系
+- 时间线能说明“发生了什么”，不必然说明 kernel 内部为何慢；单 kernel 的硬件瓶颈应转到 Nsight Compute 或代码分析
+
+![两个 stream 的已有性能对比图](./cuda_stream_intro/results/stream_vs_default.png)
+_图：已有 stream benchmark 结果；它是 overlap 的实验背景图，不是本机本次运行的 Nsight Systems 报告。_
 
 学习：
 
 - 打开 `.nsys-rep` 并定位 CUDA timeline
-- 判断 two streams 是否真的 overlap
-- 识别 GPU 空洞和 CPU 同步点
+- 判断 two streams 是否真的 overlap，并检查是否有同步或资源竞争
+- 识别 GPU 空洞、CPU 提交间隔和 memcpy/kernel 排队关系
 
-### 8. nsight_compute_intro
+### 9. nsight_compute_intro
 
-概念：Nsight Compute 分析单 kernel 的硬件指标，适合解释 occupancy、stall、memory throughput 和 roofline。
+概念：Nsight Compute 面向单个 CUDA kernel，提供 occupancy、scheduler、memory workload、compute/memory throughput 和 roofline 等指标。[Nsight Compute Profiling Guide](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html)
 
 核心命令：
 
@@ -262,21 +278,24 @@ ncu --set full --target-processes all --kernel-name-base demangled \
 
 关键洞察：
 
-- `Stall Long Scoreboard` 常指向 global memory 依赖
-- memory throughput 要和 load/store efficiency、transaction 数一起看
-- roofline 帮你判断 compute-bound、memory-bound 或其他瓶颈
+- `Stall Long Scoreboard` 表示 warp 在等待较长延迟的 scoreboard 依赖，常见于未完成的 global/local memory 相关依赖；它不是“global memory 一定是唯一根因”，需结合内存请求和源码位置确认
+- memory throughput、load/store efficiency、请求/事务和 cache 命中率应一起看；单个百分比不能独立证明带宽瓶颈
+- roofline 把算术强度、已达性能与若干硬件上限放在同一图中，适合提出“可能受哪条 ceiling 限制”的假设；它不是自动生成的因果证明
+- 只在 scheduler 有大量未使用 issue slot 时重点追 stall reason；有些 stall 是正常等待，也可能被其他 warp 隐藏。[Nsight Compute：Warp Stall Reasons](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#warp-stall-reasons)
 
 学习：
 
-- 区分 theoretical occupancy 和 achieved occupancy
-- 用 stall reasons 解释 runtime 差异
-- 用 roofline 给 kernel 分类
+- 区分 theoretical occupancy 与 achieved occupancy；二者差异还可能来自负载不均衡等运行时因素
+- 用 stall、scheduler issue、内存/计算 throughput 和源码关联解释 runtime 差异
+- 用 roofline 做 kernel 分类的起点，再用其他 section 验证假设
+
+以上分析是概念/示例；本仓库没有在此处附带 Nsight Systems/Compute 的硬件报告，不能据此声称本机已经测得某个指标。
 
 ## 第五章：模式分类 Patterns
 
-### 9. kernel_type_playground
+### 10. kernel_type_playground
 
-概念：不同 kernel 类型对优化手段的敏感性不同。
+概念：不同 kernel 对优化手段的敏感性不同；“compute-bound”或“memory-bound”是当前实现、输入规模和硬件下的工作假设，而不是 kernel 的永久标签。[CUDA C++ Best Practices Guide：Performance Metrics](https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html#performance-metrics)
 
 核心代码：
 
@@ -296,26 +315,28 @@ launch_overhead_kernel<<<1, 1>>>(d_tiny);
 
 关键洞察：
 
-- compute-bound 看算术吞吐、依赖链、寄存器
-- memory-bound 看字节数、coalescing、带宽
-- latency-bound 看 dependent load 和 latency hiding
-- launch-overhead-bound 看 graph、fusion、batching
+- compute 型要看指令吞吐、依赖链、寄存器和实际 achieved throughput
+- memory 型要看有效字节、访问合并、cache/事务和可达到带宽；“带宽百分比低”也可能是请求模式或并行度不足
+- latency 型常见 dependent load 或同步链；增加并发只有在有独立 work 且资源允许时才可能隐藏延迟
+- launch-overhead 型可评估 Graph、fusion、batching，但 Graph 主要减少重复工作流的提交开销，不会自动提高 kernel 内存带宽
 
 结果位置：
 
 - `kernel_type_playground/results/kernel_type_benchmark.csv`
-- `kernel_type_playground/results/block_size_sweep.png`
-- `kernel_type_playground/results/graph_compare.png`
+- `kernel_type_playground/results/block_size_sweep.png`、`graph_compare.png`：当前仓库未找到对应文件，因此不作为图片引用
+
+![CUDA Graph 对固定工作流的已有性能对比](./cuda_graph_intro/results/graph_vs_normal.png)
+_图：已有 CUDA Graph benchmark，作为 launch-overhead 模式的代表性实验；不是 `kernel_type_playground` 的专题结果。_
 
 学习：
 
-- 先分类，再优化
-- 同一个 block size 对不同 kernel 影响不同
-- Graph 主要解决 tiny launches，不解决内存带宽
+- 先用时间、字节数、指令/吞吐和依赖关系分类，再选择优化方向
+- 同一个 block size 对不同 kernel 的影响不同，应在相同正确性和计时语义下比较
+- 每次改变少数变量，并记录 GPU、编译选项、输入规模和重复次数
 
-### 10. reduction_scan_intro
+### 11. reduction_scan_intro
 
-概念：reduction 和 scan 是并行算法基本基元。它们把线程协作、shared memory、warp shuffle、同步成本放在一个真实问题里。
+概念：reduction 把一组值按结合操作汇聚成较少的结果；scan 则为每个位置保留前缀结果。inclusive scan 包含当前位置，exclusive scan 不包含当前位置，二者不是同一个输出的简单重命名。[CUDA Programming Guide：Cooperative Groups Reduce/Scan](https://docs.nvidia.com/cuda/cuda-programming-guide/04-special-topics/cooperative-groups.html#collective-operations)
 
 核心代码：
 
@@ -332,41 +353,36 @@ for (int offset = 16; offset > 0; offset >>= 1) {
 
 关键洞察：
 
-- block-level reduction 通常先输出 partial sums
-- warp shuffle 减少 shared memory 和同步
-- scan 比 reduction 更难，因为每个位置都要输出前缀结果
-- shared memory reduction 也可能遇到 bank conflict
+- block-level reduction 常先得到每个 block 的 partial sum，再由后续 kernel 或 host/库完成最终聚合；最后一步不能把多个 block 的结果当作天然同步
+- warp shuffle 可减少 shared memory 往返和部分 block barrier，但 mask 必须覆盖实际参与的线程，不能无条件把 `0xffffffffu` 当作所有场景的安全 mask
+- scan 比 reduction 更难，因为每个位置都要产生前缀结果；Blelloch upsweep/downsweep 是一种算法组织方式，实际实现也可能采用其他分块或库原语
+- shared memory 版本仍需考虑 bank conflict、同步覆盖范围和非 2 的幂次长度
 
 结果位置：
 
 - `reduction_scan_intro/results/reduce_scan_benchmark.csv`
-- `reduction_scan_intro/results/runtime_compare.png`
-- `reduction_scan_intro/results/bandwidth_compare.png`
+- 文档中原先列出的 `runtime_compare.png`、`bandwidth_compare.png` 当前不在仓库中，因此不引用它们
 
-学习：
-
-- tree reduction 的结构
-- Blelloch scan 的 upsweep/downsweep
-- 为什么真实 scan/reduction 往往是多阶段实现
+以上算法说明是概念/示例；没有附带该专题的本机 profiler 结果。需要生产实现时，可进一步对照 [CUDA Cooperative Groups](https://docs.nvidia.com/cuda/cuda-programming-guide/04-special-topics/cooperative-groups.html) 或使用经过验证的 CUB collective primitives。
 
 ## CUDA 性能概念掌握清单
 
 - 能解释 block、thread、warp、SM 的关系
-- 能说明 stream 和 graph 优化的是运行时调度
-- 能判断一个 kernel 更像 compute-bound、memory-bound、latency-bound 还是 launch-overhead-bound
-- 能解释 coalescing、stride、offset 对 global memory transaction 的影响
+- 能说明 stream 和 graph 优化的是运行时组织/提交，而不是自动改变 kernel 内部算法
+- 能判断一个 kernel 更像 compute-bound、memory-bound、latency-bound 还是 launch-overhead-bound，并说明这只是待验证假设
+- 能解释 coalescing、stride、offset 对 global memory 请求和事务的影响
 - 能解释 shared memory bank conflict 的基本模型
-- 能使用 CUDA event 做 kernel 计时
+- 能使用 CUDA event 做设备时间区间计时，并知道记录 event 与等待 event 的同步语义
 - 能输出 CSV 并用图验证趋势
 - 能用 Nsight Systems 验证 timeline overlap
-- 能用 Nsight Compute 查看 occupancy、stall、memory throughput 和 roofline
+- 能用 Nsight Compute 查看 occupancy、scheduler/stall、memory workload 和 roofline，并避免单指标下结论
 - 能解释为什么 occupancy 不是越高越好
 - 能写出基本 block reduction 和 warp shuffle reduction
 - 能说明 exclusive scan 和 inclusive scan 的区别
 
 ## CUDA API Quick Reference
 
-运行时与设备：
+运行时与设备：见 [CUDA Runtime API](https://docs.nvidia.com/cuda/cuda-runtime-api/index.html)。
 
 ```cpp
 cudaSetDevice(0);
@@ -375,7 +391,7 @@ cudaDeviceSynchronize();
 cudaGetLastError();
 ```
 
-内存：
+内存：见 [Memory Management](https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__MEMORY.html)。
 
 ```cpp
 cudaMalloc(&d_ptr, bytes);
@@ -385,7 +401,7 @@ cudaMallocHost(&h_ptr, bytes);
 cudaFreeHost(h_ptr);
 ```
 
-Stream：
+Stream：见 [Stream Management](https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__STREAM.html)。
 
 ```cpp
 cudaStreamCreate(&s);
@@ -395,19 +411,19 @@ cudaStreamSynchronize(s);
 cudaStreamDestroy(s);
 ```
 
-Event timing：
+Event timing：见 [Event Management](https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__EVENT.html)。`cudaEventRecord` 把当时该 stream 中已排队的工作捕获到 event；`cudaEventSynchronize(stop)` 等待 stop 完成，然后 `cudaEventElapsedTime` 计算两个已记录 event 之间的设备时间。它不是 host wall-clock 计时，也不意味着两 event 之间没有其他 stream 的工作。
 
 ```cpp
 cudaEventCreate(&start);
 cudaEventCreate(&stop);
-cudaEventRecord(start);
-kernel<<<blocks, threads>>>(...);
-cudaEventRecord(stop);
+cudaEventRecord(start, stream);
+kernel<<<blocks, threads, 0, stream>>>(...);
+cudaEventRecord(stop, stream);
 cudaEventSynchronize(stop);
 cudaEventElapsedTime(&ms, start, stop);
 ```
 
-Graph：
+Graph：见 [CUDA Graphs](https://docs.nvidia.com/cuda/cuda-programming-guide/04-special-topics/cuda-graphs.html)。
 
 ```cpp
 cudaStreamBeginCapture(s, cudaStreamCaptureModeGlobal);
@@ -417,42 +433,43 @@ cudaGraphInstantiate(&graph_exec, graph, nullptr, nullptr, 0);
 cudaGraphLaunch(graph_exec, s);
 ```
 
-Occupancy：
+Occupancy：见 [Occupancy API](https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__OCCUPANCY.html)。
 
 ```cpp
 cudaFuncGetAttributes(&attr, kernel);
-cudaOccupancyMaxActiveBlocksPerMultiprocessor(&active_blocks, kernel, block_size, shmem);
+cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+    &active_blocks, kernel, block_size, shmem);
 ```
 
-Warp shuffle：
+Warp shuffle：见 [Warp Shuffle Functions](https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#warp-shuffle-functions)。参与线程的 mask 和控制流必须匹配实际参与者。
 
 ```cpp
-float y = __shfl_down_sync(0xffffffffu, x, offset);
+float y = __shfl_down_sync(mask, x, offset);
 ```
 
 ## Profiling Tools Reference
 
 ### nvprof
 
-老工具，很多新平台上已被 Nsight 工具链取代。历史命令：
+`nvprof` 和 Visual Profiler 已弃用，官方说明其将于未来 CUDA 版本移除；新平台和新项目应优先迁移到 Nsight Systems 与 Nsight Compute。[CUDA Profiler User’s Guide：Migrating to Nsight Tools](https://docs.nvidia.com/cuda/profiler-users-guide/#migrating-to-nsight-tools-from-visual-profiler-and-nvprof)
+
+历史命令（仅用于旧环境复现）：
 
 ```bash
 nvprof ./app
 nvprof --print-gpu-trace ./app
 ```
 
-现在新项目优先使用 `nsys` 和 `ncu`。
-
 ### Nsight Systems / nsys
 
 用途：
 
 - 程序级 timeline
-- CPU/GPU 同步
+- CPU/GPU 同步与 API 调用
 - stream overlap
 - memcpy/kernel 排队关系
 
-常用命令：
+官方内容见 [Nsight Systems User Guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html)。
 
 ```bash
 nsys profile --trace=cuda,osrt,nvtx --output=results/report ./app
@@ -464,12 +481,12 @@ nsys-ui results/report.nsys-rep
 用途：
 
 - 单 kernel 深入指标
-- occupancy
-- warp stall
+- theoretical/achieved occupancy
+- warp scheduler 与 stall sampling
 - memory workload
 - roofline
 
-常用命令：
+官方内容见 [Nsight Compute Documentation](https://docs.nvidia.com/nsight-compute/)。
 
 ```bash
 ncu --set full ./app
@@ -482,35 +499,34 @@ ncu-ui results/report.ncu-rep
 
 运行时：
 
-- 多 stream 组织 pipeline，让 copy 和 compute 有机会 overlap
-- CUDA Graph 降低固定小任务流的 launch overhead
-- 减少不必要的 `cudaDeviceSynchronize`
+- 多 stream 组织 pipeline，让 copy 和 compute 在依赖、硬件 engine 和资源允许时有机会 overlap
+- CUDA Graph 降低固定小任务流的重复提交开销
+- 减少不必要的 `cudaDeviceSynchronize`，但用正确的 stream/event 依赖替代它
 
 Global memory：
 
-- 保持 warp 内连续访问
-- 尽量让数据布局服务于 coalescing
-- 减少重复 global load/store
-- 区分 requested bandwidth 和实际事务开销
+- 保持 warp 内连续访问，优先改善请求合并和数据布局
+- 减少重复 global load/store，但要权衡额外寄存器和 shared memory
+- 区分 requested bytes、实际事务、cache 命中和有效带宽
 
 Shared memory：
 
-- 只在有数据复用或通信需求时使用
-- 注意 bank conflict
-- 对 reduction/scan 优先考虑 warp shuffle 减少同步
+- 在有数据复用或线程间通信时使用
+- 检查 bank conflict 和同步范围
+- 对 reduction/scan 可考虑 warp shuffle 或库原语，但先验证 mask、边界和数值正确性
 
 Compute resources：
 
-- 控制寄存器压力，避免 occupancy 被过度压低
-- block size 结合 occupancy、memory bandwidth 和 latency hiding 一起调
+- 控制寄存器压力，避免不必要的 spilling；不要为了 occupancy 数字而牺牲关键指令级并行
+- block size 结合 occupancy、scheduler issue、memory throughput、依赖延迟和实际 runtime 调整
 - 不把 occupancy 当唯一目标
 
 Profiling：
 
-- 先用 CSV 发现趋势
+- 先用轻量 benchmark/CSV 发现趋势并固定计时语义
 - 用 Nsight Systems 验证时间线和调度
-- 用 Nsight Compute 解释单 kernel 指标
-- 每次只改变少数变量，避免无法解释结果
+- 用 Nsight Compute 解释单 kernel 指标，并把指标与源码和硬件限制关联
+- 每次只改变少数变量，记录硬件、编译选项、输入规模和重复次数
 
 最后的学习原则：
 

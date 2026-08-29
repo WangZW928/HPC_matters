@@ -31,6 +31,8 @@ int main(int argc, char* argv[])
         bool run_p5_viscous_checks = false;
         bool run_p5_time_checks = false;
         bool run_p8_restart_checks = false;
+        bool run_cartesian_benchmark = false;
+        bool run_physical_benchmark = false;
         int run_steps = 0;
         int restart_total_steps = 8;
         int restart_checkpoint_step = 3;
@@ -51,6 +53,8 @@ int main(int argc, char* argv[])
         pp.query("run_p5_viscous_checks", run_p5_viscous_checks);
         pp.query("run_p5_time_checks", run_p5_time_checks);
         pp.query("run_p8_restart_checks", run_p8_restart_checks);
+        pp.query("run_cartesian_benchmark", run_cartesian_benchmark);
+        pp.query("run_physical_benchmark", run_physical_benchmark);
         pp.query("run_steps", run_steps);
         pp.query("restart_total_steps", restart_total_steps);
         pp.query("restart_checkpoint_step", restart_checkpoint_step);
@@ -99,13 +103,25 @@ int main(int argc, char* argv[])
                                                   restart_checkpoint_step,
                                                   viscosity);
         }
-        for (int step = 0; step < run_steps; ++step) {
+        if (run_cartesian_benchmark) {
+            if (metadata_file.empty()) {
+                throw std::runtime_error("vwis.metadata_file is required for the Cartesian benchmark");
+            }
+            solver.run_cartesian_benchmark(dt, run_steps, viscosity, metadata_file);
+        }
+        if (run_physical_benchmark) {
+            if (metadata_file.empty()) {
+                throw std::runtime_error("vwis.metadata_file is required for the physical benchmark");
+            }
+            solver.run_physical_benchmark(dt, run_steps, viscosity, metadata_file);
+        }
+        if (!run_cartesian_benchmark && !run_physical_benchmark) for (int step = 0; step < run_steps; ++step) {
             solver.advance_one_step(dt, viscosity);
         }
         if (!checkpoint_file.empty() && !run_p8_restart_checks) {
             solver.write_checkpoint(checkpoint_file);
         }
-        if (!metadata_file.empty()) solver.write_metadata_manifest(metadata_file);
+        if (!metadata_file.empty() && !run_cartesian_benchmark && !run_physical_benchmark) solver.write_metadata_manifest(metadata_file);
         solver.diagnostics();
     } catch (std::exception const& error) {
         amrex::Print() << "VWiS AMReX Cartesian port error: " << error.what() << "\n";

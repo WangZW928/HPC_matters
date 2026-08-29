@@ -1,0 +1,18 @@
+# Physical Cartesian plane channel: x inflow/outflow, y no-slip walls, z periodic.
+# This is a physical run and diagnostic baseline, not yet validated against reference data.
+vwis.n_cell = 32 16 4
+vwis.max_grid_size = 8
+vwis.nghost = 2
+vwis.is_periodic = 0 0 1
+vwis.dt = 2.0e-4
+vwis.run_steps = 40
+vwis.viscosity = 0.1
+vwis.run_physical_benchmark = 1
+
+vwisbcs.enabled = 1
+vwisbcs.lo = inflow noslip ""
+vwisbcs.hi = outflow noslip ""
+vwisbcs.inlet_profile = uniform
+vwisbcs.inlet_target_flux = 1.0
+vwisbcs.constrain_outlet_flux = 1
+vwisbcs.pressure = 0.0 0.0 0.0 0.0 0.0 0.0

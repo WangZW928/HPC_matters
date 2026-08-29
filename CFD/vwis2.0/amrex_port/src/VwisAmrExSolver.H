@@ -126,6 +126,12 @@ public:
     /** P5-004 periodic temporal-order, conservation, divergence, CFL, and history checks. */
     void run_p5_time_contract_checks(amrex::Real dt, amrex::Real final_time,
                                      amrex::Real viscosity);
+    /** Run the repeatable P0 Cartesian manufactured benchmark and write JSON metrics. */
+    void run_cartesian_benchmark(amrex::Real dt, int steps, amrex::Real viscosity,
+                                 std::string const& report_path);
+    /** Run the physical Cartesian channel case; this is a run, not a validation claim. */
+    void run_physical_benchmark(amrex::Real dt, int steps, amrex::Real viscosity,
+                                std::string const& report_path);
     /** Globally reduced P3 boundary/divergence/freshness report; diagnostic only, never a RHS. */
     P3Diagnostics p3_diagnostics(char const* stage, bool require_fresh = true) const;
     /** IO-rank layout/schema diagnostics, safe after initialization or a completed step. */

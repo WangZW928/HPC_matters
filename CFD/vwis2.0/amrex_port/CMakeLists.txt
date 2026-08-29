@@ -43,7 +43,9 @@ set(VWIS_AMREX_SOURCES
     src/VwisAmrExViscosity.cpp
     src/VwisAmrExTime.cpp
     src/VwisAmrExCheckpoint.cpp
-    src/VwisAmrExContracts.cpp)
+    src/VwisAmrExContracts.cpp
+    src/VwisAmrExBenchmark.cpp
+    src/VwisAmrExPhysicalBenchmark.cpp)
 add_executable(vwis_amrex_skeleton ${VWIS_AMREX_SOURCES})
 target_link_libraries(vwis_amrex_skeleton PRIVATE AMReX::amrex)
 target_compile_features(vwis_amrex_skeleton PRIVATE cxx_std_17)
@@ -108,6 +110,18 @@ if (BUILD_TESTING)
                 -Drestart_input=${CMAKE_CURRENT_SOURCE_DIR}/inputs/p8_checkpoint_restart.in
                 -Dwork=${CMAKE_CURRENT_BINARY_DIR}/p8_strict_rejection
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/p8_strict_rejection.cmake)
+    add_test(NAME vwis_amrex_cartesian_benchmark
+             COMMAND ${CMAKE_COMMAND}
+                -Dexe=$<TARGET_FILE:vwis_amrex_skeleton>
+                -Dinput=${CMAKE_CURRENT_SOURCE_DIR}/inputs/p0_cartesian_benchmark.in
+                -Dreport=${CMAKE_CURRENT_BINARY_DIR}/cartesian_benchmark.json
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cartesian_benchmark.cmake)
+    add_test(NAME vwis_amrex_physical_channel
+             COMMAND ${CMAKE_COMMAND}
+                -Dexe=$<TARGET_FILE:vwis_amrex_skeleton>
+                -Dinput=${CMAKE_CURRENT_SOURCE_DIR}/inputs/physical_channel.in
+                -Dreport=${CMAKE_CURRENT_BINARY_DIR}/physical_channel.json
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/physical_channel.cmake)
     # The source error text is also pinned by static_contract_check.sh.  CTest's
     # WILL_FAIL inverts the nonzero process status; combining it with
     # PASS_REGULAR_EXPRESSION has version-dependent inversion semantics.

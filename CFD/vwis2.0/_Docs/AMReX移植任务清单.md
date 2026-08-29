@@ -16,7 +16,7 @@
 - `P0-001`：已审阅本计划相关源码、三份规划/审阅文档；证据为 `_Docs/CODEX_VWIS_REVIEW_20260820.md` 与本次针对 `main.C`、`CurvGrid.C`、`UData.C`、`FlowSolver.C`、`Integrator.C`、`PoissonSolver.C`、`ImmersedBoundary.C`、`StructSolver.C` 的符号/函数复核。
 - `P0-002`：两份规划已复核并修订，尤其是阶段依赖、曲线 19 点压力算子和骨架边界；证据为 `_Docs/AMReX初步移植规划.md`、`_Docs/AMReX迁移方案.md` 的本次改动。
 - `P0-003`：AMReX 26.04 已以 CPU、MPI（OpenMPI 4.1.6）和 CUDA（arch 89）构建/安装并记录；旧 PETSc/HYPRE/HDF5 ABI、旧 solver 和 CFD 基准仍未验证，因此仍进行中。
-- `P0-004/P0-005`：已形成 provisional 字段/时间层/BC/datum/I/O 契约；P2 review 已从 legacy 冻结 `Ucont=Ucat·面面积余因子` 的体积通量语义及 `Aj=det(∂ξ/∂x)`，但没有 case/压力基准/BC 表/输出，P0-005 仍不能签字完成。
+- `P0-004/P0-005`：新增 `p0_cartesian_benchmark.in` 与 CTest runner，locked AMReX 26.04 CPU 实际运行 8 步并生成逐步 JSON（散度、净通量、动量、动能、计时和构建信息）。这是 manufactured/contract baseline，不是 legacy vwis 对照；真实 legacy case、曲线/IBM/FSI reference 和物理单位仍缺，因此两项保持“进行中”。详见 `_Docs/AMReX_P0-004_P0-005_Cartesian基准设计及结果_20260829.md`。
 - `P1-001`：`amrex_port` 已有 `Initialize/Finalize`、`ParmParse`、`Geometry`、`BoxArray`、`DistributionMapping`、cell/face `MultiFab`、字段注册、`MFIter`/GPU-safe `ParallelFor`、`FillBoundary`、`BCRec` 元数据、日志/计时和 schema-only metadata。后续 P4/P5 已在此骨架上增加限定 Cartesian 投影/RHS/显式推进，但 P1 的多后端运行与真实 I/O 契约仍未闭环，故保持“进行中”。
 - `P2-001--005`：限定为单层均匀 Cartesian 数据/变换/布局契约。`Ucont[d]` 是积分面体积通量 $u_d A_d$，`Ucat` 是 cell 速度；散度回归使用净面通量/单元体积。唯一面求和用 `OwnerMask/sum_unique`，face ghost 仅覆盖 inter-Box/MPI/周期，非周期 domain face 的邻接单元复制只是 P2 外推闭合，不是物理 BC。CPU/MPI 与单卡 CUDA 历史结果须以 P2 review 后的定向复测记录为准；这些都不是 P3/P4/P5 数值验收。
 - `P3-001`：已从旧 `BcsUtility/CurvGrid` 抽取 1/3/4/5 与独立 periodic 的证据，建立逐面 named/legacy adapter；旧 0/2/6/8/10/11/12/13/14/-1/-2 明确拒绝。2026-08-24 clean 复测为 CPU CTest 7/7 PASS、MPI configure/build/link PASS、CUDA compile/device-link/link PASS；MPI 因执行环境禁止 PMIx socket、CUDA 因设备/驱动不可见而在进入应用代码前 BLOCKED，不能记作 runtime PASS。P3-002--004 保持进行中；详见 `_Docs/AMReX_P3_边界与诊断设计及测试_20260824.md`。
@@ -54,8 +54,8 @@ P0 基线/接口
 |P0-001|审阅|提取调用链、字段、离散与风险证据|无|源码/旧文档 → 审阅结论|`vwis2.0/{main,CurvGrid,UData,FlowSolver,Integrator,PoissonSolver,ImmersedBoundary,StructSolver}.C`|证据边界已写入审阅报告|未运行算例不能替代数值证据|已完成|只读相关函数，未全量输出源码|
 |P0-002|规划|复核并修订迁移顺序与结论强度|P0-001|三份文档 → 修订计划|`_Docs/AMReX初步移植规划.md`、`AMReX迁移方案.md`|曲线算子、骨架、阶段依赖已校正|后续源码/算例可能改变结论|已完成|本清单为后续主记录|
 |P0-003|构建基线|冻结 PETSc/HYPRE/MPI/编译器、编译选项和 AMReX 分支/CMake 版本|P0-001|环境与命令 → lockfile/构建说明|`vwis2.0/makefile`、`amrex_port/{CMakeLists.txt,CMakePresets.json,amrex_version.lock}`|可复现旧程序和骨架的 configure/build 命令|依赖 ABI/精度/GPU 后端不一致|进行中|AMReX 26.04 SHA、CPU/MPI/CUDA arch-89 build/install、CMake/compilers/options/commands 已实测并记录；OpenMPI 4.1.6 MPI run 与单 rank CUDA runtime 已通过。旧 PETSc/HYPRE ABI、CUDA-aware MPI 和 CFD 基准仍未验证|
-|P0-004|数值基准|选择固定 Cartesian、曲线、IBM/FSI（若可运行）参考 case，记录网格、dt、容差|P0-003|case/控制文件 → 基准 manifest|`control.dat`、`bcs.dat`、输出目录（待定位）|每 case 输入可重跑且版本化|原树 case/外部网格缺失|进行中|提供 P1 smoke/multibox 输入模板；旧 reference case、控制/BC 文件和结果未提供，数值部分 blocked|
-|P0-005|接口冻结|字段字典：单位、索引、时间层、BC 码、pressure datum、输出命名和 I/O 策略|P0-004|基准字段 → interface contract|`UData.C`、`BcsUtility.C`、`PoissonSolver.C`、`_Docs/AMReX_P0P1_设计说明.md`|评审签字；所有 P1+ 字段可追溯|`Ucont` 旧布局并非类型化 face MAC|进行中|已冻结 P2 所需的 Cartesian `Ucont/Ucat` 与 `Aj` 语义；物理单位换算、BC 整数码、datum、I/O/case 仍缺失，不能整体签字|
+|P0-004|数值基准|选择固定 Cartesian、曲线、IBM/FSI（若可运行）参考 case，记录网格、dt、容差|P0-003|case/控制文件 → 基准 manifest|`amrex_port/inputs/p0_cartesian_benchmark.in`、`tests/cartesian_benchmark.cmake`、JSON 输出|Cartesian manufactured case 可重跑并版本化|原树真实 case/外部网格缺失|进行中|Cartesian contract baseline 已可实际 build/run；8 步 CPU CTest PASS。明确不宣称 CFD 正确或 legacy 等价；曲线/IBM/FSI/真实 reference 仍 blocked|
+|P0-005|接口冻结|字段字典：单位、索引、时间层、BC 码、pressure datum、输出命名和 I/O 策略|P0-004|基准字段 → interface contract|`amrex_port/src/VwisAmrExBenchmark.cpp`、`p0_cartesian_benchmark.in`、JSON manifest|基准字段与输出可追溯|`Ucont` 旧布局并非类型化 face MAC|进行中|benchmark JSON 固化网格/dt/nu/步数/BC/zero-mean datum、逐步指标和 AMReX/compiler 信息；物理单位换算、legacy BC 整数码映射和真实 case 仍未冻结，不能整体签字|
 
 ### P1 基础框架
 
