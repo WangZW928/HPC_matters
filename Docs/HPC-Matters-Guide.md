@@ -4,11 +4,11 @@
 
 `HPC_matters` is a personal study repository for high-performance computing, scientific machine learning, C++, CUDA, and numerical methods. It is not a formal course package. The notes are written as a learning trail: first build intuition with small numerical and PINN examples, then move into C++ systems topics, and finally explore CUDA performance through focused microbenchmarks and a larger SPH simulation.
 
-The repository has three main learning tracks:
+The repository has three main learning tracks. The CUDA track has since been moved to the standalone repository [`A-simply-CUDA-tutorial`](https://github.com/WangZW928/A-simply-CUDA-tutorial); the historical paths below identify the corresponding projects there.
 
 - `lessons/`: Physics-Informed Neural Networks, numerical PDE examples, conservation constraints, and Hamiltonian systems.
 - `C++/`: C++ memory layout, memory pools, allocators, pointer basics, and template metaprogramming.
-- `CUDA/`: CUDA execution, streams, graphs, memory coalescing, bank conflicts, register pressure, occupancy, warp scheduling, profiling plans, and an Earth-Moon SPH simulation.
+- `A-simply-CUDA-tutorial/` (standalone repository): CUDA execution, streams, graphs, memory coalescing, bank conflicts, register pressure, occupancy, warp scheduling, profiling plans, and CUDA examples.
 
 ## Repository Structure
 
@@ -33,7 +33,7 @@ HPC_matters/
 │   ├── alignment_demo/
 │   ├── templates/
 │   └── TheCherno/pointer/
-├── CUDA/
+└── A-simply-CUDA-tutorial/  (standalone repository)
 │   ├── cuda_stream_intro/
 │   ├── cuda_graph_intro/
 │   ├── memory_coalescing_intro/
@@ -736,7 +736,7 @@ Managed memory can back STL-style containers with fewer code changes, but it is 
 
 #### Relationship to the CUDA stream benchmark
 
-The CUDA stream intro project demonstrates why pinned host memory matters. In `CUDA/cuda_stream_intro/src/stream_bench.cu`, host arrays are allocated with `cudaMallocHost`:
+The CUDA stream intro project demonstrates why pinned host memory matters. In `A-simply-CUDA-tutorial/cuda_stream_intro/src/stream_bench.cu`, host arrays are allocated with `cudaMallocHost`:
 
 ```cpp
 HostBuffers host;
@@ -768,7 +768,7 @@ vector_add<<<blocks, threads, 0, s1>>>(dev.a1, dev.b1, dev.c1, chunk_elems, iter
 CUDA_CHECK(cudaMemcpyAsync(host.out + chunk_elems, dev.c1, chunk_bytes, cudaMemcpyDeviceToHost, s1));
 ```
 
-The recorded result in `CUDA/cuda_stream_intro/results/summary.txt` is:
+The recorded result in `A-simply-CUDA-tutorial/cuda_stream_intro/results/summary.txt` is:
 
 ```text
 speedup(default/two_streams)=1.228732
@@ -939,7 +939,7 @@ All measured benchmark results currently come from an NVIDIA GeForce RTX 4060 La
 
 ### CUDA Stream Intro
 
-Directory: `CUDA/cuda_stream_intro/`.
+Directory: `A-simply-CUDA-tutorial/cuda_stream_intro/`.
 
 GPU concept: streams as GPU work queues, pinned host memory, async copies, and copy/compute overlap.
 
@@ -989,7 +989,7 @@ Performance insight: streams do not make one kernel faster. They help arrange in
 
 ### CUDA Graph Intro
 
-Directory: `CUDA/cuda_graph_intro/`.
+Directory: `A-simply-CUDA-tutorial/cuda_graph_intro/`.
 
 GPU concept: reduce launch overhead for fixed repeated workflows.
 
@@ -1031,7 +1031,7 @@ Performance insight: CUDA Graph helps when workflows are fixed and repeated, esp
 
 ### Memory Coalescing Intro
 
-Directory: `CUDA/memory_coalescing_intro/`.
+Directory: `A-simply-CUDA-tutorial/memory_coalescing_intro/`.
 
 GPU concept: global-memory coalescing and warp access patterns.
 
@@ -1074,7 +1074,7 @@ Performance insight: large strides destroy effective memory bandwidth because ad
 
 ### Shared Memory Bank Conflict
 
-Directory: `CUDA/shared_memory_bank_conflict/`.
+Directory: `A-simply-CUDA-tutorial/shared_memory_bank_conflict/`.
 
 GPU concept: shared memory is fast but banked; warp access patterns can serialize when lanes hit the same bank.
 
@@ -1116,7 +1116,7 @@ Performance insight: this benchmark is also a lesson in measurement design. The 
 
 ### Register Occupancy
 
-Directory: `CUDA/register_Occupancy/`.
+Directory: `A-simply-CUDA-tutorial/register_Occupancy/`.
 
 GPU concept: per-thread register count limits active blocks/warps per SM and therefore theoretical occupancy.
 
@@ -1162,7 +1162,7 @@ Performance insight: register pressure first increases per-thread work and event
 
 ### Warp Schedule
 
-Directory: `CUDA/warp_schedule/`.
+Directory: `A-simply-CUDA-tutorial/warp_schedule/`.
 
 GPU concept: active warp count, blocks per SM, latency hiding, and throughput saturation.
 
@@ -1201,7 +1201,7 @@ Performance insight: throughput saturates once enough warps are available to hid
 
 ### Earth-Moon SPH
 
-Directory: `CUDA/earth_moon_sph/`.
+Directory: `CFD/earth_moon_sph/`.
 
 GPU concept: a larger CUDA application combining particle simulation, spatial hashing, neighbor search, sorting, and visualization.
 
@@ -1261,7 +1261,7 @@ Performance insight: this is the repository's most realistic CUDA example. It in
 
 ### Nsight Systems Intro
 
-Directory: `CUDA/nsight_systems_intro/`.
+Directory: `A-simply-CUDA-tutorial/nsight_systems_intro/`.
 
 This is currently a planning README. It will use existing stream benchmarks to inspect timeline behavior: memcpy, kernels, stream overlap, and whether assumed concurrency actually appears in the profiler.
 
@@ -1269,7 +1269,7 @@ Performance insight: use Nsight Systems for whole-program timelines and CPU/GPU 
 
 ### Nsight Compute Intro
 
-Directory: `CUDA/nsight_compute_intro/`.
+Directory: `A-simply-CUDA-tutorial/nsight_compute_intro/`.
 
 This is currently a planning README. It targets single-kernel analysis: occupancy, stall reasons, memory throughput, register use, and mapping profiler counters back to benchmark behavior.
 
@@ -1277,7 +1277,7 @@ Performance insight: use Nsight Compute when runtime alone is not enough and the
 
 ### Kernel Type Playground
 
-Directory: `CUDA/kernel_type_playground/`.
+Directory: `A-simply-CUDA-tutorial/kernel_type_playground/`.
 
 This is a planned project to classify kernels as:
 
@@ -1290,7 +1290,7 @@ The intended lesson is to diagnose the bottleneck before choosing optimizations 
 
 ### Reduction and Scan Intro
 
-Directory: `CUDA/reduction_scan_intro/`.
+Directory: `A-simply-CUDA-tutorial/reduction_scan_intro/`.
 
 This is a planned project for CUDA parallel primitives:
 
@@ -1426,4 +1426,3 @@ CUDA performance techniques:
 ## Final Notes
 
 This repository is strongest as a personal learning notebook because it keeps code, notes, measurements, and interpretation together. The CUDA projects are especially useful because they turn abstract performance concepts into benchmarkable artifacts. The PINN lessons similarly keep the scientific-computing thread grounded by always tying equations to losses, code, plots, and metrics.
-
