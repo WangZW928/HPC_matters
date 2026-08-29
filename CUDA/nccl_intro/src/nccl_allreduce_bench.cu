@@ -137,8 +137,8 @@ int main(int argc, char** argv) {
         const int num_gpus = args.requested_gpus > 0
                                  ? std::min(args.requested_gpus, visible_gpus)
                                  : visible_gpus;
-        if (num_gpus < 2) {
-            std::cerr << "NCCL AllReduce demo needs at least 2 GPUs.\n";
+        if (num_gpus < 1) {
+            std::cerr << "NCCL AllReduce demo needs at least 1 GPU.\n";
             return 1;
         }
 

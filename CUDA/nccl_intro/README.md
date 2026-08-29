@@ -33,6 +33,12 @@ NCCL 里最常见的操作是 collective，也就是一组 rank 一起参与的�
 
 本项目重点测 `AllReduce`，因为它最容易和带宽、拓扑、算法选择联系起来。
 
+单 GPU 说明：本机只有一张 GPU 时，可以运行 `num_gpus=1` 的 single-rank
+smoke/latency test，验证 CUDA、NCCL communicator、stream enqueue、同步和
+AllReduce 数据路径；此时 `busbw` 为 0，因为没有跨 GPU 总线通信，不能用来
+代表多 GPU 带宽或拓扑性能。真正的 NCCL 多 GPU 通信、P2P 和拓扑比较仍需要
+至少两张 GPU。
+
 ## 3. rank、communicator 和 stream
 
 NCCL 的几个核心概念：
@@ -159,6 +165,16 @@ NCCL not found. Skipping nccl_intro targets.
 ```bash
 ./build/nccl_allreduce_bench
 ```
+
+单 GPU 运行示例：
+
+```bash
+./build/nccl_allreduce_bench results/nccl_allreduce_single_gpu.csv 1 20 5 1024 67108864
+```
+
+本机单 GPU 运行结果记录在
+`results/nccl_allreduce_single_gpu.csv`；这是 single-rank smoke/latency
+evidence，不是多 GPU 通信性能结果。
 
 可选参数：
 
