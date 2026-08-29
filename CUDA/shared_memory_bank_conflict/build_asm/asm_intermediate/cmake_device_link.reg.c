@@ -1,2 +1,0 @@
-#define NUM_PRELINKED_OBJECTS 1
-DEFINE_REGISTER_FUNC(_3dd96517_22_bank_conflict_bench_cu_6d4a1acb)

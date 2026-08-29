@@ -1,2 +1,0 @@
-#define NUM_PRELINKED_OBJECTS 1
-DEFINE_REGISTER_FUNC(_187bab00_16_reg_occ_bench_cu_0a8bb7b3)

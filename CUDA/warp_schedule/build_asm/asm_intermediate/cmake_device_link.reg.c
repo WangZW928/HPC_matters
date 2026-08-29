@@ -1,2 +1,0 @@
-#define NUM_PRELINKED_OBJECTS 1
-DEFINE_REGISTER_FUNC(_1eef773f_13_warp_bench_cu_51737f3e)

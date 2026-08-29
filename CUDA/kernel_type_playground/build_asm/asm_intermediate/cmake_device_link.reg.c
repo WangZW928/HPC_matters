@@ -1,2 +1,0 @@
-#define NUM_PRELINKED_OBJECTS 1
-DEFINE_REGISTER_FUNC(_2ba4f9e3_15_kernel_types_cu_542d12f9)

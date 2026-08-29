@@ -1,2 +1,0 @@
-#define NUM_PRELINKED_OBJECTS 1
-DEFINE_REGISTER_FUNC(_e720258b_15_stream_bench_cu_36090dad)

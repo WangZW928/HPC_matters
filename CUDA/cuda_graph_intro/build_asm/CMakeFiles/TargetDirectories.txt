@@ -1,3 +1,0 @@
-/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/cuda_graph_intro/build_asm/CMakeFiles/graph_bench.dir
-/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/cuda_graph_intro/build_asm/CMakeFiles/edit_cache.dir
-/home/wangzw/agent-workspace/Projects/HPC_matters/CUDA/cuda_graph_intro/build_asm/CMakeFiles/rebuild_cache.dir
