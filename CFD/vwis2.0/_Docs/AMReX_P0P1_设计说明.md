@@ -40,7 +40,7 @@ $\mathbf u\cdot\mathbf A_f$，不是裸面速度。本框架将其拆成类型�
 
 ## 2. 框架与内存设计
 
-`VwisAmrExSolver` 以值成员拥有 `Geometry`、`BoxArray`、
+`AVWiSSolver` 以值成员拥有 `Geometry`、`BoxArray`、
 `DistributionMapping` 和所有 `MultiFab`，因此没有长寿命的 non-owner
 `MultiFab*` 或 PETSc global/local alias。`DistributionMapping` 是唯一的并行
 ownership 定义；每个 rank 只经 `MFIter` 访问自己的 FAB。`BoxArray::maxSize`

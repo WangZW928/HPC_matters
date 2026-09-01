@@ -2,13 +2,13 @@
   "version": 3,
   "configurePresets": [{
     "name": "amrex-local-26.04",
-    "displayName": "VWiS P1 local AMReX 26.04",
+    "displayName": "AVWiS P1 local AMReX 26.04",
     "generator": "Unix Makefiles",
     "binaryDir": "${sourceDir}/../build/amrex_port",
     "cacheVariables": {
       "CMAKE_BUILD_TYPE": "Release",
       "BUILD_TESTING": "ON",
-      "VWIS_AMREX_EXPECTED_VERSION": "26.04"
+      "AVWIS_EXPECTED_VERSION": "26.04"
     }
   }]
 }

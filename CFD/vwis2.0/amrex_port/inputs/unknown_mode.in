@@ -1,0 +1,6 @@
+# Focused negative test for the explicit runtime selector.
+avwis.mode = definitely_not_a_mode
+avwis.n_cell = 4 4 4
+avwis.max_grid_size = 4
+avwis.nghost = 2
+avwis.is_periodic = 1 1 1

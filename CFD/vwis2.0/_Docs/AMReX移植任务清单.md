@@ -7,8 +7,8 @@
 |状态|数量|说明|
 |---|---:|---|
 |已完成|13|P0-001/002、P2-001--005、P3-001、P4-005、P5-002、P8-001--003 的限定工程/设计契约；不代表 CFD 求解器完成|
-|进行中|16|P0/P1、P3-002--004、P4-001--004、P5-001/P5-004 与 P10-002；部分已有 CPU runtime，MPI/GPU/完整 CFD 数值验收仍缺|
-|未开始|24|其余物理实现、数值验证、AMR/IBM/FSI、I/O 和发布任务|
+|进行中|17|P0/P1、P3-002--004、P4-001--004、P5-001/P5-003/P5-004 与 P10-002；部分已有 CPU runtime，MPI/GPU/完整 CFD 数值验收仍缺|
+|未开始|23|其余物理实现、数值验证、AMR/IBM/FSI、I/O 和发布任务|
 |合计|53|按下列任务 ID（含 P10）计数|
 
 ### 当前已完成的真实项与证据边界
@@ -21,9 +21,10 @@
 - `P2-001--005`：限定为单层均匀 Cartesian 数据/变换/布局契约。`Ucont[d]` 是积分面体积通量 $u_d A_d$，`Ucat` 是 cell 速度；散度回归使用净面通量/单元体积。唯一面求和用 `OwnerMask/sum_unique`，face ghost 仅覆盖 inter-Box/MPI/周期，非周期 domain face 的邻接单元复制只是 P2 外推闭合，不是物理 BC。CPU/MPI 与单卡 CUDA 历史结果须以 P2 review 后的定向复测记录为准；这些都不是 P3/P4/P5 数值验收。
 - `P3-001`：已从旧 `BcsUtility/CurvGrid` 抽取 1/3/4/5 与独立 periodic 的证据，建立逐面 named/legacy adapter；旧 0/2/6/8/10/11/12/13/14/-1/-2 明确拒绝。2026-08-24 clean 复测为 CPU CTest 7/7 PASS、MPI configure/build/link PASS、CUDA compile/device-link/link PASS；MPI 因执行环境禁止 PMIx socket、CUDA 因设备/驱动不可见而在进入应用代码前 BLOCKED，不能记作 runtime PASS。P3-002--004 保持进行中；详见 `_Docs/AMReX_P3_边界与诊断设计及测试_20260824.md`。
 - `P4-001--004`：已实现单层均匀 Cartesian 的积分面通量散度/RHS、显式 pressure BC/compatibility/datum、AMReX `MLPoisson`/MLMG 求解、带面积适配的 face correction 和 `Ucat` 同步。2026-08-26 locked 26.04 CPU CTest 10/10 PASS；周期、封闭 Neumann、入口/定压出口制造测试的散度均降至约 $10^{-10}$ 或更低。该 P4 证据不包含后续 P5 动量/时间推进或 CFD case，MPI runtime 仍缺，故保持进行中。
-- `P4-005`：已明确选择“Cartesian `MLPoisson` 仅作为 P4 基线，legacy 曲线非正交 19 点算子延期决策”；禁止把两者视为替换关系。曲线 metric、交叉项、自定义算子/延迟修正和验证 case 留 P5 原型，故设计门完成但曲线实现未开始。
+- `P4-005`：已明确选择“Cartesian `MLPoisson` 仅作为 P4 基线，legacy 曲线非正交 19 点算子延期决策”；禁止把两者视为替换关系。该设计门完成时曲线实现尚未开始；其后 P5-003/C0 已完成 G0.1 identity metric 数据模型，但交叉项、自定义算子/延迟修正和验证 case 仍未开始。
 - `P5-001`：已实现保守 Cartesian 对流 RHS，面通量为 `Ucont[d]` 乘 `Ucat` 两侧中心平均，cell RHS 为负净面动量通量除一次体积；与 legacy `-second_order` 分支可比但不宣称曲线等价。2026-08-28 locked 26.04 CPU CTest 13/13 PASS；16/32 周期制造场误差比约 3.92，物理入口/出口多 Box 常量贯流 RHS 为零。MPI/CUDA runtime 与 CFD case 未验，故仍为进行中。
 - `P5-002`：已实现单层均匀 Cartesian 常系数粘性 RHS，使用 `nu` 乘三方向 cell-centred 二阶中心 Laplacian；周期/inter-Box halo 与物理 no-slip ghost 分开处理，非周期方向要求显式 BC。2026-08-28 locked 26.04 CPU clean build、静态契约检查和 CTest 16/16 PASS；周期 16/32 制造解、动量守恒、负能量率及物理边界多 Box 通量平衡均 PASS。变系数、曲线 metric、IBM/EB、时间推进、MPI/CUDA runtime 和完整 CFD case 不在本任务范围。
+- `P5-003`：C0/G0.1 建立 `CoordinateMapping/MetricData`，C1/G0.2 接入 identity divergence，C2.1/C2.2 完成参数化 separable analytic orthogonal geometry、显式 mapped 算子和正交投影。C5.1 完成 stationary no-slip/periodic；C5.2 在同一受限正交路径增加 inlet/fixed-pressure outlet、tangential moving wall、slip 与 symmetry，并覆盖物理面积归一化、`u·S`、混合 periodic/physical、角 ghost、多 Box owner、Dirichlet/Neumann 投影和严格拒绝。一般非正交/曲面、mapped RHS/time、restart、MPI/CUDA 及物理 case 仍未完成，因此 P5-003 与完整 G1 保持进行中。详见 `_Docs/AMReX_P5-003_C5.2_mapped_boundary_modes_20260901.md`。
 - `P5-004`：选择显式 Euler 预测加现有 Cartesian 投影作为最小基线，投影时间系数固定为 1；`Ucat/Ucont` 均显式维护 `n/n-1/n-2`，并记录 time/step/history depth。2026-08-28 locked 26.04 CPU clean build与 CTest 18/18 PASS；周期剪切扩散 `dt/dt/2` 误差比 2.0026、动量漂移约 $1.39\times10^{-17}$、散度/history 误差为 0，超限扩散数被预期拒绝。该路径不等价于 legacy SNES；半隐式/BDF2 留 P5-005。MPI build/link PASS 但 2-rank PMIx runtime BLOCKED，checkpoint payload/真实 restart 与 CFD case 缺失，故保持进行中。详见 `_Docs/AMReX_P5-004_时间推进设计及测试_20260828.md`。
 - `P8-001/002`：实现单层均匀 Cartesian、单进程 CPU 的版本化 checkpoint/restart。使用 AMReX `VisMF` 保存 `Ucat/Ucat_old/Ucat_older`、三个方向 `Ucont` 的三层 history、`P/Phi/Nvert`，并保存/校验时间步、网格、ghost/layout/components、BC、精度、维度和 AMReX 版本。连续运行与第 K 步 checkpoint 后恢复至 N 步的状态比较为 bitwise 一致；损坏 Header 被严格拒绝。`build/amrex_port_p8` 的 clean build、静态检查、P8 2/2 和完整 CTest 20/20 PASS。当前不宣称 plotfile、MPI restart、GPU restart、AMR、IBM/FSI 或曲线网格支持；详见 `_Docs/AMReX_P8-001_P8-002_checkpoint_restart_20260829.md`。
 - `P8-003`：实现单层均匀 Cartesian、单进程 CPU 的 cell-containing point probe、plane 统计与确定性 CSV、全域/边界 JSON 诊断，并将等间隔 post-step 时间平均接入 physical channel。`4x3x2` 多 Box 制造契约精确检查 probe、6 行 plane、散度、section flow、动量、动能及压力统计；clean focused 4/4、完整 CTest 23/23 PASS。该证据是 contract test，不是 CFD validation；不包含插值 probe、MPI/GPU、AMR coverage、IBM 力/力矩或 plotfile。详见 `_Docs/AMReX_P8-003_采样统计诊断_20260829.md`。
@@ -57,7 +58,7 @@ P0 基线/接口
 |P0-002|规划|复核并修订迁移顺序与结论强度|P0-001|三份文档 → 修订计划|`_Docs/AMReX初步移植规划.md`、`AMReX迁移方案.md`|曲线算子、骨架、阶段依赖已校正|后续源码/算例可能改变结论|已完成|本清单为后续主记录|
 |P0-003|构建基线|冻结 PETSc/HYPRE/MPI/编译器、编译选项和 AMReX 分支/CMake 版本|P0-001|环境与命令 → lockfile/构建说明|`vwis2.0/makefile`、`amrex_port/{CMakeLists.txt,CMakePresets.json,amrex_version.lock}`|可复现旧程序和骨架的 configure/build 命令|依赖 ABI/精度/GPU 后端不一致|进行中|AMReX 26.04 SHA、CPU/MPI/CUDA arch-89 build/install、CMake/compilers/options/commands 已实测并记录；OpenMPI 4.1.6 MPI run 与单 rank CUDA runtime 已通过。旧 PETSc/HYPRE ABI、CUDA-aware MPI 和 CFD 基准仍未验证|
 |P0-004|数值基准|选择固定 Cartesian、曲线、IBM/FSI（若可运行）参考 case，记录网格、dt、容差|P0-003|case/控制文件 → 基准 manifest|`amrex_port/inputs/p0_cartesian_benchmark.in`、`tests/cartesian_benchmark.cmake`、JSON 输出|Cartesian manufactured case 可重跑并版本化|原树真实 case/外部网格缺失|进行中|Cartesian contract baseline 已可实际 build/run；8 步 CPU CTest PASS。明确不宣称 CFD 正确或 legacy 等价；曲线/IBM/FSI/真实 reference 仍 blocked|
-|P0-005|接口冻结|字段字典：单位、索引、时间层、BC 码、pressure datum、输出命名和 I/O 策略|P0-004|基准字段 → interface contract|`amrex_port/src/VwisAmrExBenchmark.cpp`、`p0_cartesian_benchmark.in`、JSON manifest|基准字段与输出可追溯|`Ucont` 旧布局并非类型化 face MAC|进行中|benchmark JSON 固化网格/dt/nu/步数/BC/zero-mean datum、逐步指标和 AMReX/compiler 信息；物理单位换算、legacy BC 整数码映射和真实 case 仍未冻结，不能整体签字|
+|P0-005|接口冻结|字段字典：单位、索引、时间层、BC 码、pressure datum、输出命名和 I/O 策略|P0-004|基准字段 → interface contract|`amrex_port/src/AVWiSBenchmark.cpp`、`p0_cartesian_benchmark.in`、JSON manifest|基准字段与输出可追溯|`Ucont` 旧布局并非类型化 face MAC|进行中|benchmark JSON 固化网格/dt/nu/步数/BC/zero-mean datum、逐步指标和 AMReX/compiler 信息；物理单位换算、legacy BC 整数码映射和真实 case 仍未冻结，不能整体签字|
 
 ### P1 基础框架
 
@@ -65,18 +66,18 @@ P0 基线/接口
 |---|---|---|---|---|---|---|---|---|---|
 |P1-001|骨架|保持 AMReX 初始化、ParmParse、Geometry/BA/DM 与基础字段布局|P0-001|输入参数 → 单层对象|`amrex_port/src/*`|静态代码存在，见上方证据|无物理算法|进行中|AMReX 26.04 CPU/MPI/CUDA builds compile; MPI and single-rank CUDA runtime contracts pass. cell/face/历史层/ownership 仍只是 P1 framework，不等同 CFD 移植|
 |P1-002|构建|为骨架固定 AMReX 分支、CMake preset、CPU/MPI 选项和最小 inputs|P0-003|依赖版本 → 可配置工程|`amrex_port/{CMakeLists.txt,CMakePresets.json,inputs/*}`|clean configure/build 成功|AMReX package discovery/编译器不匹配|进行中|26.04 lock/SHA；CPU/MPI/CUDA arch-89 configure/build 成功。MPI consumer 因 AMReX package 导出 C MPI dependency，最小修复为 `project(... LANGUAGES C CXX)`；CUDA device link 和单 rank runtime 均通过，CUDA-aware MPI 未测试|
-|P1-003|并行框架|验证 MultiFab 多 Box、MFIter、nGrow、periodic `FillBoundary` 与 MPI halo|P1-002|制造场 → halo 对比|`amrex_port/src/VwisAmrExSolver.cpp`、inputs|1/多 rank bitwise 或容差一致|physical ghost 不由 FillBoundary 填充|进行中|CPU MPI `p1_contract.in` 在 2/4 ranks PASS；`p1_multibox.in` 在 2 ranks PASS。CUDA 单 rank 同类 contract PASS；CUDA-aware MPI 未测试|
-|P1-004|BC/运行设施|建立 `BCRec` 映射接口、物理 BC functor、日志/计时和错误报告|P0-005,P1-002|BC 字典 → 边界元数据/日志|`amrex_port/src/VwisAmrExSolver.*`|六面 BC 分类完整，未实现类型显式拒绝|旧整数码有算例特例|进行中|已建立 `ext_dir` BCRec、参数校验、rank 输出/计时；旧码未逐面映射，物理 functor 未实现|
-|P1-005|基础 I/O|建立 plotfile/checkpoint 元数据、字段注册与版本头|P1-002,P0-005|字段注册 → 空场 plot/checkpoint|`amrex_port/src/VwisAmrExSolver.*`|空场可读回并校验 schema|与 PETSc 文件格式不兼容|进行中|字段/schema-only JSON 已注册；P8-001/002 已有受限 CPU 单 rank VisMF checkpoint/restart payload，但 plotfile/HDF5 与通用后端 I/O 仍缺|
+|P1-003|并行框架|验证 MultiFab 多 Box、MFIter、nGrow、periodic `FillBoundary` 与 MPI halo|P1-002|制造场 → halo 对比|`amrex_port/src/AVWiSSolver.cpp`、inputs|1/多 rank bitwise 或容差一致|physical ghost 不由 FillBoundary 填充|进行中|CPU MPI `p1_contract.in` 在 2/4 ranks PASS；`p1_multibox.in` 在 2 ranks PASS。CUDA 单 rank 同类 contract PASS；CUDA-aware MPI 未测试|
+|P1-004|BC/运行设施|建立 `BCRec` 映射接口、物理 BC functor、日志/计时和错误报告|P0-005,P1-002|BC 字典 → 边界元数据/日志|`amrex_port/src/AVWiSSolver.*`|六面 BC 分类完整，未实现类型显式拒绝|旧整数码有算例特例|进行中|已建立 `ext_dir` BCRec、参数校验、rank 输出/计时；旧码未逐面映射，物理 functor 未实现|
+|P1-005|基础 I/O|建立 plotfile/checkpoint 元数据、字段注册与版本头|P1-002,P0-005|字段注册 → 空场 plot/checkpoint|`amrex_port/src/AVWiSSolver.*`|空场可读回并校验 schema|与 PETSc 文件格式不兼容|进行中|字段/schema-only JSON 已注册；P8-001/002 已有受限 CPU 单 rank VisMF checkpoint/restart payload，但 plotfile/HDF5 与通用后端 I/O 仍缺|
 
 ### P2 字段与网格
 
 |ID|模块|任务描述|依赖|I/O|文件|验收|风险|状态|备注|
 |---|---|---|---|---|---|---|---|---|---|
-|P2-001|字段|定义 `P/Phi/Nvert` cell MultiFab、时间层和 component 命名|P0-005,P1-003|契约 → scalar fields|`amrex_port/src/VwisAmrExSolver.*`、`inputs/p2_contract.in`|IndexType/nGrow/单位语义字段断言；未决物理换算显式标出|把 `Nvert` 当 EB volume fraction|已完成|字段契约含 component/time-layer/units；`P/Phi` 同为 legacy 无量纲压力尺度，物理换算/pressure datum 仍属 P0/P4；`Nvert` 保持分类语义|
-|P2-002|速度|定义三个 face `Ucont` 与 cell 三分量 `Ucat`，冻结体积通量和 face ownership|P2-001|字段 → MAC/cell 布局|`amrex_port/src/VwisAmrExSolver.*`、`inputs/p2_contract.in`|常量速度给出 $Ucont_d=u_dA_d$；唯一面数/通量和正确|把 legacy 积分通量当 MacProjector 面速度|已完成|三个独立 face `MultiFab`；共享面最低 global box 为 owner，归约用 `OwnerMask/sum_unique`；legacy 依据为 `FormMetrics/Contra2Cart/CalculateDivergence`|
-|P2-003|变换|实现/测试 Cartesian `Ucont↔Ucat`；曲线变换显式留为未实现边界|P2-002|Ucat/Ucont → 同步场|`VwisAmrExSolver.*`|常量/线性场按 face area 乘除且单位一致|曲线 metric 不能以 Cartesian 面积代替|已完成|cell→face：法向速度线性平均后乘面积；face→cell：相邻通量和除以 `2A_d`；共享 valid face `OverrideSync` 后再 halo；曲线实现仍在 P5|
-|P2-004|网格|建立单层 Cartesian 坐标、dx、cell volume 和 metric 数据命名|P1-003,P0-005|domain/n_cell → Geometry/metric metadata|`VwisAmrExSolver.*`|$A_d\Delta x_d=V$ 与 Geometry 一致；`Aj` 定义不含糊|`Aj`/J/1/J 混淆|已完成|记录 dx、volume、face area；仅登记未分配的 `legacy_Aj_equivalent=1/V`（unit-index 计算坐标），不声称曲线 metric/Jacobian 场|
+|P2-001|字段|定义 `P/Phi/Nvert` cell MultiFab、时间层和 component 命名|P0-005,P1-003|契约 → scalar fields|`amrex_port/src/AVWiSSolver.*`、`inputs/p2_contract.in`|IndexType/nGrow/单位语义字段断言；未决物理换算显式标出|把 `Nvert` 当 EB volume fraction|已完成|字段契约含 component/time-layer/units；`P/Phi` 同为 legacy 无量纲压力尺度，物理换算/pressure datum 仍属 P0/P4；`Nvert` 保持分类语义|
+|P2-002|速度|定义三个 face `Ucont` 与 cell 三分量 `Ucat`，冻结体积通量和 face ownership|P2-001|字段 → MAC/cell 布局|`amrex_port/src/AVWiSSolver.*`、`inputs/p2_contract.in`|常量速度给出 $Ucont_d=u_dA_d$；唯一面数/通量和正确|把 legacy 积分通量当 MacProjector 面速度|已完成|三个独立 face `MultiFab`；共享面最低 global box 为 owner，归约用 `OwnerMask/sum_unique`；legacy 依据为 `FormMetrics/Contra2Cart/CalculateDivergence`|
+|P2-003|变换|实现/测试 Cartesian `Ucont↔Ucat`；曲线变换显式留为未实现边界|P2-002|Ucat/Ucont → 同步场|`AVWiSSolver.*`|常量/线性场按 face area 乘除且单位一致|曲线 metric 不能以 Cartesian 面积代替|已完成|cell→face：法向速度线性平均后乘面积；face→cell：相邻通量和除以 `2A_d`；共享 valid face `OverrideSync` 后再 halo；曲线实现仍在 P5|
+|P2-004|网格|建立单层 Cartesian 坐标、dx、cell volume 和 metric 数据命名|P1-003,P0-005|domain/n_cell → Geometry/metric metadata|`AVWiSSolver.*`|$A_d\Delta x_d=V$ 与 Geometry 一致；`Aj` 定义不含糊|`Aj`/J/1/J 混淆|已完成|记录 dx、volume、face area；仅登记未分配的 `legacy_Aj_equivalent=1/V`（unit-index 计算坐标），不声称曲线 metric/Jacobian 场|
 |P2-005|布局回归|多 Box/MPI 上验证 cell/face ghost、边界 face 与 derived field 一致性|P2-001--004|制造场 → layout report|`inputs/p2_contract.in`、`p2_boundary_face.in`|1/多 rank 范数、唯一 face sum、face ghost 和 divergence stencil 一致|跨 Box face 双计数|已完成|周期/非周期 face ghost、OwnerMask 唯一计数/通量和、非周期边界邻接单元外推、净面通量/体积 derived divergence；只是 manufactured layout regression，不是全域守恒或物理 BC|
 
 ### P3 边界与数据流
@@ -84,9 +85,9 @@ P0 基线/接口
 |ID|模块|任务描述|依赖|I/O|文件|验收|风险|状态|备注|
 |---|---|---|---|---|---|---|---|---|---|
 |P3-001|BC 分类|把旧 BC 整数码与每个面速度/压力/标量条件逐项映射，标出未支持项|P0-005,P1-004|BC 文件 → 显式 BC 表|`BcsUtility.C:672-1406`,`Integrator.C`、`amrex_port/src/*`、P3 设计记录|每个已用 case 无隐式默认分支|入口/出口与压力条件耦合|已完成|旧 1/3/4/5 和独立 periodic 有显式映射；新 named slip 不冒充旧码；0/2/6/8/10/11/12/13/14/-1/-2 显式拒绝；无旧 case，4/5 仅承诺文档中的 Cartesian 子集|
-|P3-002|ghost 流程|实现周期/非周期 `FillBoundary`、物理 ghost 填充和调用顺序|P2-005,P3-001|fields+BC → valid ghost|`amrex_port/src/VwisAmrExSolver.*`、`inputs/p3_*`|逐面制造解和跨 rank halo 一致|误把 FillBoundary 用作物理 BC|进行中|已分离 halo 与 physical fill，固定 OverrideSync/FillBoundary→physical→diagnostics，并有 epoch stale 拒绝；2026-08-24 CPU CTest 7/7 PASS，MPI build/link PASS 但 2-rank 在 `MPI_Init` 前被 PMIx socket 权限阻塞；多层 FillPatch 留 P9|
-|P3-003|流量 BC|实现入口流量/平面输入与出口压力/通量约束的最小 Cartesian 路径|P3-002|profile/target flux → face Ucont|`amrex_port/src/VwisAmrExSolver.*`、`inputs/p3_cartesian_boundary.in`|全局净通量、面 profile 和压力 datum 达容差|旧 case 特定分支|进行中|实现 uniform/linear-plane MPI 全局归一化、fixed pressure ghost、可选等流量出口；不是压力投影/datum 求解；CPU P3 PASS，MPI multi-rank runtime BLOCKED；CUDA compile/device-link PASS 但无设备 runtime|
-|P3-004|一致性诊断|在每个阶段核算 halo、边界面、全局质量通量和 ghost freshness|P3-002,P2-005|fields → diagnostic report|`amrex_port/src/VwisAmrExSolver.*`、`inputs/p3_*`|错误注入能被检测；MPI reductions 正确|只报 interior divergence 掩盖边界/IBM|进行中|实现 stage epoch、boundary owner-unique flux、全域 divergence integral/Linf、显式 sum/max MPI reduction 和 stale 注错；无 IBM；CPU PASS，MPI reduction runtime 因 PMIx socket BLOCKED，CUDA runtime 因设备/驱动不可见 BLOCKED|
+|P3-002|ghost 流程|实现周期/非周期 `FillBoundary`、物理 ghost 填充和调用顺序|P2-005,P3-001|fields+BC → valid ghost|`amrex_port/src/AVWiSSolver.*`、`inputs/p3_*`|逐面制造解和跨 rank halo 一致|误把 FillBoundary 用作物理 BC|进行中|已分离 halo 与 physical fill，固定 OverrideSync/FillBoundary→physical→diagnostics，并有 epoch stale 拒绝；2026-08-24 CPU CTest 7/7 PASS，MPI build/link PASS 但 2-rank 在 `MPI_Init` 前被 PMIx socket 权限阻塞；多层 FillPatch 留 P9|
+|P3-003|流量 BC|实现入口流量/平面输入与出口压力/通量约束的最小 Cartesian 路径|P3-002|profile/target flux → face Ucont|`amrex_port/src/AVWiSSolver.*`、`inputs/p3_cartesian_boundary.in`|全局净通量、面 profile 和压力 datum 达容差|旧 case 特定分支|进行中|实现 uniform/linear-plane MPI 全局归一化、fixed pressure ghost、可选等流量出口；不是压力投影/datum 求解；CPU P3 PASS，MPI multi-rank runtime BLOCKED；CUDA compile/device-link PASS 但无设备 runtime|
+|P3-004|一致性诊断|在每个阶段核算 halo、边界面、全局质量通量和 ghost freshness|P3-002,P2-005|fields → diagnostic report|`amrex_port/src/AVWiSSolver.*`、`inputs/p3_*`|错误注入能被检测；MPI reductions 正确|只报 interior divergence 掩盖边界/IBM|进行中|实现 stage epoch、boundary owner-unique flux、全域 divergence integral/Linf、显式 sum/max MPI reduction 和 stale 注错；无 IBM；CPU PASS，MPI reduction runtime 因 PMIx socket BLOCKED，CUDA runtime 因设备/驱动不可见 BLOCKED|
 
 ### P4 压力投影
 
@@ -102,12 +103,37 @@ P0 基线/接口
 
 |ID|模块|任务描述|依赖|I/O|文件|验收|风险|状态|备注|
 |---|---|---|---|---|---|---|---|---|---|
-|P5-001|对流|实现 Cartesian 对流通量与旧 `-second_order` 分支的可比 stencil 说明|P3-004,P2-002|Ucat/Ucont → advective RHS|`RHSSolver.C`、`amrex_port/src/VwisAmrExAdvection.cpp`|平流制造解与网格收敛|面/cell 插值位置错误|进行中|保守 face flux=`Ucont[d]`×两侧 `Ucat` 中心平均，RHS 为负净通量/体积；locked 26.04 CPU 13/13 PASS，16→32 制造场 L∞ 误差比 3.92，边界多 Box 常量贯流 RHS=0；MPI/CUDA/CFD case 未验，且不宣称曲线等价|
-|P5-002|粘性|实现常系数粘性、边界通量与动量守恒测试|P3-002,P5-001|Ucat,nu → viscous RHS|`amrex_port/src/VwisAmrExViscosity.cpp`|扩散制造解与能量耗散|wall model 与基本粘性混淆|已完成|locked 26.04 CPU clean build、静态契约检查、CTest 16/16 PASS；周期 16/32、物理边界多 Box 均 PASS；变系数/metric/时间推进后置|
-|P5-003|metric 原型|实现曲线 metric 读入/计算、导数/面 metric，并以制造解验证|P2-003,P2-004,P4-005|曲线网格 → metric fields/operator evidence|`CurvGrid.C:312+`,`functions.*`|metric identity、GCL/体积、19 点项逐项对照|非正交交叉项和 Jacobian 缩放|未开始|只有通过后才可称支持曲线网格|
-|P5-004|时间推进|比较显式、半隐式与 BDF2；固定历史场和时间系数|P5-001,P5-002,P4-004|RHS/history → U*|`Integrator.C:326+`、`amrex_port/src/VwisAmrExTime.cpp`|时间收敛、CFL、守恒、restart 时间层一致|旧 SNES 分支不可被默默抹平|进行中|2026-08-28 选择显式 Euler+投影系数 1 的最小 Cartesian 基线；CPU clean/CTest 18/18 PASS，时间误差比 2.0026、守恒/散度/history 与 CFL 拒绝 PASS；不等价于 legacy SNES。MPI runtime 与 CFD case 仍 BLOCKED；checkpoint/restart 已由 P8-001/002 覆盖；半隐式/BDF2 留 P5-005|
+|P5-001|对流|实现 Cartesian 对流通量与旧 `-second_order` 分支的可比 stencil 说明|P3-004,P2-002|Ucat/Ucont → advective RHS|`RHSSolver.C`、`amrex_port/src/AVWiSAdvection.cpp`|平流制造解与网格收敛|面/cell 插值位置错误|进行中|保守 face flux=`Ucont[d]`×两侧 `Ucat` 中心平均，RHS 为负净通量/体积；locked 26.04 CPU 13/13 PASS，16→32 制造场 L∞ 误差比 3.92，边界多 Box 常量贯流 RHS=0；MPI/CUDA/CFD case 未验，且不宣称曲线等价|
+|P5-002|粘性|实现常系数粘性、边界通量与动量守恒测试|P3-002,P5-001|Ucat,nu → viscous RHS|`amrex_port/src/AVWiSViscosity.cpp`|扩散制造解与能量耗散|wall model 与基本粘性混淆|已完成|locked 26.04 CPU clean build、静态契约检查、CTest 16/16 PASS；周期 16/32、物理边界多 Box 均 PASS；变系数/metric/时间推进后置|
+|P5-003|metric 原型|实现曲线 metric 读入/计算、导数/面 metric，并以制造解验证|P2-003,P2-004,P4-005|曲线网格 → metric fields/operator evidence|`amrex_port/src/AVWiSCoordinateMapping.*`、`AVWiSMetricData.*`、`AVWiSMappedOperators.*`、`AVWiSBoundary.cpp`、`AVWiSProjection.cpp`、`tests/curvilinear/Metric*.cpp`、`tests/contracts/AVWiSC5ContractChecks.cpp`、`CurvGrid.C:312+`|metric identity、GCL/体积、正交算子与受限 mapped BC；19 点项仍后置|非正交交叉项和 Jacobian 缩放|进行中|C0/C1、C2.1/C2.2、C5.1 及 C5.2 separable-orthogonal 边界子集已完成；mapped RHS/time、restart、MPI/CUDA、C3/C4、一般曲面和物理 case 未完成，不称完整曲线 solver；见 [`AMReX_P5-003_C5.2_mapped_boundary_modes_20260901.md`](./AMReX_P5-003_C5.2_mapped_boundary_modes_20260901.md)|
+|P5-004|时间推进|比较显式、半隐式与 BDF2；固定历史场和时间系数|P5-001,P5-002,P4-004|RHS/history → U*|`Integrator.C:326+`、`amrex_port/src/AVWiSTime.cpp`|时间收敛、CFL、守恒、restart 时间层一致|旧 SNES 分支不可被默默抹平|进行中|2026-08-28 选择显式 Euler+投影系数 1 的最小 Cartesian 基线；CPU clean/CTest 18/18 PASS，时间误差比 2.0026、守恒/散度/history 与 CFL 拒绝 PASS；不等价于 legacy SNES。MPI runtime 与 CFD case 仍 BLOCKED；checkpoint/restart 已由 P8-001/002 覆盖；半隐式/BDF2 留 P5-005|
 |P5-005|SNES 策略|决定保留 PETSc SNES 过渡接口或以明确线性/非线性 AMReX 语义替代|P5-004,P0-005|残差/Jacobian 契约 → 决策|`Integrator.C:88,168,326+`|残差、停止条件、失败处理有回归|“显式一步”等同 SNES 收敛的错误结论|未开始|结构 SNES/非线性子系统另行评估|
 |P5-006|LES|迁移 Smagorinsky/壁面相关最小路径、二阶插值和 SGS 诊断|P5-001--005|速度/metric → nu_t/RHS|`LESModel.C`,`RHSSolver.C`,`WallModel.C`|无 LES 回归、Cs/nu_t 剖面对比|滤波/裁剪/IBM 例外未冻结|未开始|AMR dynamic LES 留 P9|
+
+#### P5-003 曲线路线子模块状态
+
+下表是 P5-003 的唯一子模块状态记录；它不改变页首 53 个 P 级任务的计数。
+子模块共 9 个：C0、C1 已完成，C2 的最小 C2.2 operator/projection 增量已完成，
+C5.1/C5.2 的 separable-orthogonal 边界子集已完成；C2/G1 仍等待一般曲面边界及 C6–C8
+的 restart、后端与物理证据，C3/C4/C6–C8 未完成。
+P5-003 因此仍为“进行中”；C2.2 的完成不代表 G1 总门完成，也不代表
+solver 支持曲线坐标。
+
+| 子模块 | 范围 | 依赖 | 验收摘要 | 状态 |
+| --- | --- | --- | --- | --- |
+| C0 / G0.1 | 独立 identity `CoordinateMapping/MetricData` 数据模型与 CPU 契约 | P2-003/004、P4-005 | 正体积/互反/GCL、identity、`Ucont=u·S`、多 Box/ghost；证据见 [`AMReX_P5-003_G0_identity_metric_20260831.md`](./AMReX_P5-003_G0_identity_metric_20260831.md) | 已完成 |
+| C1 / G0.2 | Identity metric adapter 接入一条 solver `Ucat↔Ucont`/散度路径 | C0、P2、P4 Cartesian 基线 | adapter 前后逐值或紧容差一致，完整 Cartesian CTest 不退化；epoch/layout/非 identity 拒绝；尚需后续 G0 投影接受项才能关闭 G0 | 已完成 |
+| C2 / G1 | 解析正交 mapping 与对角 metric 算子 | C1 | C2.1 geometry；C2.2 常量/线性、identity 紧等价、三网格 gradient MMS、mapped divergence/transform、全周期 solver 投影、严格配置/epoch/layout 拒绝；restart/MPI/physical case 由 C6/C7/C8 补齐 | 进行中：C2.2 最小增量已完成；完整 G1 未关闭 |
+| C3 / G2 | 弱非正交 mapping、cross flux、metric-aware 对流/黏性 | C2、M2/M4/M6 | `epsilon=0` 退化、cross-term 单测、MMS/守恒、全残差与非正交扫描 | 未开始 |
+| C4 / G3 | 一般非正交与完整 19 点压力路径 | C3、M3/M4/M5 | operator action、逐项 stencil、BC/null space、legacy case、MPI/收敛/性能 | 未开始 |
+| C5 | 曲线 BC/ghost/face owner 流水线 | C1；曲线验收依赖 C2/C3、M3 | C5.1/C5.2 已验 no-slip、inlet/outlet、tangential moving、slip/symmetry、周期平移、角 ghost、多 Box owner、stale/非法配置拒绝和匹配投影；一般曲面与 MPI 后置 | 进行中：C5.2 separable-orthogonal 子集已完成 |
+| C6 | 曲线 checkpoint/restart 与 mapping provenance | C1、C2、C5 | mapping/checksum/metric 版本严格校验；同分解 bitwise、跨分解紧容差 | 未开始 |
+| C7 | 曲线 MPI/GPU runtime | 各模块 CPU 参考；最终依赖 C1–C6 | 1/2/4 rank、分块不变性、CPU/GPU 紧容差及硬件/性能记录 | 阻塞：G0.1 包为 MPI/CUDA OFF；既有环境受 PMIx 权限与不可见 GPU 限制 |
+| C8 | 物理曲线 case 与回归 | C2、C5、C6；一般曲线声明再依赖 C3/C4/C7 | curved-channel/legacy case 的速度、去 datum 压力、质量、壁面剪切、流量和网格收敛 | 未开始 |
+
+详细目标、主要源码位置与执行顺序见
+[`AMReX迁移方案.md` 的“当前状态、剩余工作与下一步路线”](./AMReX迁移方案.md#当前状态剩余工作与下一步路线)；
+数学/API 门禁仍以 [`AVWiS曲线坐标实现规格.md`](./AVWiS曲线坐标实现规格.md) 为准。
 
 ### P6 IBM
 
@@ -132,9 +158,9 @@ P0 基线/接口
 
 |ID|模块|任务描述|依赖|I/O|文件|验收|风险|状态|备注|
 |---|---|---|---|---|---|---|---|---|---|
-|P8-001|字段输出/checkpoint|定义并实现单层 Cartesian checkpoint 字段名、时间层、网格/BC 元数据与版本化 payload|P0-005,P1-005|fields → VisMF payload + Header|`amrex_port/src/VwisAmrExCheckpoint.cpp`、`amrex_port/src/VwisAmrExSolver.H`|所有基础流体字段可写出并由 schema 校验读回|漏存 U(n-1)/布局或误称 plotfile 兼容|已完成|2026-08-29；仅单层均匀 Cartesian、单进程 CPU；不包含 plotfile/HDF5、MPI/GPU、metric/IBM/FSI metadata；见 P8 报告|
-|P8-002|restart|恢复基础流体所有时间层并验证连续跑 vs 重启的一致性|P8-001,P5-004|checkpoint → identical state|`amrex_port/src/VwisAmrExCheckpoint.cpp`、`amrex_port/tests/p8_*`|连续跑 vs 重启 bitwise 一致；损坏 Header 拒绝|未来扩展时漏存 geometry epoch/IBM/FSI|已完成|2026-08-29；CPU CTest 20/20，P8 2/2；只验收单进程基础流体 restart，P7/P9/P10 仍需扩展证据|
-|P8-003|采样/统计|实现 probe、plane、平均量、力/力矩、质量、散度、动能与压力诊断|P3-004,P5-006|fields → CSV/plot diagnostics|`amrex_port/src/VwisAmrExDiagnostics.cpp`、`VwisAmrExPhysicalBenchmark.cpp`|固定点/平面与 MPI reduction 对照|采样跨 Box/AMR 覆盖|已完成|2026-08-29 限定完成 CPU 单 rank 均匀 Cartesian subset：cell probe、plane/CSV、等间隔时间平均、散度/质量/出口/动量/动能/压力；制造 contract 与 physical integration PASS。MPI/AMR/GPU、插值、IBM 力/力矩及 plotfile 明确后置|
+|P8-001|字段输出/checkpoint|定义并实现单层 Cartesian checkpoint 字段名、时间层、网格/BC 元数据与版本化 payload|P0-005,P1-005|fields → VisMF payload + Header|`amrex_port/src/AVWiSCheckpoint.cpp`、`amrex_port/src/AVWiSSolver.H`|所有基础流体字段可写出并由 schema 校验读回|漏存 U(n-1)/布局或误称 plotfile 兼容|已完成|2026-08-29；仅单层均匀 Cartesian、单进程 CPU；不包含 plotfile/HDF5、MPI/GPU、metric/IBM/FSI metadata；见 P8 报告|
+|P8-002|restart|恢复基础流体所有时间层并验证连续跑 vs 重启的一致性|P8-001,P5-004|checkpoint → identical state|`amrex_port/src/AVWiSCheckpoint.cpp`、`amrex_port/tests/p8_*`|连续跑 vs 重启 bitwise 一致；损坏 Header 拒绝|未来扩展时漏存 geometry epoch/IBM/FSI|已完成|2026-08-29；CPU CTest 20/20，P8 2/2；只验收单进程基础流体 restart，P7/P9/P10 仍需扩展证据|
+|P8-003|采样/统计|实现 probe、plane、平均量、力/力矩、质量、散度、动能与压力诊断|P3-004,P5-006|fields → CSV/plot diagnostics|`amrex_port/src/AVWiSDiagnostics.cpp`、`AVWiSPhysicalBenchmark.cpp`|固定点/平面与 MPI reduction 对照|采样跨 Box/AMR 覆盖|已完成|2026-08-29 限定完成 CPU 单 rank 均匀 Cartesian subset：cell probe、plane/CSV、等间隔时间平均、散度/质量/出口/动量/动能/压力；制造 contract 与 physical integration PASS。MPI/AMR/GPU、插值、IBM 力/力矩及 plotfile 明确后置|
 |P8-004|性能诊断|分解 kernel、Poisson、I/O、halo、host-device copy 与内存计时|P1-004,P5-004|timers → performance log|`Timer.C`、目标 `Diagnostics.*`|无负/漏计；多 rank 汇总正确|没有基准时不可下性能结论|未开始|P9 性能模型输入|
 
 ### P9 AMR/EB/GPU
@@ -186,9 +212,7 @@ P0 基线/接口
 
 ## 建议的下一步（按顺序）
 
-1. 执行 `P0-003`：锁定并实测 PETSc/HYPRE/MPI 与 AMReX/CMake 构建环境，补齐可复现命令。
-2. 执行 `P0-004` 与 `P0-005`：选定至少一个固定 Cartesian 基准，冻结 `Ucont/Ucat/P/Nvert`、`Aj`、BC、压力基准和 restart 指标。
-3. 执行 `P1-002`、`P1-003`：配置编译当前 `amrex_port`，以 1/多 MPI rank 验证多 Box periodic ghost；确认仍无物理算法。
-4. 复核 P2 review 后 CPU/MPI/CUDA 的短 contract 结果；只把 P2 称为“Cartesian 数据/变换/布局契约完成”。
-5. 执行 `P3-001` 至 `P4-005`：先固定实际 case 的边界/零空间，再建立独立 Cartesian 投影与曲线算子设计门；不得用 P2 derived divergence 代替投影或守恒验收。
-6. 以 `run_cases/lid_driven_cavity/` 工程演示为起点补齐网格/时间步研究、独立 reference 与 MPI，再另行设计真实 plotfile/可视化输出和 AMR coverage；半隐式/BDF2 仍留 P5-005。
+1. 以已完成的 `P5-003/C5.2` separable-orthogonal mapped 边界为基线，执行 C6 mapping provenance checkpoint/restart；一般非正交/曲面 BC 继续等待 C3/C4 与 M3 证据。
+2. 执行 C7/C8 的 MPI/GPU runtime 和物理曲线 case 后再关闭完整 G1；默认 Cartesian 继续保持不变。
+3. 并行维护未闭合的 Cartesian 基线任务：P0 环境/真实 reference、P1 多后端/I/O、P3/P4/P5 的 MPI/CFD 证据，以及 P10-002 方腔 reference 与网格/时间步研究；不得用这些局部证据反向宣称相应 P 级任务完成。
+4. G1 关闭后按 C3→C4 推进弱非正交和一般 19 点算子，并在对应阶段穿插 C5–C7；最终以 C8 物理曲线回归作为能力声明门。

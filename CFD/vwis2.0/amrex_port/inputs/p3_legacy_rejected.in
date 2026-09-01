@@ -1,7 +1,8 @@
 # Legacy code 8 is characteristic/outflow case logic, deliberately unsupported.
-vwis.n_cell = 8 8 8
-vwis.max_grid_size = 4
-vwis.nghost = 1
-vwis.is_periodic = 0 0 0
-vwisbcs.enabled = 1
-vwisbcs.legacy_codes = 5 8 1 1 1 1
+avwis.mode = solve
+avwis.n_cell = 8 8 8
+avwis.max_grid_size = 4
+avwis.nghost = 1
+avwis.is_periodic = 0 0 0
+avwisbcs.enabled = 1
+avwisbcs.legacy_codes = 5 8 1 1 1 1

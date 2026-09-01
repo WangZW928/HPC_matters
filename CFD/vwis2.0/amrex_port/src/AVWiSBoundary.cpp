@@ -1,4 +1,4 @@
-#include "VwisAmrExSolver.H"
+#include "AVWiSSolver.H"
 
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_MFIter.H>
@@ -8,6 +8,7 @@
 
 #include <AMReX_BC_TYPES.H>
 
+#include <cmath>
 #include <stdexcept>
 
 namespace {
@@ -16,7 +17,8 @@ namespace {
 amrex::Real inlet_profile_integral_impl(
     amrex::MultiFab const& face_flux, amrex::DistributionMapping const& dm,
     amrex::Geometry const& geom, CartesianBoundaryConfig const& boundary,
-    amrex::Real face_area, int dir, bool high)
+    MetricData const* metric, amrex::Real face_area, int dir, bool high,
+    bool uniform_profile = false)
 {
     amrex::MultiFab profile(face_flux.boxArray(), dm, 1, 0);
     profile.setVal(0.0);
@@ -33,14 +35,32 @@ amrex::Real inlet_profile_integral_impl(
     const int td1 = (dir + 2) % AMREX_SPACEDIM;
     for (amrex::MFIter mfi(profile, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
         auto const value = profile.array(mfi);
+        amrex::Array4<amrex::Real const> mapped_area{};
+        amrex::Array4<amrex::Real const> mapped_coordinates{};
+        if (metric != nullptr) {
+            mapped_area = metric->face_area_vector_fc(dir).const_array(mfi);
+            mapped_coordinates = metric->cell_center_coordinates_cc().const_array(mfi);
+        }
+        const int mapped = metric != nullptr;
         amrex::ParallelFor(mfi.validbox(), [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
             const int index[AMREX_SPACEDIM] = {AMREX_D_DECL(i, j, k)};
             if (index[dir] == boundary_index) {
-                const amrex::Real x0 = problo[td0] +
-                    (static_cast<amrex::Real>(index[td0]) + 0.5) * dx[td0];
-                const amrex::Real x1 = problo[td1] +
-                    (static_cast<amrex::Real>(index[td1]) + 0.5) * dx[td1];
-                value(i,j,k) = face_area * (offset + linear * (slope0 * x0 + slope1 * x1));
+                const amrex::Real x0 = mapped ? mapped_coordinates(i,j,k,td0) :
+                    problo[td0] + (static_cast<amrex::Real>(index[td0]) + 0.5) * dx[td0];
+                const amrex::Real x1 = mapped ? mapped_coordinates(i,j,k,td1) :
+                    problo[td1] + (static_cast<amrex::Real>(index[td1]) + 0.5) * dx[td1];
+                amrex::Real physical_area = face_area;
+                if (mapped) {
+                    amrex::Real area_squared = 0.0;
+                    for (int comp = 0; comp < AMREX_SPACEDIM; ++comp) {
+                        const amrex::Real component = mapped_area(i,j,k,comp);
+                        area_squared += component * component;
+                    }
+                    physical_area = std::sqrt(area_squared);
+                }
+                const amrex::Real weight = uniform_profile ? 1.0 :
+                    offset + linear * (slope0 * x0 + slope1 * x1);
+                value(i,j,k) = physical_area * weight;
             }
         });
     }
@@ -72,10 +92,37 @@ amrex::Real boundary_flux_impl(
 }
 } // namespace
 
-void VwisAmrExSolver::validate_boundary_config() const
+void AVWiSSolver::validate_boundary_config() const
 {
     if (!m_boundary.enabled) return;
-    if (m_nghost < 1) throw std::runtime_error("P3 physical BC requires vwisbcs.enabled=1 and vwis.nghost>=1");
+    if (m_nghost < 1) throw std::runtime_error("P3 physical BC requires vwisbcs.enabled=1 and avwis.nghost>=1");
+    const bool mapped = m_mapping_operator.coordinates == CoordinateSystemMode::Mapped;
+    if (mapped != (m_boundary.geometry == BoundaryGeometryMode::MappedOrthogonal)) {
+        throw std::runtime_error(
+            "avwisbcs.geometry must match avwis.coordinates (cartesian or mapped_orthogonal)");
+    }
+    if (mapped) {
+        validate_mapping_operator_config(m_mapping_operator, m_metric_data, m_metric_epoch);
+        if (m_mapping_operator.mapping_type != "analytic_orthogonal") {
+            throw std::runtime_error(
+                "C5.2 mapped physical boundaries require analytic_orthogonal mapping; "
+                "general non-orthogonal/curved-surface boundary geometry is unsupported");
+        }
+        if (m_metric_data.nghost() < 1 ||
+            m_metric_data.cell_volume_cc().boxArray() != m_ba ||
+            m_metric_data.cell_volume_cc().DistributionMap() != m_dm) {
+            throw std::runtime_error("C5.2 mapped boundary metric ghost/layout mismatch");
+        }
+        for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+            auto const& area = m_metric_data.face_area_vector_fc(dir);
+            auto const expected = amrex::convert(
+                m_ba, amrex::IntVect::TheDimensionVector(dir));
+            if (area.boxArray() != expected || area.DistributionMap() != m_dm ||
+                area.nComp() != AMREX_SPACEDIM || area.nGrow() < 1) {
+                throw std::runtime_error("C5.2 mapped boundary face-metric layout/ghost mismatch");
+            }
+        }
+    }
     if (m_boundary.inlet_profile != "uniform" && m_boundary.inlet_profile != "linear_plane") {
         throw std::runtime_error("vwisbcs.inlet_profile must be uniform or linear_plane");
     }
@@ -91,6 +138,10 @@ void VwisAmrExSolver::validate_boundary_config() const
             }
             inlet_count += kind == CartesianBC::Inflow;
             outlet_count += kind == CartesianBC::Outflow;
+            if (mapped && m_boundary.sides[2 * dir + side].legacy_code != -999) {
+                throw std::runtime_error(
+                    "C5.2 mapped physical boundaries require named BCs, not legacy integer codes");
+            }
             if (kind == CartesianBC::MovingWall &&
                 m_boundary.moving_wall_velocity[dir] != 0.0) {
                 throw std::runtime_error(
@@ -104,11 +155,12 @@ void VwisAmrExSolver::validate_boundary_config() const
     }
     if (!((inlet_count == 1 && outlet_count == 1) ||
           (inlet_count == 0 && outlet_count == 0))) {
-        throw std::runtime_error("Cartesian boundary path requires one inflow and one outflow, or a closed no-penetration domain");
+        throw std::runtime_error(
+            "boundary path requires one inflow and one outflow, or a closed no-penetration domain");
     }
 }
 
-void VwisAmrExSolver::define_boundary_metadata()
+void AVWiSSolver::define_boundary_metadata()
 {
     // FillBoundary is deliberately only inter-box/periodic communication.
     // ext_dir faces are owned by fill_physical_ghost_cells(); periodic faces
@@ -123,23 +175,26 @@ void VwisAmrExSolver::define_boundary_metadata()
     }
 }
 
-amrex::Real VwisAmrExSolver::inlet_profile_integral(int dir, bool high) const
+amrex::Real AVWiSSolver::inlet_profile_integral(int dir, bool high) const
 {
+    MetricData const* metric = m_mapping_operator.coordinates == CoordinateSystemMode::Mapped
+        ? &m_metric_data : nullptr;
     return inlet_profile_integral_impl(
-        m_ucont[dir], m_dm, m_geom, m_boundary, m_face_area[dir], dir, high);
+        m_ucont[dir], m_dm, m_geom, m_boundary, metric,
+        m_face_area[dir], dir, high);
 }
 
-amrex::Real VwisAmrExSolver::boundary_flux(int dir, bool high) const
+amrex::Real AVWiSSolver::boundary_flux(int dir, bool high) const
 {
     return boundary_flux_impl(m_ucont[dir], m_dm, m_geom, dir, high);
 }
 
-void VwisAmrExSolver::fill_physical_ghost_cells()
+void AVWiSSolver::fill_physical_ghost_cells()
 {
     fill_physical_ghost_cells_impl(true);
 }
 
-void VwisAmrExSolver::fill_physical_ghost_cells_impl(bool impose_boundary_flux)
+void AVWiSSolver::fill_physical_ghost_cells_impl(bool impose_boundary_flux)
 {
     if (!m_boundary.enabled) {
         throw std::runtime_error("physical ghost fill requested without vwisbcs.enabled=1");
@@ -147,11 +202,16 @@ void VwisAmrExSolver::fill_physical_ghost_cells_impl(bool impose_boundary_flux)
     if (m_halo_epoch != m_valid_epoch) {
         throw std::runtime_error("physical ghost fill requires FillBoundary halo at the current valid epoch");
     }
+    const bool mapped = m_mapping_operator.coordinates == CoordinateSystemMode::Mapped;
+    if (mapped) {
+        validate_mapping_operator_config(m_mapping_operator, m_metric_data, m_metric_epoch);
+    }
 
     const amrex::Box domain = m_geom.Domain();
     amrex::GpuArray<int, 2 * AMREX_SPACEDIM> kinds{};
     amrex::GpuArray<amrex::Real, 2 * AMREX_SPACEDIM> pressures{};
     amrex::GpuArray<amrex::Real, 2 * AMREX_SPACEDIM> inlet_scales{};
+    amrex::GpuArray<amrex::Real, 2 * AMREX_SPACEDIM> outlet_scales{};
     amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> moving_wall_velocity{};
     for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
         moving_wall_velocity[dir] = m_boundary.moving_wall_velocity[dir];
@@ -163,10 +223,20 @@ void VwisAmrExSolver::fill_physical_ghost_cells_impl(bool impose_boundary_flux)
             const amrex::Real raw = inlet_profile_integral(slot / 2, (slot % 2) != 0);
             if (!(raw > 0.0)) throw std::runtime_error("inlet plane profile has non-positive integrated weight");
             inlet_scales[slot] = m_boundary.inlet_target_flux / raw;
+        } else if (m_boundary.sides[slot].velocity == CartesianBC::Outflow &&
+                   m_boundary.constrain_outlet_flux) {
+            MetricData const* metric = mapped ? &m_metric_data : nullptr;
+            const amrex::Real raw = inlet_profile_integral_impl(
+                m_ucont[slot / 2], m_dm, m_geom, m_boundary, metric,
+                m_face_area[slot / 2], slot / 2, (slot % 2) != 0, true);
+            if (!(raw > 0.0)) throw std::runtime_error("outlet plane has non-positive physical area");
+            outlet_scales[slot] = m_boundary.inlet_target_flux / raw;
         }
     }
     const auto lo = domain.smallEnd();
     const auto hi = domain.bigEnd();
+    amrex::GpuArray<int, AMREX_SPACEDIM> periodic{};
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) periodic[dir] = m_geom.isPeriodic(dir);
     const auto cell_problo = m_geom.ProbLoArray();
     const auto cell_dx = m_geom.CellSizeArray();
     const int linear_profile = m_boundary.inlet_profile == "linear_plane";
@@ -181,6 +251,14 @@ void VwisAmrExSolver::fill_physical_ghost_cells_impl(bool impose_boundary_flux)
         const int ncomp = mf.nComp();
         for (amrex::MFIter mfi(mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
             auto const value = mf.array(mfi);
+            amrex::Array<amrex::Array4<amrex::Real const>, AMREX_SPACEDIM> area{};
+            amrex::Array4<amrex::Real const> mapped_coordinates{};
+            if (mapped) {
+                for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+                    area[dir] = m_metric_data.face_area_vector_fc(dir).const_array(mfi);
+                }
+                mapped_coordinates = m_metric_data.cell_center_coordinates_cc().const_array(mfi);
+            }
             const amrex::Box grown = mfi.fabbox();
             amrex::ParallelFor(grown, ncomp, [=] AMREX_GPU_DEVICE (int i, int j, int k, int comp) noexcept {
                 int index[AMREX_SPACEDIM] = {AMREX_D_DECL(i,j,k)};
@@ -190,9 +268,14 @@ void VwisAmrExSolver::fill_physical_ghost_cells_impl(bool impose_boundary_flux)
                 int side = 0;
                 int source[AMREX_SPACEDIM] = {AMREX_D_DECL(i,j,k)};
                 for (int d = 0; d < AMREX_SPACEDIM; ++d) {
-                    if (source[d] < lo[d]) { if (boundary_dir < 0) { boundary_dir = d; side = 0; } source[d] = lo[d]; }
-                    if (source[d] > hi[d]) { if (boundary_dir < 0) { boundary_dir = d; side = 1; } source[d] = hi[d]; }
+                    if (source[d] < lo[d]) {
+                        if (!periodic[d]) { if (boundary_dir < 0) { boundary_dir = d; side = 0; } source[d] = lo[d]; }
+                    }
+                    if (source[d] > hi[d]) {
+                        if (!periodic[d]) { if (boundary_dir < 0) { boundary_dir = d; side = 1; } source[d] = hi[d]; }
+                    }
                 }
+                if (boundary_dir < 0) return; // FillBoundary already supplied a purely periodic ghost.
                 const int kind = kinds[2 * boundary_dir + side];
                 const amrex::Real interior = value(source[0], source[1], source[2], comp);
                 if (role == 2) { value(i,j,k,comp) = interior; return; } // Nvert classifier: zero-gradient only.
@@ -208,21 +291,61 @@ void VwisAmrExSolver::fill_physical_ghost_cells_impl(bool impose_boundary_flux)
                 }
                 // Ucat: inlet profile is imposed consistently from boundary Ucont below;
                 // only the normal component is nonzero in this minimal interface.
-                if (kind == static_cast<int>(CartesianBC::NoSlipWall)) value(i,j,k,comp) = -interior;
-                else if (kind == static_cast<int>(CartesianBC::MovingWall))
-                    value(i,j,k,comp) = 2.0 * moving_wall_velocity[comp] - interior;
-                else if (kind == static_cast<int>(CartesianBC::SlipWall) || kind == static_cast<int>(CartesianBC::Symmetry))
-                    value(i,j,k,comp) = comp == boundary_dir ? -interior : interior;
-                else if (kind == static_cast<int>(CartesianBC::Inflow)) {
-                    if (comp == boundary_dir) {
+                if (kind == static_cast<int>(CartesianBC::NoSlipWall) ||
+                    kind == static_cast<int>(CartesianBC::MovingWall) ||
+                    kind == static_cast<int>(CartesianBC::SlipWall) ||
+                    kind == static_cast<int>(CartesianBC::Symmetry) ||
+                    kind == static_cast<int>(CartesianBC::Inflow)) {
+                    amrex::Real normal_component = comp == boundary_dir ? 1.0 : 0.0;
+                    if (mapped) {
+                        int face[AMREX_SPACEDIM] = {
+                            AMREX_D_DECL(source[0], source[1], source[2])};
+                        if (side != 0) ++face[boundary_dir];
+                        amrex::Real area_squared = 0.0;
+                        for (int physical = 0; physical < AMREX_SPACEDIM; ++physical) {
+                            const amrex::Real s = area[boundary_dir](
+                                face[0], face[1], face[2], physical);
+                            area_squared += s * s;
+                        }
+                        const amrex::Real inverse_area = 1.0 / std::sqrt(area_squared);
+                        amrex::Real normal_velocity = 0.0;
+                        for (int physical = 0; physical < AMREX_SPACEDIM; ++physical) {
+                            normal_velocity += value(
+                                source[0], source[1], source[2], physical) *
+                                area[boundary_dir](face[0], face[1], face[2], physical) *
+                                inverse_area;
+                        }
+                        normal_component = area[boundary_dir](
+                            face[0], face[1], face[2], comp) * inverse_area;
+                        if (kind == static_cast<int>(CartesianBC::SlipWall) ||
+                            kind == static_cast<int>(CartesianBC::Symmetry)) {
+                            value(i,j,k,comp) = interior -
+                                2.0 * normal_velocity * normal_component;
+                            return;
+                        }
+                    } else if (kind == static_cast<int>(CartesianBC::SlipWall) ||
+                               kind == static_cast<int>(CartesianBC::Symmetry)) {
+                        value(i,j,k,comp) = comp == boundary_dir ? -interior : interior;
+                        return;
+                    }
+                    amrex::Real target = 0.0;
+                    if (kind == static_cast<int>(CartesianBC::MovingWall)) {
+                        target = moving_wall_velocity[comp];
+                    } else if (kind == static_cast<int>(CartesianBC::Inflow)) {
                         const int td0 = (boundary_dir + 1) % AMREX_SPACEDIM;
                         const int td1 = (boundary_dir + 2) % AMREX_SPACEDIM;
-                        const amrex::Real x0 = cell_problo[td0] + (static_cast<amrex::Real>(source[td0]) + 0.5) * cell_dx[td0];
-                        const amrex::Real x1 = cell_problo[td1] + (static_cast<amrex::Real>(source[td1]) + 0.5) * cell_dx[td1];
+                        const amrex::Real x0 = mapped ? mapped_coordinates(
+                            source[0], source[1], source[2], td0) :
+                            cell_problo[td0] + (static_cast<amrex::Real>(source[td0]) + 0.5) * cell_dx[td0];
+                        const amrex::Real x1 = mapped ? mapped_coordinates(
+                            source[0], source[1], source[2], td1) :
+                            cell_problo[td1] + (static_cast<amrex::Real>(source[td1]) + 0.5) * cell_dx[td1];
                         const amrex::Real weight = profile_offset + linear_profile * (profile_slope0 * x0 + profile_slope1 * x1);
-                        const amrex::Real boundary_velocity = (side ? -1.0 : 1.0) * inlet_scales[2 * boundary_dir + side] * weight;
-                        value(i,j,k,comp) = 2.0 * boundary_velocity - interior;
-                    } else value(i,j,k,comp) = -interior;
+                        const amrex::Real inward_sign = side ? -1.0 : 1.0;
+                        target = inward_sign * inlet_scales[2 * boundary_dir + side] *
+                            weight * normal_component;
+                    }
+                    value(i,j,k,comp) = 2.0 * target - interior;
                 }
                 else value(i,j,k,comp) = interior;
             });
@@ -251,26 +374,42 @@ void VwisAmrExSolver::fill_physical_ghost_cells_impl(bool impose_boundary_flux)
                 const amrex::Real offset = m_boundary.profile_offset;
                 const amrex::Real slope0 = m_boundary.profile_slope_0;
                 const amrex::Real slope1 = m_boundary.profile_slope_1;
-                const amrex::Real area = m_face_area[dir];
+                const amrex::Real cartesian_area = m_face_area[dir];
                 const auto problo = m_geom.ProbLoArray();
                 const auto dx = m_geom.CellSizeArray();
                 const int td0 = (dir + 1) % AMREX_SPACEDIM;
                 const int td1 = (dir + 2) % AMREX_SPACEDIM;
-                const amrex::Real outflow_density = m_boundary.inlet_target_flux /
-                    (static_cast<amrex::Real>(domain.length(td0) * domain.length(td1)));
+                const amrex::Real outflow_speed = outlet_scales[2 * dir + side];
                 const bool constrain_outlet = m_boundary.constrain_outlet_flux;
                 for (amrex::MFIter mfi(m_ucont[dir], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
                     auto const flux = m_ucont[dir].array(mfi);
+                    amrex::Array4<amrex::Real const> mapped_area{};
+                    amrex::Array4<amrex::Real const> mapped_coordinates{};
+                    if (mapped) {
+                        mapped_area = m_metric_data.face_area_vector_fc(dir).const_array(mfi);
+                        mapped_coordinates = m_metric_data.cell_center_coordinates_cc().const_array(mfi);
+                    }
                     amrex::ParallelFor(mfi.validbox(), [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
                         const int index[AMREX_SPACEDIM] = {AMREX_D_DECL(i,j,k)};
                         if (index[dir] != boundary_index) return;
+                        amrex::Real physical_area = cartesian_area;
+                        if (mapped) {
+                            amrex::Real area_squared = 0.0;
+                            for (int comp = 0; comp < AMREX_SPACEDIM; ++comp) {
+                                const amrex::Real component = mapped_area(i,j,k,comp);
+                                area_squared += component * component;
+                            }
+                            physical_area = std::sqrt(area_squared);
+                        }
                         if (kind == CartesianBC::Inflow) {
-                            const amrex::Real x0 = problo[td0] + (static_cast<amrex::Real>(index[td0]) + 0.5) * dx[td0];
-                            const amrex::Real x1 = problo[td1] + (static_cast<amrex::Real>(index[td1]) + 0.5) * dx[td1];
+                            const amrex::Real x0 = mapped ? mapped_coordinates(i,j,k,td0) :
+                                problo[td0] + (static_cast<amrex::Real>(index[td0]) + 0.5) * dx[td0];
+                            const amrex::Real x1 = mapped ? mapped_coordinates(i,j,k,td1) :
+                                problo[td1] + (static_cast<amrex::Real>(index[td1]) + 0.5) * dx[td1];
                             const amrex::Real weight = offset + linear * (slope0 * x0 + slope1 * x1);
-                            flux(i,j,k) = (high ? -1.0 : 1.0) * profile_scale * weight * area;
+                            flux(i,j,k) = (high ? -1.0 : 1.0) * profile_scale * weight * physical_area;
                         } else if (kind == CartesianBC::Outflow && constrain_outlet) {
-                            flux(i,j,k) = (high ? 1.0 : -1.0) * outflow_density;
+                            flux(i,j,k) = (high ? 1.0 : -1.0) * outflow_speed * physical_area;
                         } else if (kind != CartesianBC::Outflow) {
                             flux(i,j,k) = 0.0;
                         }
@@ -287,6 +426,8 @@ void VwisAmrExSolver::fill_physical_ghost_cells_impl(bool impose_boundary_flux)
         const amrex::Real face_area = m_face_area[face_dir];
         for (amrex::MFIter mfi(mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
             auto const value = mf.array(mfi);
+            amrex::Array4<amrex::Real const> mapped_area{};
+            if (mapped) mapped_area = m_metric_data.face_area_vector_fc(face_dir).const_array(mfi);
             amrex::ParallelFor(mfi.fabbox(), [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
                 int index[AMREX_SPACEDIM] = {AMREX_D_DECL(i,j,k)};
                 if (index[0] >= flo[0] && index[0] <= fhi[0] && index[1] >= flo[1] && index[1] <= fhi[1]
@@ -294,13 +435,25 @@ void VwisAmrExSolver::fill_physical_ghost_cells_impl(bool impose_boundary_flux)
                 int boundary_dir = -1; int side = 0;
                 int source[AMREX_SPACEDIM] = {AMREX_D_DECL(i,j,k)};
                 for (int d = 0; d < AMREX_SPACEDIM; ++d) {
-                    if (source[d] < flo[d]) { if (boundary_dir < 0) { boundary_dir=d; side=0; } source[d]=flo[d]; }
-                    if (source[d] > fhi[d]) { if (boundary_dir < 0) { boundary_dir=d; side=1; } source[d]=fhi[d]; }
+                    if (source[d] < flo[d]) {
+                        if (!periodic[d]) { if (boundary_dir < 0) { boundary_dir=d; side=0; } source[d]=flo[d]; }
+                    }
+                    if (source[d] > fhi[d]) {
+                        if (!periodic[d]) { if (boundary_dir < 0) { boundary_dir=d; side=1; } source[d]=fhi[d]; }
+                    }
                 }
+                if (boundary_dir < 0) return;
                 const int kind = kinds[2 * boundary_dir + side];
                 const amrex::Real interior = value(source[0],source[1],source[2]);
                 if (kind == static_cast<int>(CartesianBC::MovingWall)) {
-                    const amrex::Real wall_flux = moving_wall_velocity[face_dir] * face_area;
+                    amrex::Real wall_flux = moving_wall_velocity[face_dir] * face_area;
+                    if (mapped) {
+                        wall_flux = 0.0;
+                        for (int comp = 0; comp < AMREX_SPACEDIM; ++comp) {
+                            wall_flux += moving_wall_velocity[comp] *
+                                mapped_area(source[0],source[1],source[2],comp);
+                        }
+                    }
                     value(i,j,k) = 2.0 * wall_flux - interior;
                     return;
                 }
@@ -317,10 +470,19 @@ void VwisAmrExSolver::fill_physical_ghost_cells_impl(bool impose_boundary_flux)
         fill_face(m_ucont_older[dir], dir);
     }
     amrex::Gpu::streamSynchronize();
+    // Physical boundary faces are written after the initial same-level halo.
+    // Re-establish the canonical lowest-box face owner, then refresh halos;
+    // no area or Jacobian factor is applied because Ucont already stores u.S.
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+        for (amrex::MultiFab* flux : {&m_ucont[dir], &m_ucont_old[dir], &m_ucont_older[dir]}) {
+            flux->OverrideSync(m_geom.periodicity());
+            flux->FillBoundary(m_geom.periodicity());
+        }
+    }
     m_physical_epoch = m_valid_epoch;
 }
 
-void VwisAmrExSolver::apply_boundary_pipeline(char const* stage)
+void AVWiSSolver::apply_boundary_pipeline(char const* stage)
 {
     fill_ghost_cells();
     fill_physical_ghost_cells();

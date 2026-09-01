@@ -1,18 +1,18 @@
 # P4 mixed pressure policy: prescribed x-low inflow and wall fluxes are
 # homogeneous Neumann for Phi; fixed-pressure x-high is homogeneous Dirichlet
 # for Phi and may receive the projection's normal-flux correction.
-vwis.n_cell = 24 16 12
-vwis.max_grid_size = 6
-vwis.nghost = 2
-vwis.dt = 0.125
-vwis.projection_time_coefficient = 1.0
-vwis.is_periodic = 0 0 0
-vwis.run_p4_projection_checks = 1
+avwis.mode = contract_p4
+avwis.n_cell = 24 16 12
+avwis.max_grid_size = 6
+avwis.nghost = 2
+avwis.dt = 0.125
+avwis.projection_time_coefficient = 1.0
+avwis.is_periodic = 0 0 0
 
-vwisbcs.enabled = 1
-vwisbcs.lo = inflow noslip noslip
-vwisbcs.hi = outflow noslip noslip
-vwisbcs.inlet_profile = uniform
-vwisbcs.inlet_target_flux = 0.75
-vwisbcs.pressure = 0.0 2.5 0.0 0.0 0.0 0.0
-vwisbcs.constrain_outlet_flux = 1
+avwisbcs.enabled = 1
+avwisbcs.lo = inflow noslip noslip
+avwisbcs.hi = outflow noslip noslip
+avwisbcs.inlet_profile = uniform
+avwisbcs.inlet_target_flux = 0.75
+avwisbcs.pressure = 0.0 2.5 0.0 0.0 0.0 0.0
+avwisbcs.constrain_outlet_flux = 1

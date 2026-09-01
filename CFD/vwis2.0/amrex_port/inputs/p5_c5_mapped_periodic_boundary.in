@@ -1,0 +1,18 @@
+# C5.1 mixed contract: x is translation-periodic; y/z are stationary mapped walls.
+avwis.mode = contract_p5_mapped_boundary
+avwis.coordinates = mapped
+avwis.mapping.type = analytic_orthogonal
+avwis.mapping.scale = 1.15 0.9 1.25
+avwis.mapping.stretch = 0.3 -0.2 0.15
+avwis.projection.operator = orthogonal_mlmg
+avwis.n_cell = 12 10 8
+avwis.max_grid_size = 4
+avwis.nghost = 2
+avwis.is_periodic = 1 0 0
+avwis.dt = 1.0e-3
+avwis.projection_time_coefficient = 1.0
+
+avwisbcs.enabled = 1
+avwisbcs.geometry = mapped_orthogonal
+avwisbcs.lo = "" noslip noslip
+avwisbcs.hi = "" noslip noslip

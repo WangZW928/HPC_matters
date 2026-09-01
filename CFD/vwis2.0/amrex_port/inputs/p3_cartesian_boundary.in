@@ -1,20 +1,20 @@
 # P3 single-level Cartesian boundary contract.  The inlet is a normalized
 # affine plane profile on x-low; x-high has fixed pressure and matching flux.
 # The remaining four sides are explicit no-slip walls (no implicit default).
-vwis.n_cell = 24 16 12
-vwis.max_grid_size = 6
-vwis.nghost = 2
-vwis.dt = 1.0e-3
-vwis.is_periodic = 0 0 0
-vwis.run_p3_boundary_checks = 1
+avwis.mode = contract_p3
+avwis.n_cell = 24 16 12
+avwis.max_grid_size = 6
+avwis.nghost = 2
+avwis.dt = 1.0e-3
+avwis.is_periodic = 0 0 0
 
-vwisbcs.enabled = 1
-vwisbcs.lo = inflow noslip noslip
-vwisbcs.hi = outflow noslip noslip
-vwisbcs.inlet_profile = linear_plane
-vwisbcs.inlet_target_flux = 1.25
-vwisbcs.profile_offset = 1.0
-vwisbcs.profile_slope_0 = 0.2
-vwisbcs.profile_slope_1 = 0.1
-vwisbcs.pressure = 0.0 2.5 0.0 0.0 0.0 0.0
-vwisbcs.constrain_outlet_flux = 1
+avwisbcs.enabled = 1
+avwisbcs.lo = inflow noslip noslip
+avwisbcs.hi = outflow noslip noslip
+avwisbcs.inlet_profile = linear_plane
+avwisbcs.inlet_target_flux = 1.25
+avwisbcs.profile_offset = 1.0
+avwisbcs.profile_slope_0 = 0.2
+avwisbcs.profile_slope_1 = 0.1
+avwisbcs.pressure = 0.0 2.5 0.0 0.0 0.0 0.0
+avwisbcs.constrain_outlet_flux = 1

@@ -1,0 +1,17 @@
+# C5.2 is not C3/C4: a general non-orthogonal provider is deliberately absent
+# and must be rejected rather than routed through Cartesian or orthogonal code.
+avwis.mode = solve
+avwis.coordinates = mapped
+avwis.mapping.type = general_nonorthogonal
+avwis.projection.operator = orthogonal_mlmg
+avwis.n_cell = 8 8 8
+avwis.max_grid_size = 4
+avwis.nghost = 2
+avwis.is_periodic = 0 0 0
+avwis.run_steps = 0
+
+avwisbcs.enabled = 1
+avwisbcs.geometry = mapped_orthogonal
+avwisbcs.lo = inflow noslip noslip
+avwisbcs.hi = outflow noslip noslip
+avwisbcs.inlet_target_flux = 1.0

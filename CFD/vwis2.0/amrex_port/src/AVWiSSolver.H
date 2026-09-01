@@ -1,7 +1,9 @@
-#ifndef VWIS_AMREX_SOLVER_H_
-#define VWIS_AMREX_SOLVER_H_
+#ifndef AVWIS_SOLVER_H_
+#define AVWIS_SOLVER_H_
 
 #include "CartesianBoundaryConfig.H"
+#include "AVWiSMetricData.H"
+#include "AVWiSMappedOperators.H"
 
 #include <AMReX_Array.H>
 #include <AMReX_BCRec.H>
@@ -109,7 +111,7 @@ struct MetricSpec {
  * coefficient viscous RHS operators and a minimal explicit fractional step; no variable viscosity,
  * curvilinear operator, LES, IBM, or FSI exists.
  */
-class VwisAmrExSolver {
+class AVWiSSolver {
 public:
     /**
      * Define the sole Cartesian level. n_cell is cell count, max_grid_size controls
@@ -117,10 +119,11 @@ public:
      * and is_periodic controls only geometry/halo wrapping. physical_domain is
      * Cartesian geometry, never a curvilinear metric input.
      */
-    VwisAmrExSolver(amrex::Vector<int> const& n_cell, int max_grid_size,
+    AVWiSSolver(amrex::Vector<int> const& n_cell, int max_grid_size,
                     int nghost, amrex::RealBox const& physical_domain,
                     amrex::Vector<int> const& is_periodic,
-                    CartesianBoundaryConfig const& boundary = {});
+                    CartesianBoundaryConfig const& boundary = {},
+                    MappingOperatorConfig const& mapping_operator = {});
 
     /** Initialize valid state to zero and, when configured, execute the P3 boundary pipeline. */
     void initialize();
@@ -134,43 +137,18 @@ public:
     void advance_one_step(amrex::Real dt, amrex::Real viscosity = 0.1);
     /** Conservative explicit-step diagnostics; limits are guards, not a nonlinear stability proof. */
     TimeStepDiagnostics time_step_diagnostics(amrex::Real dt, amrex::Real viscosity) const;
-    /** Exercise base cell layout, initialization, periodic halo, and physical-BC limitation contracts. */
-    void run_runtime_contract_checks();
     /** Recover Cartesian velocity by averaging adjacent face volume-flux densities. */
     void sync_ucat_from_ucont();
     /** Build Cartesian face volume flux from interpolated normal velocity times area. */
     void sync_ucont_from_ucat();
-    /** Verify P2-003/004/005 manufactured transforms, metrics, and multi-box layout. */
-    void run_p2_transform_layout_checks();
-    /** Verify P3 classification, cell/face physical ghosts, flux, and stale-ghost diagnostics. */
-    void run_p3_boundary_contract_checks();
     /** Solve the P4 Cartesian pressure correction and project integrated face fluxes. */
     ProjectionDiagnostics project_cartesian(amrex::Real dt, amrex::Real time_coefficient = 1.0);
-    /** Manufactured checks for the configured periodic, closed, or inflow/outflow pressure policy. */
-    void run_p4_projection_contract_checks(amrex::Real dt, amrex::Real time_coefficient = 1.0);
+    /** C2.2 periodic diagonal/separable mapped pressure projection. */
+    ProjectionDiagnostics project_orthogonal(amrex::Real dt, amrex::Real time_coefficient = 1.0);
     /** Conservative Cartesian -div(Ucont[d] * face_average(Ucat)) / cell volume. */
     void compute_cartesian_advection_rhs(amrex::MultiFab& rhs);
-    /** Constant and smooth manufactured P5-001 checks, including configured physical boundaries. */
-    void run_p5_advection_contract_checks();
     /** Uniform Cartesian constant-coefficient nu*Laplacian(Ucat), component-wise. */
     void compute_cartesian_viscous_rhs(amrex::MultiFab& rhs, amrex::Real viscosity);
-    /** P5-002 periodic manufactured/conservation or physical-boundary multi-Box checks. */
-    void run_p5_viscous_contract_checks(amrex::Real viscosity);
-    /** P5-004 periodic temporal-order, conservation, divergence, CFL, and history checks. */
-    void run_p5_time_contract_checks(amrex::Real dt, amrex::Real final_time,
-                                     amrex::Real viscosity);
-    /** Run the repeatable P0 Cartesian manufactured benchmark and write JSON metrics. */
-    void run_cartesian_benchmark(amrex::Real dt, int steps, amrex::Real viscosity,
-                                 std::string const& report_path);
-    /** Run the physical Cartesian channel case; this is a run, not a validation claim. */
-    void run_physical_benchmark(amrex::Real dt, int steps, amrex::Real viscosity,
-                                std::string const& report_path);
-    /** Run and export the CPU/single-rank 2D-equivalent lid-driven cavity demonstration. */
-    void run_lid_driven_cavity(amrex::Real dt, int steps, amrex::Real viscosity,
-                               std::string const& report_path,
-                               std::string const& field_path,
-                               std::string const& centerline_path,
-                               std::string const& history_path);
     /** Globally reduced P3 boundary/divergence/freshness report; diagnostic only, never a RHS. */
     P3Diagnostics p3_diagnostics(char const* stage, bool require_fresh = true) const;
     /** IO-rank layout/schema diagnostics, safe after initialization or a completed step. */
@@ -181,10 +159,6 @@ public:
     void write_checkpoint(std::string const& path) const;
     /** Restore every persistent Cartesian field and time layer from a strict checkpoint. */
     void read_checkpoint(std::string const& path);
-    /** Real disk round-trip: uninterrupted N steps versus restart after K steps. */
-    void run_p8_restart_contract_checks(std::string const& path, amrex::Real dt,
-                                        int total_steps, int checkpoint_step,
-                                        amrex::Real viscosity);
     /** Sample the containing cell; the current P8-003 implementation is CPU/single-rank. */
     UniformPointSample sample_uniform_point(
         amrex::Array<amrex::Real, AMREX_SPACEDIM> const& position) const;
@@ -194,11 +168,20 @@ public:
     void write_uniform_plane_csv(std::string const& path, int direction, int cell_index) const;
     /** Compute conservation, energy, momentum, and pressure statistics. */
     UniformFlowDiagnostics uniform_flow_diagnostics() const;
-    /** Deterministic manufactured P8-003 sampling/statistics regression. */
-    void run_p8_sampling_statistics_contract(std::string const& report_path,
-                                             std::string const& plane_path);
+    /** Read-only identity metric owned for the complete solver lifetime. */
+    MetricData const& metric_data() const noexcept { return m_metric_data; }
+    /** Epoch frozen when the solver's identity metric was successfully built. */
+    std::uint64_t metric_epoch() const noexcept { return m_metric_epoch; }
+    MappingOperatorConfig const& mapping_operator_config() const noexcept {
+        return m_mapping_operator;
+    }
 
 private:
+    // Case setup/export must coordinate solver-owned fields. One internal
+    // bridge avoids exposing raw MultiFabs or case-specific declarations here.
+    friend class AVWiSCaseRunnerAccess;
+    friend class AVWiSContractTestAccess;
+
     void register_fields();
     void register_metric_metadata();
     void define_boundary_metadata();
@@ -216,6 +199,9 @@ private:
     amrex::Geometry m_geom;
     amrex::BoxArray m_ba;
     amrex::DistributionMapping m_dm;
+    MetricData m_metric_data;
+    std::uint64_t m_metric_epoch = 0;
+    MappingOperatorConfig m_mapping_operator;
 
     // Cell IndexType. Nvert remains a legacy classifier, never an EB volume fraction.
     amrex::MultiFab m_p;

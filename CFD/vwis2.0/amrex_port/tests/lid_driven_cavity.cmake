@@ -9,10 +9,10 @@ set(history "${work}/history.csv")
 file(REMOVE "${report}" "${field}" "${centerline}" "${history}")
 execute_process(
   COMMAND "${exe}" "${input}"
-    "vwis.metadata_file=${report}"
-    "vwis.field_file=${field}"
-    "vwis.centerline_file=${centerline}"
-    "vwis.history_file=${history}"
+    "avwis.metadata_file=${report}"
+    "avwis.field_file=${field}"
+    "avwis.centerline_file=${centerline}"
+    "avwis.history_file=${history}"
   RESULT_VARIABLE result OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr)
 if (NOT result EQUAL 0)
   message(FATAL_ERROR "Lid cavity sanity run failed (${result})\n${stdout}\n${stderr}")
@@ -24,7 +24,7 @@ foreach (artifact "${report}" "${field}" "${centerline}" "${history}")
 endforeach()
 file(READ "${report}" json)
 foreach (required
-    "\"schema\": \"vwis-lid-driven-cavity-v1\""
+    "\"schema\": \"avwis-lid-driven-cavity-v1\""
     "\"status\": \"demonstration / engineering result; not CFD validation\""
     "\"grid\": [8, 8, 1]"
     "\"reynolds_number\": 100"

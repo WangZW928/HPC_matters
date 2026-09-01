@@ -1,9 +1,9 @@
 # P5-004 expected failure: the explicit diffusion number exceeds its guard.
-vwis.n_cell = 16 8 8
-vwis.max_grid_size = 4
-vwis.nghost = 2
-vwis.is_periodic = 1 1 1
-vwis.dt = 2.0e-2
-vwis.final_time = 4.0e-2
-vwis.viscosity = 0.1
-vwis.run_p5_time_checks = 1
+avwis.mode = contract_p5_time
+avwis.n_cell = 16 8 8
+avwis.max_grid_size = 4
+avwis.nghost = 2
+avwis.is_periodic = 1 1 1
+avwis.dt = 2.0e-2
+avwis.final_time = 4.0e-2
+avwis.viscosity = 0.1

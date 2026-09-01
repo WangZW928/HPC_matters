@@ -1,4 +1,4 @@
-#include "VwisAmrExSolver.H"
+#include "AVWiSSolver.H"
 
 #include <AMReX_Gpu.H>
 #include <AMReX_MFIter.H>
@@ -36,9 +36,129 @@ struct PlaneRow {
     amrex::Real divergence;
 };
 
+char const* location_name(FieldLocation location)
+{
+    switch (location) {
+    case FieldLocation::Cell: return "cell";
+    case FieldLocation::XFace: return "x-face";
+    case FieldLocation::YFace: return "y-face";
+    case FieldLocation::ZFace: return "z-face";
+    }
+    return "unknown";
+}
+
 } // namespace
 
-UniformPointSample VwisAmrExSolver::sample_uniform_point(
+P3Diagnostics AVWiSSolver::p3_diagnostics(char const* stage, bool require_fresh) const
+{
+    if (!m_boundary.enabled) throw std::runtime_error("P3 diagnostics require explicit boundary configuration");
+    if (require_fresh) require_ghosts_fresh(stage);
+    P3Diagnostics result;
+    result.valid_epoch = m_valid_epoch;
+    result.halo_epoch = m_halo_epoch;
+    result.physical_epoch = m_physical_epoch;
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+        if (!m_geom.isPeriodic(dir)) {
+            result.outward_boundary_flux += boundary_flux(dir, false) + boundary_flux(dir, true);
+        }
+    }
+
+    amrex::MultiFab divergence(m_ba, m_dm, 1, 0);
+    for (amrex::MFIter mfi(divergence, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        auto const div = divergence.array(mfi);
+        auto const fx = m_ucont[0].const_array(mfi);
+        auto const fy = m_ucont[1].const_array(mfi);
+        auto const fz = m_ucont[2].const_array(mfi);
+        const amrex::Real inverse_volume = 1.0 / m_cell_volume;
+        amrex::ParallelFor(mfi.validbox(), [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+            div(i,j,k) = ((fx(i+1,j,k)-fx(i,j,k)) + (fy(i,j+1,k)-fy(i,j,k))
+                         + (fz(i,j,k+1)-fz(i,j,k))) * inverse_volume;
+        });
+    }
+    amrex::Gpu::streamSynchronize();
+    amrex::Real local_integral = divergence.sum(0, true) * m_cell_volume;
+    amrex::Real local_max = divergence.norm0(0, 0, true);
+    amrex::ParallelDescriptor::ReduceRealSum(local_integral);
+    amrex::ParallelDescriptor::ReduceRealMax(local_max);
+    result.integrated_divergence = local_integral;
+    result.max_abs_divergence = local_max;
+    amrex::Print() << "P3 stage=" << stage << " freshness=" << result.valid_epoch << "/"
+                   << result.halo_epoch << "/" << result.physical_epoch
+                   << " outward_flux=" << result.outward_boundary_flux
+                   << " integral_div=" << result.integrated_divergence
+                   << " max_abs_div=" << result.max_abs_divergence << "\n";
+    return result;
+}
+
+void AVWiSSolver::diagnostics() const
+{
+    amrex::Print() << "AVWiS P5 "
+                   << coordinate_system_mode_name(m_mapping_operator.coordinates)
+                   << " sub-contract: boxes=" << m_ba.size()
+                   << ", ranks=" << amrex::ParallelDescriptor::NProcs()
+                   << ", ghosts=" << m_nghost
+                   << ", dx=" << m_dx[0] << "," << m_dx[1] << "," << m_dx[2]
+                   << ", cell_volume=" << m_cell_volume
+                   << ", max(|P|)=" << m_p.norm0(0, 0, true)
+                   << ", time=" << m_time << ", step=" << m_step
+                   << ", history_depth=" << m_history_depth
+                   << ", init_s=" << m_initialize_seconds
+                   << ", advance_s=" << m_last_advance_seconds << "\n";
+    for (auto const& field : m_fields) {
+        amrex::Print() << "  field " << field.name << " location=" << location_name(field.location)
+                       << " nComp=" << field.components << " nGrow=" << field.ghost_cells
+                       << " layer=" << field.time_layer << " units=" << field.units << "\n";
+    }
+    if (m_boundary.enabled) {
+        amrex::Print() << "  boundary geometry="
+                       << boundary_geometry_mode_name(m_boundary.geometry) << "\n";
+        for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+            amrex::Print() << "  boundary dir=" << dir << " lo="
+                           << cartesian_bc_name(m_boundary.sides[2 * dir].velocity) << " hi="
+                           << cartesian_bc_name(m_boundary.sides[2 * dir + 1].velocity) << "\n";
+        }
+    }
+}
+
+void AVWiSSolver::write_metadata_manifest(std::string const& path) const
+{
+    if (m_mapping_operator.coordinates != CoordinateSystemMode::Cartesian) {
+        throw std::runtime_error(
+            "C2.2 mapped mode has no mapping-provenance metadata/checkpoint schema");
+    }
+    if (!amrex::ParallelDescriptor::IOProcessor()) return;
+    std::ofstream output(path);
+    if (!output) throw std::runtime_error("cannot write P5 metadata manifest: " + path);
+    output << "{\n  \"schema\": \"avwis-amrex-p5-cartesian-contract-v1\",\n"
+           << "  \"payload_written\": false,\n"
+           << "  \"note\": \"Not a plotfile or checkpoint; P5-004 history cannot be restarted from this metadata.\",\n"
+           << "  \"fields\": [\n";
+    for (std::size_t i = 0; i < m_fields.size(); ++i) {
+        auto const& field = m_fields[i];
+        output << "    {\"name\": \"" << field.name << "\", \"location\": \""
+               << location_name(field.location) << "\", \"components\": " << field.components
+               << ", \"ngrow\": " << field.ghost_cells << ", \"units\": \"" << field.units
+               << "\", \"time_layer\": \"" << field.time_layer
+               << "\", \"component_names\": \"" << field.component_names
+               << "\", \"ownership\": \"" << field.ownership << "\"}"
+               << (i + 1 == m_fields.size() ? "\n" : ",\n");
+    }
+    output << "  ],\n  \"cartesian\": {\"dx\": [" << m_dx[0] << ", " << m_dx[1] << ", " << m_dx[2]
+           << "], \"cell_volume\": " << m_cell_volume << "},\n  \"metrics\": [\n";
+    for (std::size_t i = 0; i < m_metrics.size(); ++i) {
+        auto const& metric = m_metrics[i];
+        output << "    {\"name\": \"" << metric.name << "\", \"location\": \"" << metric.location
+               << "\", \"value\": \"" << metric.value << "\", \"meaning\": \"" << metric.meaning << "\"}"
+               << (i + 1 == m_metrics.size() ? "\n" : ",\n");
+    }
+    output << "  ],\n"
+           << "  \"time_state\": {\"time\": " << m_time << ", \"step\": " << m_step
+           << ", \"history_depth\": " << m_history_depth << "},\n"
+           << "  \"advance_one_step\": \"provisional explicit Euler RHS plus Cartesian projection; not legacy SNES\",\n"
+           << "  \"projection\": \"single-level Cartesian MLPoisson/MLMG; used by the provisional explicit baseline\"\n}\n";
+}
+
+UniformPointSample AVWiSSolver::sample_uniform_point(
     amrex::Array<amrex::Real, AMREX_SPACEDIM> const& position) const
 {
     require_p8_diagnostics_scope();
@@ -74,7 +194,7 @@ UniformPointSample VwisAmrExSolver::sample_uniform_point(
     return result;
 }
 
-UniformPlaneStatistics VwisAmrExSolver::uniform_plane_statistics(
+UniformPlaneStatistics AVWiSSolver::uniform_plane_statistics(
     int direction, int cell_index) const
 {
     require_p8_diagnostics_scope();
@@ -126,7 +246,7 @@ UniformPlaneStatistics VwisAmrExSolver::uniform_plane_statistics(
     return result;
 }
 
-UniformFlowDiagnostics VwisAmrExSolver::uniform_flow_diagnostics() const
+UniformFlowDiagnostics AVWiSSolver::uniform_flow_diagnostics() const
 {
     require_p8_diagnostics_scope();
     UniformFlowDiagnostics result;
@@ -180,7 +300,7 @@ UniformFlowDiagnostics VwisAmrExSolver::uniform_flow_diagnostics() const
     return result;
 }
 
-void VwisAmrExSolver::write_uniform_plane_csv(
+void AVWiSSolver::write_uniform_plane_csv(
     std::string const& path, int direction, int cell_index) const
 {
     require_p8_diagnostics_scope();
@@ -223,76 +343,4 @@ void VwisAmrExSolver::write_uniform_plane_csv(
                << row.velocity[0] << ',' << row.velocity[1] << ',' << row.velocity[2] << ','
                << row.pressure << ',' << row.divergence << '\n';
     }
-}
-
-void VwisAmrExSolver::run_p8_sampling_statistics_contract(
-    std::string const& report_path, std::string const& plane_path)
-{
-    require_p8_diagnostics_scope();
-    const amrex::Box& domain = m_geom.Domain();
-    if (domain.length(0) != 4 || domain.length(1) != 3 || domain.length(2) != 2 ||
-        !m_geom.isAllPeriodic()) {
-        throw std::runtime_error("P8 sampling contract requires periodic n_cell=4 3 2");
-    }
-    for (amrex::MFIter mfi(m_ucat); mfi.isValid(); ++mfi) {
-        auto const u = m_ucat.array(mfi);
-        auto const p = m_p.array(mfi);
-        const amrex::Box& box = mfi.validbox();
-        for (int k = box.smallEnd(2); k <= box.bigEnd(2); ++k) {
-            for (int j = box.smallEnd(1); j <= box.bigEnd(1); ++j) {
-                for (int i = box.smallEnd(0); i <= box.bigEnd(0); ++i) {
-                    u(i,j,k,0) = 1.0;
-                    u(i,j,k,1) = 2.0;
-                    u(i,j,k,2) = 3.0;
-                    p(i,j,k) = static_cast<amrex::Real>(100*i + 10*j + k);
-                }
-            }
-        }
-    }
-    mark_valid_modified();
-    sync_ucont_from_ucat();
-    const amrex::Array<amrex::Real, AMREX_SPACEDIM> probe_position{
-        AMREX_D_DECL(0.625, 0.5, 0.75)};
-    const UniformPointSample probe = sample_uniform_point(probe_position);
-    const UniformPlaneStatistics plane = uniform_plane_statistics(0, 1);
-    const UniformFlowDiagnostics flow = uniform_flow_diagnostics();
-    write_uniform_plane_csv(plane_path, 0, 1);
-
-    const amrex::Real tolerance = 64.0 * std::numeric_limits<amrex::Real>::epsilon();
-    auto close = [=](amrex::Real lhs, amrex::Real rhs) {
-        return std::abs(lhs-rhs) <= tolerance * amrex::max(1.0, std::abs(rhs));
-    };
-    if (probe.cell[0] != 2 || probe.cell[1] != 1 || probe.cell[2] != 1 ||
-        !close(probe.pressure, 211.0) || !close(probe.divergence, 0.0) ||
-        plane.cell_count != 6 || !close(plane.mean_pressure, 110.5) ||
-        !close(plane.normal_flow, 1.0) || !close(flow.integrated_divergence, 0.0) ||
-        !close(flow.max_abs_divergence, 0.0) || !close(flow.momentum[0], 1.0) ||
-        !close(flow.momentum[1], 2.0) || !close(flow.momentum[2], 3.0) ||
-        !close(flow.kinetic_energy, 7.0) || !close(flow.pressure_mean, 160.5) ||
-        !close(flow.pressure_min, 0.0) || !close(flow.pressure_max, 321.0)) {
-        throw std::runtime_error("P8 sampling/statistics manufactured values failed");
-    }
-
-    std::ofstream output(report_path);
-    if (!output) throw std::runtime_error("cannot write P8 sampling report: " + report_path);
-    output.precision(std::numeric_limits<amrex::Real>::max_digits10);
-    output << "{\n  \"schema\": \"vwis-uniform-diagnostics-v1\",\n"
-           << "  \"status\": \"PASS\",\n  \"case_type\": \"manufactured contract test\",\n"
-           << "  \"scope\": \"single-level uniform Cartesian CPU single-rank\",\n"
-           << "  \"plotfile_compatible\": false,\n"
-           << "  \"probe\": {\"cell\": [" << probe.cell[0] << ',' << probe.cell[1] << ',' << probe.cell[2]
-           << "], \"velocity\": [" << probe.velocity[0] << ',' << probe.velocity[1] << ',' << probe.velocity[2]
-           << "], \"pressure\": " << probe.pressure << ", \"divergence\": " << probe.divergence << "},\n"
-           << "  \"plane\": {\"direction\": 0, \"cell_index\": 1, \"cell_count\": " << plane.cell_count
-           << ", \"mean_velocity\": [" << plane.mean_velocity[0] << ',' << plane.mean_velocity[1] << ',' << plane.mean_velocity[2]
-           << "], \"mean_pressure\": " << plane.mean_pressure << ", \"normal_flow\": " << plane.normal_flow << "},\n"
-           << "  \"flow\": {\"integrated_divergence\": " << flow.integrated_divergence
-           << ", \"max_abs_divergence\": " << flow.max_abs_divergence
-           << ", \"net_mass_flux\": " << flow.net_mass_flux << ", \"outlet_flow\": " << flow.outlet_flow
-           << ", \"momentum\": [" << flow.momentum[0] << ',' << flow.momentum[1] << ',' << flow.momentum[2]
-           << "], \"kinetic_energy\": " << flow.kinetic_energy
-           << ", \"pressure_mean\": " << flow.pressure_mean << ", \"pressure_min\": " << flow.pressure_min
-           << ", \"pressure_max\": " << flow.pressure_max << "}\n}\n";
-    amrex::Print() << "VWiS AMReX P8-003 sampling/statistics: PASS report=" << report_path
-                   << " plane=" << plane_path << "\n";
 }

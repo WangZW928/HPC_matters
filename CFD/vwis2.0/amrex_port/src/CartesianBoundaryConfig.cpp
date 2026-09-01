@@ -1,6 +1,7 @@
 #include "CartesianBoundaryConfig.H"
 
 #include <AMReX_ParmParse.H>
+#include <AMReX_Print.H>
 
 #include <cmath>
 #include <stdexcept>
@@ -31,15 +32,36 @@ CartesianBC legacy_bc(int code)
                                  "legacy case-specific 0/2/6/8/10/11/12/13/14/-1/-2 are rejected");
     }
 }
+
+BoundaryGeometryMode named_geometry(std::string const& name)
+{
+    if (name == "cartesian") return BoundaryGeometryMode::Cartesian;
+    if (name == "mapped_orthogonal") return BoundaryGeometryMode::MappedOrthogonal;
+    throw std::runtime_error(
+        "avwisbcs.geometry must be cartesian or mapped_orthogonal");
+}
 } // namespace
 
 CartesianBoundaryConfig read_cartesian_boundary_config(
     amrex::Vector<int> const& is_periodic)
 {
-    amrex::ParmParse pp("vwisbcs");
+    char const* namespace_name = "avwisbcs";
+    amrex::ParmParse current(namespace_name);
+    if (!current.contains("enabled")) {
+        amrex::ParmParse legacy("vwisbcs");
+        if (legacy.contains("enabled")) {
+            amrex::Print() << "WARNING: legacy vwis.* BC namespace is deprecated; use avwisbcs.*\n";
+            namespace_name = "vwisbcs";
+        }
+    }
+    amrex::ParmParse pp(namespace_name);
     CartesianBoundaryConfig config;
     pp.query("enabled", config.enabled);
     if (!config.enabled) return config;
+
+    std::string geometry = "cartesian";
+    pp.query("geometry", geometry);
+    config.geometry = named_geometry(geometry);
 
     amrex::Vector<std::string> lo_name(AMREX_SPACEDIM, "");
     amrex::Vector<std::string> hi_name(AMREX_SPACEDIM, "");
@@ -66,8 +88,9 @@ CartesianBoundaryConfig read_cartesian_boundary_config(
     amrex::Vector<amrex::Real> pressure(2 * AMREX_SPACEDIM, 0.0);
     pp.queryarr("pressure", pressure, 0, 2 * AMREX_SPACEDIM);
     for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+        const int dir_offset = 2 * dir;
         for (int side = 0; side < 2; ++side) {
-            const int slot = 2 * dir + side;
+            const int slot = dir_offset + side;
             auto& spec = config.sides[slot];
             spec.pressure = pressure[slot];
             if (is_periodic[dir]) {
@@ -94,6 +117,11 @@ CartesianBoundaryConfig read_cartesian_boundary_config(
         }
     }
     return config;
+}
+
+char const* boundary_geometry_mode_name(BoundaryGeometryMode mode) noexcept
+{
+    return mode == BoundaryGeometryMode::Cartesian ? "cartesian" : "mapped_orthogonal";
 }
 
 char const* cartesian_bc_name(CartesianBC bc) noexcept

@@ -1,0 +1,18 @@
+# C5.2 mapped boundaries require named modes. Legacy integer codes remain
+# Cartesian-only because their case-specific mapped semantics are not frozen.
+avwis.mode = solve
+avwis.coordinates = mapped
+avwis.mapping.type = analytic_orthogonal
+avwis.mapping.scale = 1.2 0.85 1.1
+avwis.mapping.stretch = 0.35 -0.25 0.2
+avwis.projection.operator = orthogonal_mlmg
+avwis.n_cell = 8 8 8
+avwis.max_grid_size = 4
+avwis.nghost = 2
+avwis.is_periodic = 0 0 0
+avwis.run_steps = 0
+
+avwisbcs.enabled = 1
+avwisbcs.geometry = mapped_orthogonal
+avwisbcs.legacy_codes = 5 4 1 1 1 1
+avwisbcs.inlet_target_flux = 1.0

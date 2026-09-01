@@ -6,7 +6,7 @@ string(RANDOM LENGTH 8 ALPHABET 0123456789abcdef nonce)
 set(run "${work}_${stamp}_${nonce}")
 file(MAKE_DIRECTORY "${run}")
 execute_process(
-  COMMAND "${exe}" "${input}" "vwis.checkpoint_file=${run}/checkpoint"
+  COMMAND "${exe}" "${input}" "avwis.checkpoint_file=${run}/checkpoint"
   WORKING_DIRECTORY "${run}"
   RESULT_VARIABLE write_result
   OUTPUT_VARIABLE write_output
@@ -16,13 +16,13 @@ if(NOT write_result EQUAL 0)
 endif()
 set(header "${run}/checkpoint/Header")
 file(READ "${header}" contents)
-string(REPLACE "VWIS_AMREX_CARTESIAN_CHECKPOINT" "CORRUPTED_CHECKPOINT_HEADER" corrupted "${contents}")
+string(REPLACE "AVWIS_CARTESIAN_CHECKPOINT" "CORRUPTED_CHECKPOINT_HEADER" corrupted "${contents}")
 if(corrupted STREQUAL contents)
   message(FATAL_ERROR "P8 test could not corrupt Header magic")
 endif()
 file(WRITE "${header}" "${corrupted}")
 execute_process(
-  COMMAND "${exe}" "${restart_input}" "vwis.restart_file=${run}/checkpoint"
+  COMMAND "${exe}" "${restart_input}" "avwis.restart_file=${run}/checkpoint"
   WORKING_DIRECTORY "${run}"
   RESULT_VARIABLE restart_result
   OUTPUT_VARIABLE restart_output

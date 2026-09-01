@@ -1,4 +1,7 @@
-#include "VwisAmrExSolver.H"
+#include "LidDrivenCavityCase.H"
+
+#include "AVWiSCaseRunnerAccess.H"
+#include "AVWiSSolver.H"
 
 #include <AMReX.H>
 #include <AMReX_Gpu.H>
@@ -16,11 +19,11 @@
 #include <string>
 #include <vector>
 
-#ifndef VWIS_AMREX_LOCKED_VERSION
-#define VWIS_AMREX_LOCKED_VERSION "unknown"
+#ifndef AVWIS_LOCKED_VERSION
+#define AVWIS_LOCKED_VERSION "unknown"
 #endif
-#ifndef VWIS_AMREX_LOCKED_GIT_SHA
-#define VWIS_AMREX_LOCKED_GIT_SHA "unknown"
+#ifndef AVWIS_LOCKED_GIT_SHA
+#define AVWIS_LOCKED_GIT_SHA "unknown"
 #endif
 
 namespace {
@@ -43,8 +46,8 @@ bool finite_flow(UniformFlowDiagnostics const& value)
 
 } // namespace
 
-void VwisAmrExSolver::run_lid_driven_cavity(
-    amrex::Real dt, int steps, amrex::Real viscosity,
+void AVWiSCaseRunnerAccess::run_lid_driven_cavity_case_impl(
+    AVWiSSolver& solver, amrex::Real dt, int steps, amrex::Real viscosity,
     std::string const& report_path, std::string const& field_path,
     std::string const& centerline_path, std::string const& history_path)
 {
@@ -54,14 +57,14 @@ void VwisAmrExSolver::run_lid_driven_cavity(
 #ifdef AMREX_USE_GPU
     throw std::runtime_error("lid cavity CSV demonstration is validated only with an AMReX CPU build");
 #endif
-    const auto& domain = m_geom.Domain();
+    const auto& domain = solver.m_geom.Domain();
     if (steps <= 0 || !std::isfinite(dt) || dt <= 0.0 ||
         !std::isfinite(viscosity) || viscosity <= 0.0) {
         throw std::runtime_error("lid cavity requires positive finite dt, steps, and viscosity");
     }
     if (domain.length(0) != domain.length(1) || domain.length(2) != 1 ||
-        m_geom.ProbLength(0) != m_geom.ProbLength(1) || !m_geom.isPeriodic(2) ||
-        m_geom.isPeriodic(0) || m_geom.isPeriodic(1)) {
+        solver.m_geom.ProbLength(0) != solver.m_geom.ProbLength(1) || !solver.m_geom.isPeriodic(2) ||
+        solver.m_geom.isPeriodic(0) || solver.m_geom.isPeriodic(1)) {
         throw std::runtime_error(
             "lid cavity requires square Nx x Ny x 1 geometry with only z periodic");
     }
@@ -69,14 +72,14 @@ void VwisAmrExSolver::run_lid_driven_cavity(
         CartesianBC::NoSlipWall, CartesianBC::NoSlipWall,
         CartesianBC::NoSlipWall, CartesianBC::MovingWall};
     for (int slot = 0; slot < 4; ++slot) {
-        if (m_boundary.sides[slot].velocity != expected[slot]) {
+        if (solver.m_boundary.sides[slot].velocity != expected[slot]) {
             throw std::runtime_error(
                 "lid cavity requires noslip xlo/xhi/ylo and moving_wall yhi");
         }
     }
-    const amrex::Real lid_speed = m_boundary.moving_wall_velocity[0];
-    if (!(lid_speed > 0.0) || m_boundary.moving_wall_velocity[1] != 0.0 ||
-        m_boundary.moving_wall_velocity[2] != 0.0) {
+    const amrex::Real lid_speed = solver.m_boundary.moving_wall_velocity[0];
+    if (!(lid_speed > 0.0) || solver.m_boundary.moving_wall_velocity[1] != 0.0 ||
+        solver.m_boundary.moving_wall_velocity[2] != 0.0) {
         throw std::runtime_error("lid cavity requires positive x-directed tangential lid velocity");
     }
 
@@ -93,15 +96,15 @@ void VwisAmrExSolver::run_lid_driven_cavity(
     UniformPointSample center{};
     TimeStepDiagnostics final_stability{};
     amrex::Array<amrex::Real, AMREX_SPACEDIM> center_position{
-        AMREX_D_DECL(m_geom.ProbLo(0) + 0.5 * m_geom.ProbLength(0),
-                     m_geom.ProbLo(1) + 0.5 * m_geom.ProbLength(1),
-                     m_geom.ProbLo(2) + 0.5 * m_geom.ProbLength(2))};
+        AMREX_D_DECL(solver.m_geom.ProbLo(0) + 0.5 * solver.m_geom.ProbLength(0),
+                     solver.m_geom.ProbLo(1) + 0.5 * solver.m_geom.ProbLength(1),
+                     solver.m_geom.ProbLo(2) + 0.5 * solver.m_geom.ProbLength(2))};
 
     for (int local_step = 0; local_step < steps; ++local_step) {
-        advance_one_step(dt, viscosity);
-        final_flow = uniform_flow_diagnostics();
-        center = sample_uniform_point(center_position);
-        final_stability = time_step_diagnostics(dt, viscosity);
+        solver.advance_one_step(dt, viscosity);
+        final_flow = solver.uniform_flow_diagnostics();
+        center = solver.sample_uniform_point(center_position);
+        final_stability = solver.time_step_diagnostics(dt, viscosity);
         max_post_divergence = std::max(max_post_divergence, final_flow.max_abs_divergence);
         max_mass_imbalance = std::max(max_mass_imbalance, std::abs(final_flow.net_mass_flux));
         all_finite = all_finite && finite_flow(final_flow) &&
@@ -112,7 +115,7 @@ void VwisAmrExSolver::run_lid_driven_cavity(
             throw std::runtime_error(
                 "lid cavity post-projection divergence exceeds 1e-8; refine BoxArray splitting for the one-cell periodic direction");
         }
-        history << m_step << ',' << m_time << ',' << final_flow.max_abs_divergence << ','
+        history << solver.m_step << ',' << solver.m_time << ',' << final_flow.max_abs_divergence << ','
                 << final_flow.integrated_divergence << ',' << final_flow.net_mass_flux << ','
                 << final_flow.kinetic_energy << ',' << center.velocity[0] << ','
                 << center.velocity[1] << ',' << final_stability.advective_cfl << ','
@@ -122,14 +125,14 @@ void VwisAmrExSolver::run_lid_driven_cavity(
     require_output(history, history_path);
     if (!all_finite) throw std::runtime_error("lid cavity produced NaN or Inf diagnostics");
 
-    fill_ghost_cells();
-    fill_physical_ghost_cells();
+    solver.fill_ghost_cells();
+    solver.fill_physical_ghost_cells();
     amrex::Real wall_velocity_error = 0.0;
     const int yhi = domain.bigEnd(1);
-    for (amrex::MFIter mfi(m_ucat); mfi.isValid(); ++mfi) {
+    for (amrex::MFIter mfi(solver.m_ucat); mfi.isValid(); ++mfi) {
         const amrex::Box& box = mfi.validbox();
         if (box.smallEnd(1) > yhi || box.bigEnd(1) < yhi) continue;
-        auto const velocity = m_ucat.const_array(mfi);
+        auto const velocity = solver.m_ucat.const_array(mfi);
         for (int k = box.smallEnd(2); k <= box.bigEnd(2); ++k) {
             for (int i = box.smallEnd(0); i <= box.bigEnd(0); ++i) {
                 wall_velocity_error = std::max(
@@ -150,18 +153,18 @@ void VwisAmrExSolver::run_lid_driven_cavity(
             "lid cavity wall velocity or closed-boundary mass sanity check failed");
     }
 
-    amrex::MultiFab divergence(m_ba, m_dm, 1, 0);
-    compute_cartesian_divergence(divergence);
+    amrex::MultiFab divergence(solver.m_ba, solver.m_dm, 1, 0);
+    solver.compute_cartesian_divergence(divergence);
     const int nx = domain.length(0);
     const int ny = domain.length(1);
     const int ilo = domain.smallEnd(0);
     const int jlo = domain.smallEnd(1);
     const int klo = domain.smallEnd(2);
     std::vector<amrex::Real> u(nx * ny), v(nx * ny), w(nx * ny), p(nx * ny), div(nx * ny);
-    for (amrex::MFIter mfi(m_ucat); mfi.isValid(); ++mfi) {
+    for (amrex::MFIter mfi(solver.m_ucat); mfi.isValid(); ++mfi) {
         const amrex::Box& box = mfi.validbox();
-        auto const velocity = m_ucat.const_array(mfi);
-        auto const pressure = m_p.const_array(mfi);
+        auto const velocity = solver.m_ucat.const_array(mfi);
+        auto const pressure = solver.m_p.const_array(mfi);
         auto const divergence_value = divergence.const_array(mfi);
         for (int j = box.smallEnd(1); j <= box.bigEnd(1); ++j) {
             for (int i = box.smallEnd(0); i <= box.bigEnd(0); ++i) {
@@ -183,9 +186,9 @@ void VwisAmrExSolver::run_lid_driven_cavity(
     field << std::setprecision(std::numeric_limits<amrex::Real>::max_digits10)
           << "x,y,u,v,w,velocity_magnitude,pressure,divergence\n";
     for (int j = 0; j < ny; ++j) {
-        const amrex::Real y = m_geom.ProbLo(1) + (j + 0.5) * m_dx[1];
+        const amrex::Real y = solver.m_geom.ProbLo(1) + (j + 0.5) * solver.m_dx[1];
         for (int i = 0; i < nx; ++i) {
-            const amrex::Real x = m_geom.ProbLo(0) + (i + 0.5) * m_dx[0];
+            const amrex::Real x = solver.m_geom.ProbLo(0) + (i + 0.5) * solver.m_dx[0];
             const std::size_t at = static_cast<std::size_t>(j) * nx + i;
             const amrex::Real speed = std::sqrt(u[at]*u[at] + v[at]*v[at] + w[at]*w[at]);
             field << x << ',' << y << ',' << u[at] << ',' << v[at] << ',' << w[at]
@@ -214,14 +217,14 @@ void VwisAmrExSolver::run_lid_driven_cavity(
         const int ir = static_cast<int>(xb[1]);
         const amrex::Real value = (1.0-xb[2]) * u[static_cast<std::size_t>(j)*nx+il] +
                                   xb[2] * u[static_cast<std::size_t>(j)*nx+ir];
-        centerline << "u_at_x_0.5," << m_geom.ProbLo(1) + (j+0.5)*m_dx[1] << ',' << value << '\n';
+        centerline << "u_at_x_0.5," << solver.m_geom.ProbLo(1) + (j+0.5)*solver.m_dx[1] << ',' << value << '\n';
     }
     for (int i = 0; i < nx; ++i) {
         const int jl = static_cast<int>(yb[0]);
         const int jr = static_cast<int>(yb[1]);
         const amrex::Real value = (1.0-yb[2]) * v[static_cast<std::size_t>(jl)*nx+i] +
                                   yb[2] * v[static_cast<std::size_t>(jr)*nx+i];
-        centerline << "v_at_y_0.5," << m_geom.ProbLo(0) + (i+0.5)*m_dx[0] << ',' << value << '\n';
+        centerline << "v_at_y_0.5," << solver.m_geom.ProbLo(0) + (i+0.5)*solver.m_dx[0] << ',' << value << '\n';
     }
     centerline.close();
     require_output(centerline, centerline_path);
@@ -229,22 +232,22 @@ void VwisAmrExSolver::run_lid_driven_cavity(
     std::ofstream report(report_path, std::ios::trunc);
     require_output(report, report_path);
     report << std::setprecision(std::numeric_limits<amrex::Real>::max_digits10)
-           << "{\n  \"schema\": \"vwis-lid-driven-cavity-v1\",\n"
+           << "{\n  \"schema\": \"avwis-lid-driven-cavity-v1\",\n"
            << "  \"status\": \"demonstration / engineering result; not CFD validation\",\n"
            << "  \"case_type\": \"2D-equivalent 3D Cartesian lid-driven square cavity\",\n"
-           << "  \"amrex_release_locked\": \"" << VWIS_AMREX_LOCKED_VERSION << "\",\n"
-           << "  \"amrex_git_sha\": \"" << VWIS_AMREX_LOCKED_GIT_SHA << "\",\n"
+           << "  \"amrex_release_locked\": \"" << AVWIS_LOCKED_VERSION << "\",\n"
+           << "  \"amrex_git_sha\": \"" << AVWIS_LOCKED_GIT_SHA << "\",\n"
            << "  \"amrex_runtime_version\": \"" << amrex::Version() << "\",\n"
            << "  \"compiler\": \"" << __VERSION__ << "\",\n"
            << "  \"grid\": [" << nx << ", " << ny << ", 1],\n"
            << "  \"periodic\": [false, false, true],\n"
            << "  \"dt\": " << dt << ",\n  \"steps\": " << steps
-           << ",\n  \"final_time\": " << m_time << ",\n  \"lid_velocity\": ["
-           << m_boundary.moving_wall_velocity[0] << ", "
-           << m_boundary.moving_wall_velocity[1] << ", "
-           << m_boundary.moving_wall_velocity[2] << "],\n"
+           << ",\n  \"final_time\": " << solver.m_time << ",\n  \"lid_velocity\": ["
+           << solver.m_boundary.moving_wall_velocity[0] << ", "
+           << solver.m_boundary.moving_wall_velocity[1] << ", "
+           << solver.m_boundary.moving_wall_velocity[2] << "],\n"
            << "  \"viscosity\": " << viscosity << ",\n  \"reynolds_number\": "
-           << lid_speed * m_geom.ProbLength(0) / viscosity << ",\n"
+           << lid_speed * solver.m_geom.ProbLength(0) / viscosity << ",\n"
            << "  \"time_integrator\": \"explicit Euler predictor plus Cartesian pressure projection\",\n"
            << "  \"spatial_scheme\": \"cell-centred second-order central advection and viscosity; MAC projection\",\n"
            << "  \"initial_condition\": \"fluid at rest\",\n"
@@ -271,5 +274,15 @@ void VwisAmrExSolver::run_lid_driven_cavity(
     report.close();
     require_output(report, report_path);
     amrex::Print() << "VWiS lid-driven cavity demonstration complete: report=" << report_path
-                   << " steps=" << steps << " final_time=" << m_time << "\n";
+                   << " steps=" << steps << " final_time=" << solver.m_time << "\n";
+}
+
+void run_lid_driven_cavity_case(
+    AVWiSSolver& solver, amrex::Real dt, int steps, amrex::Real viscosity,
+    std::string const& report_path, std::string const& field_path,
+    std::string const& centerline_path, std::string const& history_path)
+{
+    AVWiSCaseRunnerAccess::run_lid_driven_cavity_case_impl(
+        solver, dt, steps, viscosity, report_path, field_path, centerline_path,
+        history_path);
 }

@@ -1,12 +1,12 @@
 # P5-002 zero-state diffusion across physical no-slip boundaries and multiple boxes.
-vwis.n_cell = 16 12 8
-vwis.max_grid_size = 4
-vwis.nghost = 2
-vwis.is_periodic = 0 0 0
-vwis.dt = 1.0e-3
-vwis.viscosity = 0.125
-vwis.run_p5_viscous_checks = 1
+avwis.mode = contract_p5_viscous
+avwis.n_cell = 16 12 8
+avwis.max_grid_size = 4
+avwis.nghost = 2
+avwis.is_periodic = 0 0 0
+avwis.dt = 1.0e-3
+avwis.viscosity = 0.125
 
-vwisbcs.enabled = 1
-vwisbcs.lo = noslip noslip noslip
-vwisbcs.hi = noslip noslip noslip
+avwisbcs.enabled = 1
+avwisbcs.lo = noslip noslip noslip
+avwisbcs.hi = noslip noslip noslip

@@ -3,7 +3,7 @@ if (NOT DEFINED exe OR NOT DEFINED input OR NOT DEFINED report OR NOT DEFINED pl
 endif()
 file(REMOVE "${report}" "${plane}")
 execute_process(
-  COMMAND "${exe}" "${input}" "vwis.metadata_file=${report}" "vwis.plane_file=${plane}"
+  COMMAND "${exe}" "${input}" "avwis.metadata_file=${report}" "avwis.plane_file=${plane}"
   RESULT_VARIABLE result OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr)
 if (NOT result EQUAL 0)
   message(FATAL_ERROR "P8 sampling/statistics contract failed (${result})\n${stdout}\n${stderr}")
@@ -13,7 +13,7 @@ if (NOT EXISTS "${report}" OR NOT EXISTS "${plane}")
 endif()
 file(READ "${report}" json)
 foreach (required
-    "\"schema\": \"vwis-uniform-diagnostics-v1\""
+    "\"schema\": \"avwis-uniform-diagnostics-v1\""
     "\"status\": \"PASS\""
     "\"case_type\": \"manufactured contract test\""
     "\"plotfile_compatible\": false"

@@ -1,0 +1,19 @@
+# A moving wall may translate only tangentially to its separable-orthogonal
+# physical face. This y-wall input deliberately supplies a nonzero y velocity.
+avwis.mode = solve
+avwis.coordinates = mapped
+avwis.mapping.type = analytic_orthogonal
+avwis.mapping.scale = 1.1 0.85 1.2
+avwis.mapping.stretch = 0.25 -0.3 0.2
+avwis.projection.operator = orthogonal_mlmg
+avwis.n_cell = 8 8 8
+avwis.max_grid_size = 4
+avwis.nghost = 2
+avwis.is_periodic = 1 0 0
+avwis.run_steps = 0
+
+avwisbcs.enabled = 1
+avwisbcs.geometry = mapped_orthogonal
+avwisbcs.lo = "" moving_wall slip
+avwisbcs.hi = "" moving_wall symmetry
+avwisbcs.moving_wall_velocity = 0.4 0.1 0.0

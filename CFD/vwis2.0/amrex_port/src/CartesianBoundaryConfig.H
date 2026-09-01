@@ -10,6 +10,9 @@
 /** P3 single-level Cartesian physical-boundary semantics. */
 enum class CartesianBC { Periodic, NoSlipWall, MovingWall, SlipWall, Symmetry, Inflow, Outflow };
 
+/** Coordinate interpretation of physical boundary faces. Cartesian is the default. */
+enum class BoundaryGeometryMode { Cartesian, MappedOrthogonal };
+
 struct BoundarySideSpec {
     CartesianBC velocity = CartesianBC::Periodic;
     int legacy_code = -999; // -999 means no legacy integer code was supplied.
@@ -29,13 +32,17 @@ struct CartesianBoundaryConfig {
     amrex::Array<amrex::Real, AMREX_SPACEDIM> moving_wall_velocity{
         AMREX_D_DECL(1.0, 0.0, 0.0)};
     bool enabled = false;
+    BoundaryGeometryMode geometry = BoundaryGeometryMode::Cartesian;
 };
 
-/** Parse the stable `vwisbcs` input namespace and map supported legacy codes. */
+/** Parse `avwisbcs`, with compatibility fallback to the legacy `vwisbcs`. */
 CartesianBoundaryConfig read_cartesian_boundary_config(
     amrex::Vector<int> const& is_periodic);
 
 /** Stable diagnostic/input spelling for a Cartesian boundary kind. */
 char const* cartesian_bc_name(CartesianBC bc) noexcept;
+
+/** Stable diagnostic/input spelling for the boundary geometry mode. */
+char const* boundary_geometry_mode_name(BoundaryGeometryMode mode) noexcept;
 
 #endif

@@ -1,0 +1,13 @@
+# Deliberate C2.2 opt-in. No physical BC, time advance, or checkpoint is enabled.
+avwis.mode = contract_p5_orthogonal
+avwis.coordinates = mapped
+avwis.mapping.type = analytic_orthogonal
+avwis.mapping.scale = 1.2 0.85 1.1
+avwis.mapping.stretch = 0.35 -0.25 0.2
+avwis.projection.operator = orthogonal_mlmg
+avwis.n_cell = 12 10 8
+avwis.max_grid_size = 4
+avwis.nghost = 2
+avwis.is_periodic = 1 1 1
+avwis.dt = 1.0e-3
+avwis.projection_time_coefficient = 1.0

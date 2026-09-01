@@ -1,16 +1,12 @@
-#include "VwisAmrExSolver.H"
+#include "AVWiSSolver.H"
 
 #include <AMReX.H>
 #include <AMReX_Gpu.H>
-#include <AMReX_MFIter.H>
-#include <AMReX_MFParallelFor.H>
-#include <AMReX_Math.H>
 #include <AMReX_ParallelDescriptor.H>
 #include <AMReX_Print.H>
 #include <AMReX_VisMF.H>
 
 #include <algorithm>
-#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -20,17 +16,18 @@
 #include <string>
 #include <vector>
 
-#ifndef VWIS_AMREX_LOCKED_VERSION
-#define VWIS_AMREX_LOCKED_VERSION "unknown"
+#ifndef AVWIS_LOCKED_VERSION
+#define AVWIS_LOCKED_VERSION "unknown"
 #endif
-#ifndef VWIS_AMREX_LOCKED_GIT_SHA
-#define VWIS_AMREX_LOCKED_GIT_SHA "unknown"
+#ifndef AVWIS_LOCKED_GIT_SHA
+#define AVWIS_LOCKED_GIT_SHA "unknown"
 #endif
 
 namespace {
 
 constexpr int checkpoint_schema_version = 2;
-constexpr char checkpoint_magic[] = "VWIS_AMREX_CARTESIAN_CHECKPOINT";
+constexpr char checkpoint_magic[] = "AVWIS_CARTESIAN_CHECKPOINT";
+constexpr char legacy_checkpoint_magic[] = "VWIS_AMREX_CARTESIAN_CHECKPOINT";
 
 struct Payload {
     std::string name;
@@ -122,6 +119,15 @@ public:
         }
     }
 
+    void exact_or_legacy(std::string const& expected, std::string const& legacy)
+    {
+        if (m_at >= m_lines.size()) reject("missing Header identity line");
+        std::string const actual = m_lines[m_at++];
+        if (actual != expected && actual != legacy) {
+            reject("malformed or incompatible Header line " + std::to_string(m_at));
+        }
+    }
+
     std::string value(std::string const& key)
     {
         if (m_at >= m_lines.size()) reject("missing Header key " + key);
@@ -175,8 +181,11 @@ amrex::Real max_difference(amrex::MultiFab const& lhs, amrex::MultiFab const& rh
 
 } // namespace
 
-void VwisAmrExSolver::write_checkpoint(std::string const& path) const
+void AVWiSSolver::write_checkpoint(std::string const& path) const
 {
+    if (m_mapping_operator.coordinates != CoordinateSystemMode::Cartesian) {
+        reject("C2.2 mapped mapping provenance is not part of the Cartesian schema");
+    }
     require_cpu_single_rank();
     if (path.empty()) reject("empty checkpoint path");
 
@@ -213,8 +222,8 @@ void VwisAmrExSolver::write_checkpoint(std::string const& path) const
     if (!output) reject("cannot create Header");
     output << checkpoint_magic << '\n'
            << "schema_version " << checkpoint_schema_version << '\n'
-           << "amrex_release " << VWIS_AMREX_LOCKED_VERSION << '\n'
-           << "amrex_git_sha " << VWIS_AMREX_LOCKED_GIT_SHA << '\n'
+           << "amrex_release " << AVWIS_LOCKED_VERSION << '\n'
+           << "amrex_git_sha " << AVWIS_LOCKED_GIT_SHA << '\n'
            << "amrex_runtime_version " << amrex::Version() << '\n'
            << "dimension " << AMREX_SPACEDIM << '\n'
            << "real_bytes " << sizeof(amrex::Real) << '\n'
@@ -270,25 +279,28 @@ void VwisAmrExSolver::write_checkpoint(std::string const& path) const
     output << "END\n";
     output.close();
     if (!output) reject("failed while writing Header");
-    amrex::Print() << "VWiS AMReX P8 checkpoint written: " << path
+    amrex::Print() << "AVWiS P8 checkpoint written: " << path
                    << " time=" << m_time << " step=" << m_step
                    << " history_depth=" << m_history_depth << "\n";
 }
 
-void VwisAmrExSolver::read_checkpoint(std::string const& path)
+void AVWiSSolver::read_checkpoint(std::string const& path)
 {
+    if (m_mapping_operator.coordinates != CoordinateSystemMode::Cartesian) {
+        reject("C2.2 mapped mapping provenance is not part of the Cartesian schema");
+    }
     require_cpu_single_rank();
     if (path.empty()) reject("empty checkpoint path");
     std::filesystem::path root(path);
     StrictHeader header(root / "Header");
-    header.exact(checkpoint_magic);
+    header.exact_or_legacy(checkpoint_magic, legacy_checkpoint_magic);
     const int disk_schema_version = static_cast<int>(
         signed_integer(header.value("schema_version"), "schema_version"));
     if (disk_schema_version != 1 && disk_schema_version != checkpoint_schema_version) {
         reject("schema_version mismatch");
     }
-    same(header.value("amrex_release"), VWIS_AMREX_LOCKED_VERSION, "AMReX release");
-    same(header.value("amrex_git_sha"), VWIS_AMREX_LOCKED_GIT_SHA, "AMReX git SHA");
+    same(header.value("amrex_release"), AVWIS_LOCKED_VERSION, "AMReX release");
+    same(header.value("amrex_git_sha"), AVWIS_LOCKED_GIT_SHA, "AMReX git SHA");
     same(header.value("amrex_runtime_version"), amrex::Version(), "AMReX runtime version");
     same_integer(header.value("dimension"), AMREX_SPACEDIM, "dimension");
     same_integer(header.value("real_bytes"), sizeof(amrex::Real), "Real byte width");
@@ -414,166 +426,7 @@ void VwisAmrExSolver::read_checkpoint(std::string const& path)
     mark_valid_modified();
     if (m_boundary.enabled) apply_boundary_pipeline("checkpoint-restart");
     else fill_ghost_cells();
-    amrex::Print() << "VWiS AMReX P8 checkpoint restored: " << path
+    amrex::Print() << "AVWiS P8 checkpoint restored: " << path
                    << " time=" << m_time << " step=" << m_step
                    << " history_depth=" << m_history_depth << "\n";
-}
-
-void VwisAmrExSolver::run_p8_restart_contract_checks(
-    std::string const& path, amrex::Real dt, int total_steps,
-    int checkpoint_step, amrex::Real viscosity)
-{
-    require_cpu_single_rank();
-    if (total_steps < 2 || checkpoint_step <= 0 || checkpoint_step >= total_steps) {
-        throw std::runtime_error("P8 restart contract requires 0 < checkpoint_step < total_steps");
-    }
-
-    const amrex::Real xlo = m_geom.ProbLo(0);
-    const amrex::Real length = m_geom.ProbLength(0);
-    const amrex::Real dx0 = m_dx[0];
-    for (amrex::MFIter mfi(m_ucat, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-        auto u = m_ucat.array(mfi);
-        auto p = m_p.array(mfi);
-        auto phi = m_phi.array(mfi);
-        auto nvert = m_nvert.array(mfi);
-        amrex::ParallelFor(mfi.validbox(), [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-            amrex::Real x = xlo + (static_cast<amrex::Real>(i) + 0.5) * dx0;
-            u(i,j,k,0) = 0.0;
-            u(i,j,k,1) = amrex::Math::sinpi(2.0 * (x-xlo) / length);
-            u(i,j,k,2) = 0.0;
-            p(i,j,k) = 0.01 * (i + 2*j + 3*k);
-            phi(i,j,k) = -0.02 * (2*i - j + k);
-            nvert(i,j,k) = ((i + j + k) % 7 == 0) ? 1.0 : 0.0;
-        });
-    }
-    mark_valid_modified();
-    sync_ucont_from_ucat();
-    amrex::MultiFab::Copy(m_ucat_old, m_ucat, 0, 0, AMREX_SPACEDIM, m_nghost);
-    amrex::MultiFab::Copy(m_ucat_older, m_ucat, 0, 0, AMREX_SPACEDIM, m_nghost);
-    m_ucat_old.mult(0.9, 0, AMREX_SPACEDIM, m_nghost);
-    m_ucat_older.mult(0.8, 0, AMREX_SPACEDIM, m_nghost);
-    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
-        amrex::MultiFab::Copy(m_ucont_old[dir], m_ucont[dir], 0, 0, 1, m_nghost);
-        amrex::MultiFab::Copy(m_ucont_older[dir], m_ucont[dir], 0, 0, 1, m_nghost);
-        m_ucont_old[dir].mult(0.9, 0, 1, m_nghost);
-        m_ucont_older[dir].mult(0.8, 0, 1, m_nghost);
-    }
-    m_time = 2.0 * dt;
-    m_step = 2;
-    m_history_depth = 3;
-    fill_ghost_cells();
-
-    auto cell_copy = [&](amrex::MultiFab const& source, int components) {
-        amrex::MultiFab result(source.boxArray(), source.DistributionMap(), components, m_nghost);
-        amrex::MultiFab::Copy(result, source, 0, 0, components, m_nghost);
-        return result;
-    };
-    amrex::MultiFab initial_p = cell_copy(m_p, 1);
-    amrex::MultiFab initial_phi = cell_copy(m_phi, 1);
-    amrex::MultiFab initial_nvert = cell_copy(m_nvert, 1);
-    amrex::MultiFab initial_ucat = cell_copy(m_ucat, AMREX_SPACEDIM);
-    amrex::MultiFab initial_ucat_old = cell_copy(m_ucat_old, AMREX_SPACEDIM);
-    amrex::MultiFab initial_ucat_older = cell_copy(m_ucat_older, AMREX_SPACEDIM);
-    amrex::Array<amrex::MultiFab, AMREX_SPACEDIM> initial_ucont, initial_ucont_old, initial_ucont_older;
-    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
-        initial_ucont[dir] = cell_copy(m_ucont[dir], 1);
-        initial_ucont_old[dir] = cell_copy(m_ucont_old[dir], 1);
-        initial_ucont_older[dir] = cell_copy(m_ucont_older[dir], 1);
-    }
-
-    for (int step = 0; step < total_steps; ++step) advance_one_step(dt, viscosity);
-    amrex::MultiFab final_p = cell_copy(m_p, 1);
-    amrex::MultiFab final_phi = cell_copy(m_phi, 1);
-    amrex::MultiFab final_nvert = cell_copy(m_nvert, 1);
-    amrex::MultiFab final_ucat = cell_copy(m_ucat, AMREX_SPACEDIM);
-    amrex::MultiFab final_ucat_old = cell_copy(m_ucat_old, AMREX_SPACEDIM);
-    amrex::MultiFab final_ucat_older = cell_copy(m_ucat_older, AMREX_SPACEDIM);
-    amrex::Array<amrex::MultiFab, AMREX_SPACEDIM> final_ucont, final_ucont_old, final_ucont_older;
-    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
-        final_ucont[dir] = cell_copy(m_ucont[dir], 1);
-        final_ucont_old[dir] = cell_copy(m_ucont_old[dir], 1);
-        final_ucont_older[dir] = cell_copy(m_ucont_older[dir], 1);
-    }
-    amrex::Real final_time = m_time;
-    std::uint64_t final_step = m_step;
-
-    auto restore_initial = [&]() {
-        amrex::MultiFab::Copy(m_p, initial_p, 0, 0, 1, m_nghost);
-        amrex::MultiFab::Copy(m_phi, initial_phi, 0, 0, 1, m_nghost);
-        amrex::MultiFab::Copy(m_nvert, initial_nvert, 0, 0, 1, m_nghost);
-        amrex::MultiFab::Copy(m_ucat, initial_ucat, 0, 0, AMREX_SPACEDIM, m_nghost);
-        amrex::MultiFab::Copy(m_ucat_old, initial_ucat_old, 0, 0, AMREX_SPACEDIM, m_nghost);
-        amrex::MultiFab::Copy(m_ucat_older, initial_ucat_older, 0, 0, AMREX_SPACEDIM, m_nghost);
-        for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
-            amrex::MultiFab::Copy(m_ucont[dir], initial_ucont[dir], 0, 0, 1, m_nghost);
-            amrex::MultiFab::Copy(m_ucont_old[dir], initial_ucont_old[dir], 0, 0, 1, m_nghost);
-            amrex::MultiFab::Copy(m_ucont_older[dir], initial_ucont_older[dir], 0, 0, 1, m_nghost);
-        }
-        m_time = 2.0 * dt; m_step = 2; m_history_depth = 3;
-        mark_valid_modified(); fill_ghost_cells();
-    };
-    restore_initial();
-    for (int step = 0; step < checkpoint_step; ++step) advance_one_step(dt, viscosity);
-
-    amrex::MultiFab disk_p = cell_copy(m_p, 1);
-    amrex::MultiFab disk_phi = cell_copy(m_phi, 1);
-    amrex::MultiFab disk_nvert = cell_copy(m_nvert, 1);
-    amrex::MultiFab disk_ucat = cell_copy(m_ucat, AMREX_SPACEDIM);
-    amrex::MultiFab disk_ucat_old = cell_copy(m_ucat_old, AMREX_SPACEDIM);
-    amrex::MultiFab disk_ucat_older = cell_copy(m_ucat_older, AMREX_SPACEDIM);
-    amrex::Array<amrex::MultiFab, AMREX_SPACEDIM> disk_ucont, disk_ucont_old, disk_ucont_older;
-    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
-        disk_ucont[dir] = cell_copy(m_ucont[dir], 1);
-        disk_ucont_old[dir] = cell_copy(m_ucont_old[dir], 1);
-        disk_ucont_older[dir] = cell_copy(m_ucont_older[dir], 1);
-    }
-    amrex::Real disk_time = m_time;
-    std::uint64_t disk_step = m_step;
-    int disk_history = m_history_depth;
-    write_checkpoint(path);
-
-    m_p.setVal(91.0); m_phi.setVal(92.0); m_nvert.setVal(93.0);
-    m_ucat.setVal(94.0); m_ucat_old.setVal(95.0); m_ucat_older.setVal(96.0);
-    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
-        m_ucont[dir].setVal(97.0); m_ucont_old[dir].setVal(98.0); m_ucont_older[dir].setVal(99.0);
-    }
-    m_time = -1.0; m_step = 0; m_history_depth = 1;
-    read_checkpoint(path);
-
-    amrex::Real roundtrip_error = 0.0;
-    roundtrip_error = amrex::max(roundtrip_error, max_difference(m_p, disk_p, 1, m_nghost));
-    roundtrip_error = amrex::max(roundtrip_error, max_difference(m_phi, disk_phi, 1, m_nghost));
-    roundtrip_error = amrex::max(roundtrip_error, max_difference(m_nvert, disk_nvert, 1, m_nghost));
-    roundtrip_error = amrex::max(roundtrip_error, max_difference(m_ucat, disk_ucat, AMREX_SPACEDIM, m_nghost));
-    roundtrip_error = amrex::max(roundtrip_error, max_difference(m_ucat_old, disk_ucat_old, AMREX_SPACEDIM, m_nghost));
-    roundtrip_error = amrex::max(roundtrip_error, max_difference(m_ucat_older, disk_ucat_older, AMREX_SPACEDIM, m_nghost));
-    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
-        roundtrip_error = amrex::max(roundtrip_error, max_difference(m_ucont[dir], disk_ucont[dir], 1, m_nghost));
-        roundtrip_error = amrex::max(roundtrip_error, max_difference(m_ucont_old[dir], disk_ucont_old[dir], 1, m_nghost));
-        roundtrip_error = amrex::max(roundtrip_error, max_difference(m_ucont_older[dir], disk_ucont_older[dir], 1, m_nghost));
-    }
-    if (roundtrip_error != 0.0 || m_time != disk_time || m_step != disk_step ||
-        m_history_depth != disk_history) {
-        throw std::runtime_error("P8 VisMF round-trip changed persistent state");
-    }
-
-    for (int step = checkpoint_step; step < total_steps; ++step) advance_one_step(dt, viscosity);
-    amrex::Real continuation_error = 0.0;
-    continuation_error = amrex::max(continuation_error, max_difference(m_p, final_p, 1));
-    continuation_error = amrex::max(continuation_error, max_difference(m_phi, final_phi, 1));
-    continuation_error = amrex::max(continuation_error, max_difference(m_nvert, final_nvert, 1));
-    continuation_error = amrex::max(continuation_error, max_difference(m_ucat, final_ucat, AMREX_SPACEDIM));
-    continuation_error = amrex::max(continuation_error, max_difference(m_ucat_old, final_ucat_old, AMREX_SPACEDIM));
-    continuation_error = amrex::max(continuation_error, max_difference(m_ucat_older, final_ucat_older, AMREX_SPACEDIM));
-    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
-        continuation_error = amrex::max(continuation_error, max_difference(m_ucont[dir], final_ucont[dir], 1));
-        continuation_error = amrex::max(continuation_error, max_difference(m_ucont_old[dir], final_ucont_old[dir], 1));
-        continuation_error = amrex::max(continuation_error, max_difference(m_ucont_older[dir], final_ucont_older[dir], 1));
-    }
-    if (continuation_error != 0.0 || m_time != final_time || m_step != final_step || m_history_depth != 3) {
-        throw std::runtime_error("P8 uninterrupted and checkpoint/restart trajectories differ");
-    }
-    amrex::Print() << "VWiS AMReX P8-001/P8-002: PASS (VisMF all histories/state; strict Header; "
-                   << "roundtrip_error=" << roundtrip_error
-                   << ", continuation_error=" << continuation_error << ")\n";
 }

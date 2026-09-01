@@ -1,0 +1,9 @@
+avwis.mode = solve
+avwis.coordinates = mapped
+avwis.mapping.type = analytic_orthogonal
+avwis.projection.operator = cartesian_mlmg
+avwis.n_cell = 8 8 8
+avwis.max_grid_size = 4
+avwis.nghost = 2
+avwis.is_periodic = 1 1 1
+avwis.run_steps = 0

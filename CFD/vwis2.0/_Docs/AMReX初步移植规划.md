@@ -105,6 +105,6 @@ main/PETSc+MPI
 ## 6. 本次新增物与验证范围
 
 - 规划：`_Docs/AMReX初步移植规划.md`。
-- 独立骨架：`amrex_port/CMakeLists.txt`、`amrex_port/src/main.cpp`、`amrex_port/src/VwisAmrExSolver.H/.cpp`、`amrex_port/README.md`。
+- 独立骨架：`amrex_port/CMakeLists.txt`、`amrex_port/src/main.cpp`、`amrex_port/src/AVWiSSolver.H/.cpp`、`amrex_port/README.md`。
 - 骨架显式使用 `Geometry`、`BoxArray`、`DistributionMapping`、cell `MultiFab`、face `MultiFab`、`MFIter`、`ParallelFor`、`FillBoundary` 和 CMake AMReX package；保留后续 `BCRec`/`FillPatch`、`MLMG`/`MacProjector`、EB2/custom IBM、plotfile/checkpoint 的接口路线。
 - 未实现：全部物理 BC、RHS、LES、SNES 风格动量求解、Poisson/MAC 投影、IBM/EB、FSI、曲线 metric、AMR、GPU 专项优化、plotfile/checkpoint。没有 AMReX 包时仅做静态源码/CMake 检查，不能把该状态表述为编译通过。

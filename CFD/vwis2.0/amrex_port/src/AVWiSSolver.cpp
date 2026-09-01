@@ -1,4 +1,4 @@
-#include "VwisAmrExSolver.H"
+#include "AVWiSSolver.H"
 
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_MFIter.H>
@@ -19,12 +19,13 @@ FieldLocation face_location(int dir)
 }
 } // namespace
 
-VwisAmrExSolver::VwisAmrExSolver(
+AVWiSSolver::AVWiSSolver(
     amrex::Vector<int> const& n_cell, int max_grid_size, int nghost,
     amrex::RealBox const& physical_domain,
     amrex::Vector<int> const& is_periodic,
-    CartesianBoundaryConfig const& boundary)
-    : m_boundary(boundary), m_nghost(nghost)
+    CartesianBoundaryConfig const& boundary,
+    MappingOperatorConfig const& mapping_operator)
+    : m_mapping_operator(mapping_operator), m_boundary(boundary), m_nghost(nghost)
 {
     if (n_cell.size() != AMREX_SPACEDIM || is_periodic.size() != AMREX_SPACEDIM ||
         nghost < 0 || max_grid_size <= 0) {
@@ -51,6 +52,27 @@ VwisAmrExSolver::VwisAmrExSolver(
     m_ba.maxSize(max_grid_size);
     m_dm = amrex::DistributionMapping(m_ba);
 
+    if (m_mapping_operator.coordinates == CoordinateSystemMode::Mapped) {
+        if (m_nghost < 1) {
+            throw std::runtime_error("AVWiS C2.2 mapped transforms require at least one ghost cell");
+        }
+        for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+            if (!m_geom.isPeriodic(dir) && !m_boundary.enabled) {
+                throw std::runtime_error(
+                    "AVWiS mapped non-periodic directions require an explicit boundary configuration");
+            }
+        }
+    }
+
+    // C2.2 keeps the default identity metric but permits one deliberate,
+    // validated analytic orthogonal mapping/operator combination.
+    m_metric_data.define(m_ba, m_dm, 1);
+    auto mapping = make_coordinate_mapping(m_mapping_operator.mapping_type,
+                                           m_mapping_operator.analytic_parameters);
+    m_metric_data.build(*mapping, LogicalGrid::from_cartesian_geometry(m_geom), m_geom);
+    m_metric_epoch = m_metric_data.epoch();
+    validate_mapping_operator_config(m_mapping_operator, m_metric_data, m_metric_epoch);
+
     m_p.define(m_ba, m_dm, 1, m_nghost);
     m_phi.define(m_ba, m_dm, 1, m_nghost);
     m_nvert.define(m_ba, m_dm, 1, m_nghost);
@@ -72,8 +94,12 @@ VwisAmrExSolver::VwisAmrExSolver(
     define_boundary_metadata();
 }
 
-void VwisAmrExSolver::register_fields()
+void AVWiSSolver::register_fields()
 {
+    const std::string flux_units =
+        m_mapping_operator.coordinates == CoordinateSystemMode::Mapped
+        ? "legacy nondimensional mapped volume flux (Cartesian velocity dot physical face area vector)"
+        : "legacy nondimensional Cartesian volume flux (normal velocity times face area)";
     m_fields = {
         {"P", FieldLocation::Cell, 1, m_nghost, "legacy nondimensional pressure; physical conversion and datum unresolved", "n", "P", "cell-owned"},
         {"Phi", FieldLocation::Cell, 1, m_nghost, "legacy nondimensional pressure correction; same scale as P", "workspace", "Phi", "cell-owned"},
@@ -85,15 +111,15 @@ void VwisAmrExSolver::register_fields()
     for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
         std::string axis(1, static_cast<char>('x' + dir));
         m_fields.push_back({"Ucont_" + axis, face_location(dir), 1, m_nghost,
-                            "legacy nondimensional Cartesian volume flux (normal velocity times face area)", "n", axis + "-normal volume flux", "overlapping face boxes; lowest global box owns shared faces"});
+                            flux_units, "n", axis + "-normal volume flux", "overlapping face boxes; lowest global box owns shared faces"});
         m_fields.push_back({"Ucont_" + axis + "_old", face_location(dir), 1, m_nghost,
-                            "legacy nondimensional Cartesian volume flux (normal velocity times face area)", "n-1", axis + "-normal volume flux", "overlapping face boxes; lowest global box owns shared faces"});
+                            flux_units, "n-1", axis + "-normal volume flux", "overlapping face boxes; lowest global box owns shared faces"});
         m_fields.push_back({"Ucont_" + axis + "_older", face_location(dir), 1, m_nghost,
-                            "legacy nondimensional Cartesian volume flux (normal velocity times face area)", "n-2", axis + "-normal volume flux", "overlapping face boxes; lowest global box owns shared faces"});
+                            flux_units, "n-2", axis + "-normal volume flux", "overlapping face boxes; lowest global box owns shared faces"});
     }
 }
 
-void VwisAmrExSolver::register_metric_metadata()
+void AVWiSSolver::register_metric_metadata()
 {
     auto real_text = [](amrex::Real value) {
         std::ostringstream stream;
@@ -101,7 +127,11 @@ void VwisAmrExSolver::register_metric_metadata()
         return stream.str();
     };
     m_metrics = {
-        {"coordinate_system", "level", "Cartesian", "orthogonal uniform Cartesian coordinates"},
+        {"coordinate_system", "level",
+         m_mapping_operator.coordinates == CoordinateSystemMode::Cartesian ? "Cartesian" : "mapped",
+         m_mapping_operator.coordinates == CoordinateSystemMode::Cartesian
+             ? "orthogonal uniform Cartesian coordinates"
+             : "C2.2 separable analytic orthogonal coordinates"},
         {"dx", "level", real_text(m_dx[0]) + "," + real_text(m_dx[1]) + "," + real_text(m_dx[2]),
          "cell widths (dx,dy,dz) from Geometry"},
         {"cell_volume", "cell", real_text(m_cell_volume), "dx*dy*dz; no Jacobian factor"},
@@ -111,9 +141,22 @@ void VwisAmrExSolver::register_metric_metadata()
         {"legacy_Aj_equivalent", "not allocated", real_text(1.0 / m_cell_volume),
          "inverse Cartesian cell volume for unit-index computational spacing; curvilinear Aj is unsupported"}
     };
+    if (m_mapping_operator.coordinates == CoordinateSystemMode::Mapped) {
+        m_metrics = {
+            {"coordinate_system", "level", "mapped",
+             "C2.2 separable analytic orthogonal coordinates"},
+            {"mapping_type", "level", m_mapping_operator.mapping_type,
+             "immutable CoordinateMapping provider id"},
+            {"projection_operator", "level",
+             projection_operator_mode_name(m_mapping_operator.projection),
+             "explicit pressure operator selection"},
+            {"metric_discretization", "level", MetricData::discretization_version,
+             "cell volume and face metric are stored fields; no constant Cartesian substitute"}
+        };
+    }
 }
 
-void VwisAmrExSolver::initialize()
+void AVWiSSolver::initialize()
 {
     const amrex::Real start = amrex::second();
     // Array4 handles are captured by value, so the GPU lambda captures no host state.
@@ -152,12 +195,12 @@ void VwisAmrExSolver::initialize()
     m_initialize_seconds = amrex::second() - start;
 }
 
-void VwisAmrExSolver::mark_valid_modified()
+void AVWiSSolver::mark_valid_modified()
 {
     ++m_valid_epoch;
 }
 
-void VwisAmrExSolver::require_ghosts_fresh(char const* consumer) const
+void AVWiSSolver::require_ghosts_fresh(char const* consumer) const
 {
     if (m_halo_epoch != m_valid_epoch || (m_boundary.enabled && m_physical_epoch != m_valid_epoch)) {
         throw std::runtime_error(std::string("stale ghost read before ") + consumer +
@@ -166,7 +209,7 @@ void VwisAmrExSolver::require_ghosts_fresh(char const* consumer) const
     }
 }
 
-void VwisAmrExSolver::fill_ghost_cells()
+void AVWiSSolver::fill_ghost_cells()
 {
     m_p.FillBoundary(m_geom.periodicity());
     m_phi.FillBoundary(m_geom.periodicity());
@@ -185,12 +228,12 @@ void VwisAmrExSolver::fill_ghost_cells()
     m_halo_epoch = m_valid_epoch;
 }
 
-void VwisAmrExSolver::sync_ucat_from_ucont()
+void AVWiSSolver::sync_ucat_from_ucont()
 {
     sync_ucat_from_ucont_impl(true);
 }
 
-void VwisAmrExSolver::sync_ucat_from_ucont_impl(bool reapply_boundary_flux)
+void AVWiSSolver::sync_ucat_from_ucont_impl(bool reapply_boundary_flux)
 {
     // Face valid regions overlap at Box boundaries.  OverrideSync first makes
     // the AMReX owner authoritative, then FillBoundary supplies stencil ghosts.
@@ -198,7 +241,12 @@ void VwisAmrExSolver::sync_ucat_from_ucont_impl(bool reapply_boundary_flux)
         m_ucont[dir].OverrideSync(m_geom.periodicity());
         m_ucont[dir].FillBoundary(m_geom.periodicity());
     }
-    for (amrex::MFIter mfi(m_ucat, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+    if (m_mapping_operator.coordinates == CoordinateSystemMode::Mapped) {
+        amrex::Array<amrex::MultiFab const*, AMREX_SPACEDIM> flux{
+            AMREX_D_DECL(&m_ucont[0], &m_ucont[1], &m_ucont[2])};
+        sync_orthogonal_ucat_from_ucont(flux, m_metric_data, m_metric_epoch,
+                                       m_mapping_operator, m_ucat);
+    } else for (amrex::MFIter mfi(m_ucat, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
         auto const ucat = m_ucat.array(mfi);
         for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
             auto const ucont = m_ucont[dir].const_array(mfi);
@@ -221,8 +269,20 @@ void VwisAmrExSolver::sync_ucat_from_ucont_impl(bool reapply_boundary_flux)
     }
 }
 
-void VwisAmrExSolver::sync_ucont_from_ucat()
+void AVWiSSolver::sync_ucont_from_ucat()
 {
+    if (m_mapping_operator.coordinates == CoordinateSystemMode::Mapped) {
+        if (m_boundary.enabled) apply_boundary_pipeline("pre-mapped-sync-ucont-from-ucat");
+        else m_ucat.FillBoundary(m_geom.periodicity());
+        amrex::Array<amrex::MultiFab*, AMREX_SPACEDIM> flux{
+            AMREX_D_DECL(&m_ucont[0], &m_ucont[1], &m_ucont[2])};
+        sync_orthogonal_ucont_from_ucat(m_ucat, flux, m_metric_data, m_metric_epoch,
+                                       m_mapping_operator, m_geom.periodicity());
+        mark_valid_modified();
+        if (m_boundary.enabled) apply_boundary_pipeline("mapped-sync-ucont-from-ucat");
+        else fill_ghost_cells();
+        return;
+    }
     if (m_boundary.enabled) apply_boundary_pipeline("pre-sync-ucont-from-ucat");
     else m_ucat.FillBoundary(m_geom.periodicity());
     const amrex::Box& domain = m_geom.Domain();
@@ -247,7 +307,7 @@ void VwisAmrExSolver::sync_ucont_from_ucat()
                 }
             });
         }
-        // This is required even though the manufactured values agree: it is the
+        // This is required even when the interpolated face values agree: it is the
         // canonical shared-face ownership rule for future independently written boxes.
         m_ucont[dir].OverrideSync(m_geom.periodicity());
         m_ucont[dir].FillBoundary(m_geom.periodicity());

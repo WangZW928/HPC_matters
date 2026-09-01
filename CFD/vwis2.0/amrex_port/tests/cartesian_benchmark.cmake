@@ -3,7 +3,7 @@ if (NOT DEFINED exe OR NOT DEFINED input OR NOT DEFINED report)
 endif()
 file(REMOVE "${report}")
 execute_process(
-  COMMAND "${exe}" "${input}" "vwis.metadata_file=${report}"
+  COMMAND "${exe}" "${input}" "avwis.metadata_file=${report}"
   RESULT_VARIABLE result
   OUTPUT_VARIABLE stdout
   ERROR_VARIABLE stderr)

@@ -1,4 +1,13 @@
-# VWiS AMReX P0--P8-003 Cartesian contract
+# AVWiS (AMReX–VWiS) Cartesian contract and P5-003 C5.2 mapped boundaries
+
+## Naming convention
+
+AVWiS means **AMReX–VWiS** and is the product name of this AMReX port. VWiS
+continues to mean the original solver/algorithm. The AMReX implementation,
+its executable (`avwis`), and its core C++ types use the `AVWiS` spelling.
+The former `vwis.*` runtime namespace remains accepted as a compatibility
+alias; new inputs and documentation use `avwis.*`. The boundary namespace
+follows the same rule: `avwisbcs.*` is canonical and `vwisbcs.*` is legacy.
 
 `amrex_port/` is independent of the original `vwis2.0/` PETSc/HYPRE solver.
 It is a single-level Cartesian data/runtime framework with a narrow pressure
@@ -13,14 +22,26 @@ legacy SNES residual solve and does not implement semi-implicit or BDF2
 advancement. P8-001/P8-002 now add a versioned single-level CPU
 checkpoint/restart payload using AMReX `VisMF`, including all three fluid time
 layers and strict Header validation. There is still no LES, IBM/EB, FSI,
-curvilinear metric/operator, AMR, plotfile/HDF5 output, MPI/GPU restart, or full
-CFD case validation. P8-003 adds CPU/single-rank uniform-grid point probes,
+general curvilinear operator, AMR, plotfile/HDF5 output, MPI/GPU restart, or full
+CFD case validation. P5-003 C1 makes each solver own an immutable identity
+`MetricData` on its exact `BoxArray/DistributionMapping` and uses a narrow
+adapter as the cell-volume source for the existing integrated-flux divergence.
+P5-003 C2.1 adds a production analytic orthogonal metric provider and geometry
+contract. C2.2 adds explicit metric-aware gradient/divergence, the diagonal
+orthogonal `Ucat<->Ucont` transform, and a periodic orthogonal MLMG projection
+path. The analytic path is deliberate opt-in; Cartesian identity remains the
+default. C5.1 adds stationary no-slip walls and periodic pairs; C5.2 extends
+that same analytic separable-orthogonal path with mapped inlet/fixed-pressure
+outlet, tangential moving wall, slip, and symmetry modes. Mapped advection,
+viscosity, time advancement, checkpoint/restart, general non-orthogonal
+surfaces, and non-orthogonal pressure terms remain rejected.
+P8-003 adds CPU/single-rank uniform-grid point probes,
 plane summaries/CSV extraction, reusable flow statistics, and equal-spacing
 post-step time averages in the physical channel report. These CSV/JSON files
 are diagnostics and are explicitly not AMReX plotfiles.
 
 The Cartesian boundary vocabulary also includes `moving_wall`, with
-`vwisbcs.moving_wall_velocity` defaulting to `1 0 0`. Its normal component
+`avwisbcs.moving_wall_velocity` defaulting to `1 0 0`. Its normal component
 must be zero. Cell ghosts use mirror Dirichlet data
 `Ughost=2*Uwall-Uinterior`, tangential face-flux ghosts use the same wall
 state after face-area scaling, and the physical normal face flux remains zero.
@@ -42,27 +63,120 @@ cmake -S amrex_port -B build/amrex_port \
   -DAMReX_DIR=/path/to/amrex/lib/cmake/AMReX
 cmake --build build/amrex_port
 ctest --test-dir build/amrex_port --output-on-failure
-./build/amrex_port/vwis_amrex_skeleton amrex_port/inputs/p1_smoke.in
-mpiexec -n 2 ./build/amrex_port/vwis_amrex_skeleton amrex_port/inputs/p1_multibox.in
+./build/amrex_port/avwis amrex_port/inputs/p1_smoke.in
+mpiexec -n 2 ./build/amrex_port/avwis amrex_port/inputs/p1_multibox.in
 # Repeatable P0-004/P0-005 manufactured Cartesian benchmark; JSON is emitted by the runner.
-ctest --test-dir build/amrex_port -R vwis_amrex_cartesian_benchmark --output-on-failure
+ctest --test-dir build/amrex_port -R avwis_cartesian_benchmark --output-on-failure
 ```
 
 The final MPI command is a test recipe, not a claimed result. For a different
-AMReX during porting, add `-DVWIS_AMREX_ALLOW_VERSION_MISMATCH=ON` and record
+AMReX during porting, add `-DAVWIS_ALLOW_VERSION_MISMATCH=ON` and record
 the result as exploratory. Without AMReX, run:
 
 ```bash
 bash amrex_port/tests/static_contract_check.sh
 ```
 
+## Runtime modes
+
+Every input selects exactly one operation with the required `avwis.mode` key.
+The accepted values are:
+
+- `solve`: initialize or restart, advance `avwis.run_steps`, and optionally
+  write `avwis.checkpoint_file` and `avwis.metadata_file`.
+- `contract_base`, `contract_p2`, `contract_p3`, and `contract_p4`: run the
+  corresponding framework, transform, boundary, or projection contract.
+  `contract_base_p2` preserves the established combined base-plus-P2 contract
+  exercised by `inputs/p2_contract.in` as one explicit operation.
+- `contract_p5_advection`, `contract_p5_viscous`, and `contract_p5_time`: run
+  the focused Cartesian P5 contracts.
+- `contract_p5_orthogonal`: run the focused periodic analytic-orthogonal C2.2
+  solver projection contract.
+- `contract_p5_mapped_boundary`: run the focused C5.1 analytic-orthogonal wall,
+  periodic translation, ghost, ownership, validation, and projection contract.
+- `contract_p5_mapped_boundary_c52`: run the C5.2 inlet/outlet,
+  moving/slip/symmetry, mixed periodic, ownership, ghost-order, and matching
+  pressure-projection contracts.
+- `contract_p8_restart` and `contract_p8_sampling`: run the restart or uniform
+  sampling/statistics contract.
+- `benchmark_cartesian` and `benchmark_physical_channel`: run the manufactured
+  Cartesian or physical plane-channel benchmark.
+- `case_lid_cavity`: run the lid-driven-cavity engineering case.
+
+For example:
+
+```text
+avwis.mode = solve
+avwis.n_cell = 16 16 16
+avwis.is_periodic = 1 1 1
+avwis.run_steps = 8
+avwis.dt = 1.0e-3
+avwis.viscosity = 0.1
+```
+
+The former independent `vwis.run_*` boolean selectors are not retained as a
+compatibility interface. Inputs using the compatibility namespace must still
+choose one `vwis.mode`; a missing or unknown mode is rejected with an explicit
+diagnostic. This makes simultaneous operations impossible by construction.
+
+## Source ownership
+
+`src/` owns the reusable production application core: solver state and
+lifecycle, Cartesian operators and boundary handling, checkpoint/restart,
+runtime diagnostic APIs, and the `CoordinateMapping`/`MetricData` geometry
+module plus its explicit identity/orthogonal mapped operator layer.
+`benchmarks/` owns the manufactured Cartesian and
+physical channel runners, while `cases/` owns the lid-driven cavity runner.
+`tests/contracts/` owns the P1--P8 contract-runner facade, its test-only access
+bridge, and every manufactured/regression contract implementation. Contract checks may call
+production operators through the composed bridge, but the checks themselves are
+test code and do not belong to production sources. `tests/curvilinear/` owns
+the independent metric assertions and mapping fixtures. Other `tests/` files contain
+CTest wrappers, and `inputs/` retains the public runtime configurations.
+
+Case and benchmark drivers are free runner functions accepting
+`AVWiSSolver&`; they are not part of the solver's public API. The P1--P5
+checks are methods of `AVWiSContractRunner`, which is composed with an existing
+`AVWiSSolver&`. A contract test is not a solver, so inheritance is rejected:
+it would express a false is-a relationship, complicate protected/private
+access, and encourage construction of a second solver merely to run checks.
+The composed runner instead uses the narrow `AVWiSContractTestAccess` friend
+bridge. Raw `MultiFab` state remains private, and reusable operations such as
+initialization, stepping, diagnostics, and field transforms stay on the solver.
+Runtime dispatch remains in the small `src/RunMode.*` helper so established
+`avwis.mode=contract_*` inputs continue to work. CMake names the boundary
+explicitly: `AVWIS_PRODUCTION_SOURCES` contains only reusable solver/runtime
+code, `AVWIS_APPLICATION_SOURCES` contains the executable and compatibility
+dispatcher, and `AVWIS_TEST_MODE_SOURCES` contains `tests/contracts/*`. The
+last set is linked because this executable deliberately exposes those test modes. In particular,
+`contract_base_p2` still invokes the base check before the P2 check.
+
+The solver owns the reusable numerical lifecycle: construction initializes the
+AMReX geometry, grids, field storage, metrics, and boundary metadata, and
+`initialize()` clears the persistent fields and applies the configured generic
+boundary pipeline. A case or benchmark then supplies its physical initial
+condition and any case-specific boundary setup through runner code (for
+example, the lid velocity or manufactured shear). It does not reimplement the
+solver or allocate a second solver; it only prepares the solver-owned state
+before using the common advance and diagnostic APIs. This separation is why a
+case may need setup even though the solver is already initialized: grid/field
+allocation and physical flow initialization are different responsibilities.
+
+P8 follows the same boundary. Production checkpoint/restart, point sampling,
+plane CSV, and flow-statistics APIs remain in `src/`; the uninterrupted-versus-
+restart comparison and manufactured sampling/schema assertions live in
+`tests/contracts/AVWiSP8ContractChecks.cpp`. The narrow test-access bridge
+coordinates private persistent state without putting P8 runner declarations
+on the public `AVWiSSolver` API.
+
 ## P0--P4 data and lifecycle contract
 
 The implementation is organized by responsibility: `CartesianBoundaryConfig.*`
-owns input parsing and legacy-code mapping, `VwisAmrExBoundary.cpp` owns
-physical ghosts and boundary-face fluxes, and `VwisAmrExContracts.cpp` owns
-runtime checks, reductions, diagnostics, and schema output.  The solver header
-and `VwisAmrExSolver.cpp` retain the data owner, lifecycle, halo exchange, and
+owns input parsing and legacy-code mapping, `AVWiSBoundary.cpp` owns
+physical ghosts and boundary-face fluxes, `AVWiSDiagnostics.cpp` owns runtime
+diagnostics and schema output, and `tests/contracts/AVWiSContractChecks.cpp`
+owns the P1--P5 checks, reductions, and manufactured test fields.  The solver header
+and `AVWiSSolver.cpp` retain the data owner, lifecycle, halo exchange, and
 Cartesian face/cell transforms.  Boundary kernels copy scalar configuration
 into fixed-size GPU value arrays before launch; host strings and containers are
 never captured by device lambdas.
@@ -70,7 +184,7 @@ never captured by device lambdas.
 `Geometry`, `BoxArray`, and `DistributionMapping` define one Cartesian level.
 `P`, `Phi`, `Nvert`, `Ucat`, and `Ucat_old` are cell-centred. `Ucont`,
 `Ucont_old`, and `Ucont_older` are three separate one-component face-centred
-arrays: x/y/z faces respectively. Every field uses `vwis.nghost` grow cells
+arrays: x/y/z faces respectively. Every field uses `avwis.nghost` grow cells
 (the supplied inputs set two). `Ucat` components are x/y/z Cartesian values;
 each `Ucont[dir]` component is the integrated normal volume flux
 $U_d=u_dA_d$, matching the legacy area-cofactor/`Aj` divergence semantics.
@@ -92,7 +206,7 @@ write invalidates both freshness epochs. Long-lived temporaries must be
 class-owned; do not allocate an owning `MultiFab` inside `MFIter`.
 
 `write_metadata_manifest` writes rank-0 JSON schema only when
-`vwis.metadata_file` is set. The P8 checkpoint path is separate: it writes a
+`avwis.metadata_file` is set. The P8 checkpoint path is separate: it writes a
 versioned `Header` plus AMReX `VisMF` payloads. It is intentionally limited to
 one CPU rank and must not be confused with a plotfile or MPI restart.
 
@@ -115,9 +229,10 @@ and averages the resulting normal velocities. Both paths call
 `OwnerMask`/`sum_unique`; iterating every face FAB valid box directly would
 double count interfaces.
 
-The manifest declares `dx`, cell volume, Cartesian face areas and an unallocated
+The solver manifest declares `dx`, cell volume, Cartesian face areas and an unallocated
 `legacy_Aj_equivalent=1/cell_volume` for unit-index computational coordinates;
-no curvilinear metric field or curved-grid input is allocated. `p2_contract.in`
+this Cartesian schema remains unchanged even though the solver now owns a
+read-only identity `MetricData`. The P2 inputs do not opt into mapped mode. `p2_contract.in`
 checks periodic multi-box/MPI transforms, unique face count/flux sum, face
 ghosts, and a linear net-flux/cell-volume divergence stencil.
 `p2_boundary_face.in` checks non-periodic face ghosts and the explicit
@@ -125,9 +240,162 @@ boundary-face extrapolation across multiple boxes. These are contract and
 manufactured algebra tests, not physical BC, projection, conservation, or CFD
 validation.
 
+## P5-003 C1/G0.2 identity adapter and C2.1/C2.2 orthogonal increment
+
+`avwis_metric` is a production static library independent of the contract
+runner and `AVWiSSolver` private state. `IdentityCoordinateMapping` fills
+physical node coordinates from an explicit `LogicalGrid`; the current identity
+parameterization uses the Cartesian `Geometry` origin and cell spacing, so
+`mapping_jacobian_cc=1` while `cell_volume_cc=dx*dy*dz`. The two quantities are
+separate fields and are never aliases.
+
+`MetricData::define()` allocates nodal/cell/face fields on converted views of
+one cell `BoxArray` and the same `DistributionMapping`. `build()` constructs
+and validates the fields; later mutation is possible only through explicit
+`rebuild()`. Production accessors return `const MultiFab&`. The frozen names
+and meanings in this first increment are:
+
+| Field | Meaning |
+| --- | --- |
+| `mapping_jacobian_cc` | Forward $J_x=\det(\partial x/\partial\xi)$ |
+| `inverse_mapping_jacobian_cc` | Inverse $J_\xi=1/J_x$; legacy `Aj` semantics |
+| `cell_volume_cc` | Discrete physical polyhedron volume; divergence volume source |
+| `face_area_vector_fc[dir]` | Shared oriented integrated area vector toward increasing $\xi^{dir}$ |
+| `grad_xi_cc` / `area_cofactor_cc` | $\nabla\xi^m$ and $J_x\nabla\xi^m$ |
+| `face_gradient_metric_fc[dir]` | $Q_f^{mk}=S_f^m\cdot\nabla\xi_f^k$ |
+
+The face geometry uses one fixed diagonal and two consistently oriented
+triangles. Cell volume uses the same triangle moments and the divergence
+theorem. Shared face fields call `OverrideSync` before halo fill; coordinate
+ghosts preserve physical periodic translation rather than copying periodic
+node positions. The dedicated `avwis_p5_metric_identity_contract` test checks
+positive Jacobian/volume, reciprocal semantics, GCL closure, metric
+reciprocity, `Ucont=u dot S`, zero divergence for constant velocity, exact
+Cartesian identity values, multi-Box owner counts, and physical/inter-Box
+ghost values.
+
+At construction, `AVWiSSolver` defines and builds that identity metric from the
+same `m_ba`, `m_dm`, and Cartesian `Geometry`, then freezes its successful
+epoch. Public consumption is `const MetricData&` plus the recorded epoch; no
+writable metric `MultiFab` is exposed. `compute_cartesian_divergence()` now
+passes solver-owned integrated `Ucont` to `compute_identity_metric_divergence()`.
+The adapter validates identity mapping, epoch, cell/face layouts and ownership,
+then divides the net face flux exactly once by `cell_volume_cc`. Any future
+non-identity mapping or stale epoch is rejected explicitly.
+
+`avwis_p5_metric_identity_adapter_contract` compares the adapter with the old
+Cartesian scalar-volume formula at
+`512*epsilon*max(1, reference)` for one Box and many Boxes. It covers constant
+`u dot S` face flux, zero constant-field divergence, nonzero affine-flux
+divergence, overlapping-face layouts, and stale-epoch rejection. No runtime
+input switch was added: existing Cartesian inputs retain their behavior and
+cannot accidentally enable an unfinished mapped mode.
+
+C1 is still not the complete G0 gate. `Ucat<->Ucont`, diagnostic divergence,
+advection, viscosity, physical BC, pressure operator/correction, checkpoint
+schema, and time advancement retain their established Cartesian metric sources.
+
+`AnalyticOrthogonalCoordinateMapping` is a production separable provider with
+per-axis positive `scale` and smooth sinusoidal `stretch`. Its strict
+`abs(stretch)<1` invariant makes every directional derivative positive;
+`scale=1,stretch=0` reproduces the C0 identity fields. The provider evaluates
+nodal coordinates in GPU-safe kernels without capturing a host polymorphic
+object. The strict factory accepts only `identity` and `analytic_orthogonal`,
+and invalid finite/range/scale inputs fail before metric construction.
+
+`avwis_p5_metric_analytic_orthogonal_contract` covers identity equivalence,
+strong stretching, positive `Jx`/volume/oriented face areas, diagonal cell and
+face metrics, reciprocity, GCL, constant-velocity `Ucont=u dot S` geometric
+divergence, analytic node ghosts, shared-face owners, one/many Boxes, invalid
+inputs, and three-grid second-order convergence of cell-centred `Jx`. Separable
+face areas and polyhedral volumes are analytic-exact up to floating-point
+roundoff for the frozen geometry construction.
+
+C2.2 adds `MappingOperatorConfig` with explicit coordinate, mapping, and
+projection modes. The default combination is `cartesian + identity +
+cartesian_mlmg`. The only mapped combination is `mapped +
+identity|analytic_orthogonal + orthogonal_mlmg`; stale epochs, mapping mismatch,
+unknown modes, and `mapped + cartesian_mlmg` are rejected.
+
+`AVWiSMappedOperators.*` implements centered metric cell gradients, integrated
+face-flux divergence divided once by stored physical volume, diagonal face
+pressure-gradient flux, and the separable orthogonal velocity transforms. The
+solver path uses `MLABecLaplacian` on the volume-multiplied periodic pressure
+equation and applies the same diagonal `Q` face flux in the correction. Enable
+the tested path explicitly as follows:
+
+```text
+avwis.coordinates = mapped
+avwis.mapping.type = analytic_orthogonal
+avwis.mapping.scale = 1.2 0.85 1.1
+avwis.mapping.stretch = 0.35 -0.25 0.2
+avwis.projection.operator = orthogonal_mlmg
+avwis.is_periodic = 1 1 1
+```
+
+This is not complete curvilinear solver support. C2.2 is limited to reusable
+orthogonal operators and projection. C5.1/C5.2 extend it with the supported
+mapped boundary vocabulary described below. Mapped advection/viscosity/time
+advance, restart provenance, MPI/CUDA runtime, non-orthogonal cross terms, the
+19-point pressure path, and a physical curved case remain outside the
+increment. See
+`_Docs/AMReX_P5-003_C2.2_orthogonal_operators_20260901.md`.
+
+## P5-003 C5.1/C5.2 mapped physical boundaries
+
+Mapped physical boundaries require an explicit, non-default configuration:
+
+```text
+avwis.coordinates = mapped
+avwis.mapping.type = analytic_orthogonal
+avwis.projection.operator = orthogonal_mlmg
+avwisbcs.enabled = 1
+avwisbcs.geometry = mapped_orthogonal
+```
+
+Non-periodic sides may use named `noslip`, `moving_wall`, `slip`, `symmetry`,
+`inflow`, and `outflow`. The inlet/outlet topology remains exactly one of each;
+closed domains use no inlet or outlet. Periodic directions use empty `lo/hi`
+entries. Moving-wall velocity is a constant Cartesian vector and must be
+tangential to every side carrying that mode. Mapped legacy integer BCs,
+identity/unknown providers, coordinate/boundary mismatch, and general
+non-orthogonal mappings remain rejected. Cartesian remains the default for
+both coordinate and boundary geometry, so existing inputs retain their prior
+path.
+
+For logical face direction `m`, the boundary path reads the stored physical
+area vector `S^m`, its magnitude, and its physical unit normal. Inlet profiles
+are evaluated in physical tangential coordinates and globally normalized by
+`sum(weight*|S^m|)`; authoritative `Ucont` is `u dot S^m`. Moving walls mirror
+about the configured Cartesian wall vector, while slip and symmetry reflect
+only the local physical-normal velocity. No-slip remains the C5.1 special case.
+`Ucont` is already integrated, so area, Jacobian, and volume are not applied a
+second time.
+
+The orthogonal projection assigns homogeneous Neumann correction data to
+prescribed-normal-flux boundaries and homogeneous Dirichlet correction data to
+a fixed-pressure outlet. Consequently inlet/wall normal flux is preserved and
+the outlet may be corrected to close divergence. Periodic/all-Neumann systems
+retain the checked null space and volume-weighted gauge; outlet systems are
+nonsingular. Corners preserve periodic wrapping first and then use the first
+physical side in x/y/z order. This is deterministic, but it is not a general
+multi-normal corner model.
+
+The state order is `face owner/periodic halo -> physical cell ghost -> boundary
+Ucont -> face owner/halo -> operator -> classified mapped projection ->
+Ucont owner/halo -> Ucat reconstruction -> physical ghost -> diagnostics`.
+Metric layout, ghost width, mapping ID, and epoch are checked before a mapped
+boundary consumer runs. Focused inputs cover all six wall faces, mixed periodic
+translation, corners, multi-Box ownership, stale ghost/metric and layout
+rejection, inlet/outlet flux normalization and nonsingular projection,
+moving/slip/symmetry states, unsafe normal wall motion, non-orthogonal and
+legacy rejection, and projection compatibility. See the C5.1 report and
+`_Docs/AMReX_P5-003_C5.2_mapped_boundary_modes_20260901.md` for exact
+tolerances and acceptance results.
+
 ## P3 Cartesian physical boundaries
 
-Set `vwisbcs.enabled=1` and explicitly name `vwisbcs.lo/hi` for every
+Set `avwisbcs.enabled=1` and explicitly name `avwisbcs.lo/hi` for every
 non-periodic side. Supported names are `noslip`, `slip`, `symmetry`, `inflow`,
 and `outflow`. Alternatively `legacy_codes` accepts only the evidenced general
 old codes 1/3/4/5. Periodicity remains a Geometry property, as in the old code;
@@ -295,7 +563,7 @@ increment. Full evidence is recorded in the P8 report.
 
 ## P8-003 uniform Cartesian sampling and statistics
 
-`VwisAmrExDiagnostics.cpp` provides a cell-containing physical-coordinate
+`AVWiSDiagnostics.cpp` provides a cell-containing physical-coordinate
 point probe, cell-plane statistics, deterministic plane CSV extraction, and an
 instantaneous diagnostic reduction. The diagnostic schema reports integrated
 and maximum absolute divergence, net physical-boundary mass flux, outlet flow,
@@ -324,7 +592,7 @@ plotfile-compatible. The 2026-08-29 commands and results are recorded in
 `../run_cases/lid_driven_cavity/` contains a reproducible `32x32x1`, periodic-z
 square cavity at `Re=100`. It writes solver-native CSV/JSON diagnostics and
 Matplotlib PNG/SVG figures; it does not claim AMReX plotfile output or
-reference validation. The focused `vwis_amrex_lid_driven_cavity_sanity` CTest
+reference validation. The focused `avwis_lid_driven_cavity_sanity` CTest
 checks deterministic schemas, row counts, finite output, and the solver's hard
 post-projection divergence guard. The case record documents the explicit Euler
 limitation and an AMReX 26.04 thin-domain BoxArray restriction observed during
@@ -376,7 +644,7 @@ used. This uses existing P3/P4 BC and projection paths; no benchmark-specific
 boundary capability was added.
 
 Run it with `ctest --test-dir build/amrex_port --output-on-failure -R
-vwis_amrex_physical_channel`. The runner writes `physical_channel.json`, with
+avwis_physical_channel`. The runner writes `physical_channel.json`, with
 one record per step containing timing, post-projection divergence, net mass
 flux, momentum, kinetic energy, outlet flow, section means, centerline
 velocity, pressure drop, and pressure statistics. It also writes arithmetic

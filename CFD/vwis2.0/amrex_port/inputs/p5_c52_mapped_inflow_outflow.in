@@ -1,0 +1,26 @@
+# C5.2 mapped inlet/outlet with a translation-periodic y direction and
+# slip/symmetry z walls. The linear profile is evaluated in physical space.
+avwis.mode = contract_p5_mapped_boundary_c52
+avwis.coordinates = mapped
+avwis.mapping.type = analytic_orthogonal
+avwis.mapping.scale = 1.25 0.9 1.1
+avwis.mapping.stretch = 0.35 -0.2 0.15
+avwis.projection.operator = orthogonal_mlmg
+avwis.n_cell = 12 10 8
+avwis.max_grid_size = 4
+avwis.nghost = 2
+avwis.is_periodic = 0 1 0
+avwis.dt = 1.0e-3
+avwis.projection_time_coefficient = 1.0
+
+avwisbcs.enabled = 1
+avwisbcs.geometry = mapped_orthogonal
+avwisbcs.lo = inflow "" slip
+avwisbcs.hi = outflow "" symmetry
+avwisbcs.inlet_profile = linear_plane
+avwisbcs.inlet_target_flux = 0.7
+avwisbcs.profile_offset = 1.0
+avwisbcs.profile_slope_0 = 0.1
+avwisbcs.profile_slope_1 = 0.05
+avwisbcs.constrain_outlet_flux = 1
+avwisbcs.pressure = 0.0 0.25 0.0 0.0 0.0 0.0

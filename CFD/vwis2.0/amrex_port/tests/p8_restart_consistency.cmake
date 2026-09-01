@@ -6,7 +6,7 @@ string(RANDOM LENGTH 8 ALPHABET 0123456789abcdef nonce)
 set(run "${work}_${stamp}_${nonce}")
 file(MAKE_DIRECTORY "${run}")
 execute_process(
-  COMMAND "${exe}" "${input}" "vwis.checkpoint_file=${run}/checkpoint"
+  COMMAND "${exe}" "${input}" "avwis.checkpoint_file=${run}/checkpoint"
   WORKING_DIRECTORY "${run}"
   RESULT_VARIABLE result
   OUTPUT_VARIABLE output
@@ -14,7 +14,7 @@ execute_process(
 if(NOT result EQUAL 0)
   message(FATAL_ERROR "P8 restart consistency failed (${result})\n${output}\n${error}")
 endif()
-string(FIND "${output}${error}" "VWiS AMReX P8-001/P8-002: PASS" found)
+string(FIND "${output}${error}" "AVWiS P8-001/P8-002: PASS" found)
 if(found EQUAL -1)
   message(FATAL_ERROR "P8 PASS marker missing\n${output}\n${error}")
 endif()
