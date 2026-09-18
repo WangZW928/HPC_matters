@@ -7,8 +7,7 @@
     "binaryDir": "${sourceDir}/../build/amrex_port",
     "cacheVariables": {
       "CMAKE_BUILD_TYPE": "Release",
-      "BUILD_TESTING": "ON",
-      "AVWIS_EXPECTED_VERSION": "26.04"
+      "BUILD_TESTING": "ON"
     }
   }]
 }

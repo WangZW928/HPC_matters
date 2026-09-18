@@ -169,11 +169,13 @@ AVWiSSolver::project_cartesian(amrex::Real dt, amrex::Real time_coefficient)
 
     const amrex::Real correction_scale = dt / time_coefficient;
     for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+        m_phi_operator_flux[dir].OverrideSync(m_geom.periodicity());
+        m_phi_operator_flux[dir].FillBoundary(m_geom.periodicity());
         const amrex::Real integrated_scale = correction_scale * m_face_area[dir];
-        for (amrex::MFIter mfi(m_ucont[dir], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        for (amrex::MFIter mfi(m_ucont[dir], false); mfi.isValid(); ++mfi) {
             auto const flux = m_ucont[dir].array(mfi);
             auto const op_flux = m_phi_operator_flux[dir].const_array(mfi);
-            amrex::ParallelFor(mfi.validbox(), [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+            amrex::ParallelFor(mfi.tilebox(), [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
                 // MLMG getFluxes supplies the operator flux -grad(Phi). The
                 // physical correction is -dt/alpha*grad(Phi), so add the
                 // operator flux after converting it to integrated flux with A_d.
@@ -182,14 +184,27 @@ AVWiSSolver::project_cartesian(amrex::Real dt, amrex::Real time_coefficient)
         }
         m_ucont[dir].OverrideSync(m_geom.periodicity());
         m_ucont[dir].FillBoundary(m_geom.periodicity());
+        for (amrex::MFIter mfi(m_ucat, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+            auto const velocity = m_ucat.array(mfi);
+            auto const op_flux = m_phi_operator_flux[dir].const_array(mfi);
+            amrex::ParallelFor(mfi.tilebox(), [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+                const int ip = i + (dir == 0);
+                const int jp = j + (dir == 1);
+                const int kp = k + (dir == 2);
+                velocity(i,j,k,dir) += correction_scale * 0.5
+                    * (op_flux(i,j,k) + op_flux(ip,jp,kp));
+            });
+        }
     }
 
     amrex::MultiFab::Add(m_p, m_phi, 0, 0, 1, 0);
     mark_valid_modified();
-    // Do not re-impose P3's pre-projection outlet-flux constraint here. The
-    // pressure-Dirichlet outlet is the one boundary whose normal flux the
-    // projection is allowed to correct.
-    sync_ucat_from_ucont_impl(false);
+    // Update Ucat by the pressure correction itself. Reconstructing all of
+    // Ucat from adjacent faces here would apply an unphysical averaging filter
+    // on every time step. Do not re-impose P3's pre-projection outlet flux: the
+    // pressure-Dirichlet outlet is allowed to change it.
+    fill_ghost_cells();
+    if (m_boundary.enabled) fill_physical_ghost_cells_impl(false);
 
     compute_cartesian_divergence(m_projection_rhs);
     report.max_divergence_after = m_projection_rhs.norm0(0, 0, true);
@@ -234,6 +249,33 @@ AVWiSSolver::project_orthogonal(amrex::Real dt, amrex::Real time_coefficient)
     report.max_divergence_before = m_projection_rhs.norm0(0, 0, true);
     amrex::ParallelDescriptor::ReduceRealMax(report.max_divergence_before);
 
+    amrex::Real divergence_scale = 1.0;
+    auto const logical_spacing = m_metric_data.logical_grid().spacing;
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+        amrex::Real velocity_scale = m_ucat.norm0(dir, 0, true);
+        amrex::Real inverse_map_scale =
+            m_metric_data.grad_xi_cc().norm0(3*dir+dir, 0, true);
+        amrex::ParallelDescriptor::ReduceRealMax(velocity_scale);
+        amrex::ParallelDescriptor::ReduceRealMax(inverse_map_scale);
+        divergence_scale += velocity_scale * inverse_map_scale / logical_spacing[dir];
+    }
+    const amrex::Real zero_divergence_tolerance = 4096.0
+        * std::numeric_limits<amrex::Real>::epsilon() * divergence_scale;
+    if (report.max_divergence_before <= zero_divergence_tolerance) {
+        for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+            if (m_geom.isPeriodic(dir)) continue;
+            has_pressure_dirichlet = has_pressure_dirichlet ||
+                m_boundary.sides[2*dir].velocity == CartesianBC::Outflow ||
+                m_boundary.sides[2*dir+1].velocity == CartesianBC::Outflow;
+        }
+        m_phi.setVal(0.0);
+        report.singular = !has_pressure_dirichlet;
+        report.max_divergence_after = report.max_divergence_before;
+        amrex::Print() << "C2.2 orthogonal projection: skipped roundoff-scale RHS; max_div="
+                       << report.max_divergence_before << "\n";
+        return report;
+    }
+
     // MLABecLaplacian represents -div_xi(b grad_xi). With b_f=beta Q_mm h_m,
     // its cell action is the negative integrated physical operator. Therefore
     // the matching RHS is -alpha/dt times the net integrated predicted flux.
@@ -242,7 +284,7 @@ AVWiSSolver::project_orthogonal(amrex::Real dt, amrex::Real time_coefficient)
     for (amrex::MFIter mfi(m_projection_rhs, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
         auto const rhs = m_projection_rhs.array(mfi);
         auto const cell_volume = volume.const_array(mfi);
-        amrex::ParallelFor(mfi.validbox(), [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+        amrex::ParallelFor(mfi.tilebox(), [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
             rhs(i,j,k) *= rhs_scale * cell_volume(i,j,k);
         });
     }
@@ -342,7 +384,7 @@ AVWiSSolver::project_orthogonal(amrex::Real dt, amrex::Real time_coefficient)
         compute_orthogonal_face_gradient_flux(
             m_phi, dir, m_metric_data, m_metric_epoch, m_mapping_operator,
             m_phi_operator_flux[dir]);
-        for (amrex::MFIter mfi(m_ucont[dir], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        for (amrex::MFIter mfi(m_ucont[dir], false); mfi.isValid(); ++mfi) {
             auto const flux = m_ucont[dir].array(mfi);
             auto const pressure_flux = m_phi_operator_flux[dir].const_array(mfi);
             amrex::ParallelFor(mfi.validbox(), [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
@@ -354,8 +396,22 @@ AVWiSSolver::project_orthogonal(amrex::Real dt, amrex::Real time_coefficient)
     }
 
     amrex::MultiFab::Add(m_p, m_phi, 0, 0, 1, 0);
+    amrex::MultiFab pressure_gradient(m_ba, m_dm, AMREX_SPACEDIM, 0);
+    compute_metric_cell_gradient(
+        m_phi, m_metric_data, m_metric_epoch, m_mapping_operator, pressure_gradient);
+    for (amrex::MFIter mfi(m_ucat, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        auto const velocity = m_ucat.array(mfi);
+        auto const gradient = pressure_gradient.const_array(mfi);
+        amrex::ParallelFor(
+            mfi.tilebox(), AMREX_SPACEDIM,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k, int comp) noexcept {
+                velocity(i,j,k,comp) -= correction_scale * gradient(i,j,k,comp);
+            });
+    }
+    amrex::Gpu::streamSynchronize();
     mark_valid_modified();
-    sync_ucat_from_ucont_impl(false);
+    fill_ghost_cells();
+    if (m_boundary.enabled) fill_physical_ghost_cells_impl(false);
 
     compute_metric_divergence(velocity_flux, m_metric_data, m_metric_epoch,
                               m_mapping_operator, m_projection_rhs);

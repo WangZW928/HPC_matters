@@ -2,6 +2,7 @@
 #define VWIS_RUN_MODE_H_
 
 #include <AMReX_REAL.H>
+#include <AMReX_Array.H>
 
 #include <string>
 
@@ -22,12 +23,15 @@ enum class RunMode {
     ContractP5Viscous,
     ContractP5Time,
     ContractP5Orthogonal,
+    ContractP5OrthogonalTime,
     ContractP5MappedBoundary,
     ContractP5MappedBoundaryC52,
     ContractP8Restart,
     ContractP8Sampling,
     BenchmarkCartesian,
+    BenchmarkCartesianMMS,
     BenchmarkPhysicalChannel,
+    BenchmarkMappedChannelReference,
     CaseLidCavity
 };
 
@@ -40,6 +44,7 @@ struct RunConfiguration {
     amrex::Real viscosity = 0.1;
     amrex::Real final_time = 8.0e-3;
     amrex::Real projection_time_coefficient = 1.0;
+    amrex::Array<amrex::Real, AMREX_SPACEDIM> body_force{};
     std::string metadata_file;
     std::string checkpoint_file;
     std::string restart_file;

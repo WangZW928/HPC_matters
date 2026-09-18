@@ -126,11 +126,21 @@ void AVWiSSolver::validate_boundary_config() const
     if (m_boundary.inlet_profile != "uniform" && m_boundary.inlet_profile != "linear_plane") {
         throw std::runtime_error("vwisbcs.inlet_profile must be uniform or linear_plane");
     }
+    if (!std::isfinite(m_boundary.inlet_target_flux) ||
+        !std::isfinite(m_boundary.profile_offset) ||
+        !std::isfinite(m_boundary.profile_slope_0) ||
+        !std::isfinite(m_boundary.profile_slope_1)) {
+        throw std::runtime_error(
+            "avwisbcs inlet target/profile parameters must be finite");
+    }
     int inlet_count = 0;
     int outlet_count = 0;
     for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
         for (int side = 0; side < 2; ++side) {
             auto const kind = m_boundary.sides[2 * dir + side].velocity;
+            if (!std::isfinite(m_boundary.sides[2 * dir + side].pressure)) {
+                throw std::runtime_error("avwisbcs pressure values must be finite");
+            }
             if (m_geom.isPeriodic(dir)) {
                 if (kind != CartesianBC::Periodic) throw std::runtime_error("periodic direction has a physical BC");
             } else if (kind == CartesianBC::Periodic) {
@@ -482,9 +492,12 @@ void AVWiSSolver::fill_physical_ghost_cells_impl(bool impose_boundary_flux)
     m_physical_epoch = m_valid_epoch;
 }
 
-void AVWiSSolver::apply_boundary_pipeline(char const* stage)
+void AVWiSSolver::apply_boundary_pipeline(char const* stage, bool emit_diagnostics)
 {
     fill_ghost_cells();
     fill_physical_ghost_cells();
-    (void)p3_diagnostics(stage, true);
+    // Diagnostics allocate a temporary field and perform global reductions.
+    // Keep them available at explicit observation points without placing them
+    // unconditionally in every advection/viscosity/projection hot path.
+    if (emit_diagnostics) (void)p3_diagnostics(stage, true);
 }

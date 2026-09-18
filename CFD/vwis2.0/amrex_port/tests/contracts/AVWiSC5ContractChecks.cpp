@@ -125,6 +125,15 @@ void AVWiSContractTestAccess::run_p5_mapped_boundary_contract_checks(
     mark_valid_modified();
     sync_ucont_from_ucat();
 
+    // P3 diagnostics must use the same metric volume as the mapped
+    // divergence operator. A constant Cartesian volume would break this
+    // discrete divergence-theorem identity on stretched grids.
+    auto const mapped_diagnostics = p3_diagnostics("c5.1-mapped-volume", true);
+    if (std::abs(mapped_diagnostics.integrated_divergence -
+                 mapped_diagnostics.outward_boundary_flux) > geometric_tolerance) {
+        throw std::runtime_error("C5.1 mapped diagnostic volume weighting failed");
+    }
+
     // Cell ghosts: periodic directions wrap first; if one or more physical
     // sides meet, the first physical direction in x,y,z owns the corner rule.
     amrex::Gpu::DeviceScalar<int> ghost_errors_device(0);
@@ -321,6 +330,23 @@ void AVWiSContractTestAccess::run_p5_mapped_boundary_c52_contract_checks(
             "C5.2 focused inputs must exercise inlet/outlet or moving/slip/symmetry modes");
     }
 
+    const amrex::Real saved_pressure = m_boundary.sides[0].pressure;
+    m_boundary.sides[0].pressure = std::numeric_limits<amrex::Real>::infinity();
+    bool nonfinite_pressure_rejected = false;
+    try { validate_boundary_config(); }
+    catch (std::runtime_error const&) { nonfinite_pressure_rejected = true; }
+    m_boundary.sides[0].pressure = saved_pressure;
+    if (!nonfinite_pressure_rejected) {
+        throw std::runtime_error("C5.2 non-finite boundary pressure was accepted");
+    }
+
+    bool cartesian_diagnostics_rejected = false;
+    try { (void)m_solver.uniform_flow_diagnostics(); }
+    catch (std::runtime_error const&) { cartesian_diagnostics_rejected = true; }
+    if (!cartesian_diagnostics_rejected) {
+        throw std::runtime_error("C5.2 mapped state was accepted by uniform Cartesian diagnostics");
+    }
+
     for (amrex::MFIter mfi(m_ucat, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
         auto const u = m_ucat.array(mfi);
         amrex::ParallelFor(
@@ -333,6 +359,11 @@ void AVWiSContractTestAccess::run_p5_mapped_boundary_c52_contract_checks(
     sync_ucont_from_ucat();
 
     constexpr amrex::Real tolerance = 4.0e-12;
+    auto const mapped_diagnostics = p3_diagnostics("c5.2-mapped-volume", true);
+    if (std::abs(mapped_diagnostics.integrated_divergence -
+                 mapped_diagnostics.outward_boundary_flux) > tolerance) {
+        throw std::runtime_error("C5.2 mapped diagnostic volume weighting failed");
+    }
     amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> wall_velocity{};
     for (int comp = 0; comp < AMREX_SPACEDIM; ++comp) {
         wall_velocity[comp] = m_boundary.moving_wall_velocity[comp];

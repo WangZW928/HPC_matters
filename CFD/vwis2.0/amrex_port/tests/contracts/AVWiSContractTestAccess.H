@@ -13,6 +13,10 @@ class AVWiSContractRunner;
 class AVWiSContractTestAccess {
     friend class AVWiSContractRunner;
 
+public:
+    // NVCC requires any enclosing function that defines an extended device
+    // lambda to have public access. Construction remains controlled by the
+    // runner in practice; this entire bridge is linked only as test-mode code.
     explicit AVWiSContractTestAccess(AVWiSSolver& solver)
         : m_solver(solver),
           m_geom(solver.m_geom), m_ba(solver.m_ba), m_dm(solver.m_dm),
@@ -43,6 +47,8 @@ class AVWiSContractTestAccess {
                                      amrex::Real viscosity);
     void run_p5_orthogonal_projection_contract_checks(
         amrex::Real dt, amrex::Real time_coefficient);
+    void run_p5_orthogonal_time_contract_checks(
+        std::string const& report_path, amrex::Real dt, amrex::Real viscosity);
     void run_p5_mapped_boundary_contract_checks(
         amrex::Real dt, amrex::Real time_coefficient);
     void run_p5_mapped_boundary_c52_contract_checks(
@@ -90,6 +96,12 @@ class AVWiSContractTestAccess {
     void compute_cartesian_viscous_rhs(amrex::MultiFab& rhs, amrex::Real viscosity) {
         m_solver.compute_cartesian_viscous_rhs(rhs, viscosity);
     }
+    void compute_advection_rhs(amrex::MultiFab& rhs) {
+        m_solver.compute_advection_rhs(rhs);
+    }
+    void compute_viscous_rhs(amrex::MultiFab& rhs, amrex::Real viscosity) {
+        m_solver.compute_viscous_rhs(rhs, viscosity);
+    }
     TimeStepDiagnostics time_step_diagnostics(amrex::Real dt, amrex::Real viscosity) const {
         return m_solver.time_step_diagnostics(dt, viscosity);
     }
@@ -115,6 +127,7 @@ class AVWiSContractTestAccess {
         m_solver.write_uniform_plane_csv(path, direction, cell_index);
     }
 
+private:
     AVWiSSolver& m_solver;
     amrex::Geometry& m_geom;
     amrex::BoxArray& m_ba;

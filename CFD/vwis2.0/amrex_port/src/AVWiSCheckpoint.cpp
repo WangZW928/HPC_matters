@@ -1,6 +1,7 @@
 #include "AVWiSSolver.H"
 
 #include <AMReX.H>
+#include <AMReX_BoxList.H>
 #include <AMReX_Gpu.H>
 #include <AMReX_ParallelDescriptor.H>
 #include <AMReX_Print.H>
@@ -25,8 +26,9 @@
 
 namespace {
 
-constexpr int checkpoint_schema_version = 2;
-constexpr char checkpoint_magic[] = "AVWIS_CARTESIAN_CHECKPOINT";
+constexpr int checkpoint_schema_version = 3;
+constexpr char checkpoint_magic[] = "AVWIS_CHECKPOINT";
+constexpr char cartesian_checkpoint_magic[] = "AVWIS_CARTESIAN_CHECKPOINT";
 constexpr char legacy_checkpoint_magic[] = "VWIS_AMREX_CARTESIAN_CHECKPOINT";
 
 struct Payload {
@@ -56,6 +58,30 @@ std::string real_text(amrex::Real value)
     std::ostringstream stream;
     stream << std::setprecision(std::numeric_limits<amrex::Real>::max_digits10) << value;
     return stream.str();
+}
+
+std::string mapping_provenance(MappingOperatorConfig const& config)
+{
+    std::ostringstream canonical;
+    canonical << coordinate_system_mode_name(config.coordinates) << '|'
+              << config.mapping_type << '|'
+              << projection_operator_mode_name(config.projection) << '|'
+              << MetricData::discretization_version;
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+        canonical << '|' << real_text(config.analytic_parameters.scale[dir]);
+    }
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+        canonical << '|' << real_text(config.analytic_parameters.stretch[dir]);
+    }
+
+    std::uint64_t checksum = UINT64_C(14695981039346656037);
+    for (unsigned char byte : canonical.str()) {
+        checksum ^= byte;
+        checksum *= UINT64_C(1099511628211);
+    }
+    std::ostringstream result;
+    result << std::hex << std::setfill('0') << std::setw(16) << checksum;
+    return result.str();
 }
 
 std::vector<std::string> words(std::string const& value)
@@ -119,11 +145,12 @@ public:
         }
     }
 
-    void exact_or_legacy(std::string const& expected, std::string const& legacy)
+    void checkpoint_identity()
     {
         if (m_at >= m_lines.size()) reject("missing Header identity line");
         std::string const actual = m_lines[m_at++];
-        if (actual != expected && actual != legacy) {
+        if (actual != checkpoint_magic && actual != cartesian_checkpoint_magic &&
+            actual != legacy_checkpoint_magic) {
             reject("malformed or incompatible Header line " + std::to_string(m_at));
         }
     }
@@ -165,27 +192,10 @@ void same_real(std::string const& actual, amrex::Real expected, char const* key)
     if (real_number(actual, key) != expected) reject(std::string(key) + " mismatch");
 }
 
-amrex::Real max_difference(amrex::MultiFab const& lhs, amrex::MultiFab const& rhs,
-                           int components, int nghost = 0)
-{
-    amrex::MultiFab difference(lhs.boxArray(), lhs.DistributionMap(), components, nghost);
-    amrex::MultiFab::Copy(difference, lhs, 0, 0, components, nghost);
-    amrex::MultiFab::Subtract(difference, rhs, 0, 0, components, nghost);
-    amrex::Real result = 0.0;
-    for (int comp = 0; comp < components; ++comp) {
-        result = amrex::max(result, difference.norm0(comp, nghost, true));
-    }
-    amrex::ParallelDescriptor::ReduceRealMax(result);
-    return result;
-}
-
 } // namespace
 
 void AVWiSSolver::write_checkpoint(std::string const& path) const
 {
-    if (m_mapping_operator.coordinates != CoordinateSystemMode::Cartesian) {
-        reject("C2.2 mapped mapping provenance is not part of the Cartesian schema");
-    }
     require_cpu_single_rank();
     if (path.empty()) reject("empty checkpoint path");
 
@@ -228,7 +238,22 @@ void AVWiSSolver::write_checkpoint(std::string const& path) const
            << "dimension " << AMREX_SPACEDIM << '\n'
            << "real_bytes " << sizeof(amrex::Real) << '\n'
            << "real_digits " << std::numeric_limits<amrex::Real>::digits << '\n'
-           << "backend CPU\nlevels 1\nranks 1\ncoordinate_system Cartesian\n"
+           << "backend CPU\nlevels 1\nranks 1\ncoordinate_system "
+           << coordinate_system_mode_name(m_mapping_operator.coordinates) << '\n'
+           << "mapping_type " << m_mapping_operator.mapping_type << '\n'
+           << "projection_operator "
+           << projection_operator_mode_name(m_mapping_operator.projection) << '\n'
+           << "metric_discretization " << MetricData::discretization_version << '\n'
+           << "mapping_scale";
+    for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+        output << ' ' << real_text(m_mapping_operator.analytic_parameters.scale[d]);
+    }
+    output << '\n' << "mapping_stretch";
+    for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+        output << ' ' << real_text(m_mapping_operator.analytic_parameters.stretch[d]);
+    }
+    output << '\n' << "mapping_provenance_checksum "
+           << mapping_provenance(m_mapping_operator) << '\n'
            << "time " << real_text(m_time) << '\n'
            << "step " << m_step << '\n'
            << "history_depth " << m_history_depth << '\n';
@@ -286,17 +311,15 @@ void AVWiSSolver::write_checkpoint(std::string const& path) const
 
 void AVWiSSolver::read_checkpoint(std::string const& path)
 {
-    if (m_mapping_operator.coordinates != CoordinateSystemMode::Cartesian) {
-        reject("C2.2 mapped mapping provenance is not part of the Cartesian schema");
-    }
     require_cpu_single_rank();
     if (path.empty()) reject("empty checkpoint path");
     std::filesystem::path root(path);
     StrictHeader header(root / "Header");
-    header.exact_or_legacy(checkpoint_magic, legacy_checkpoint_magic);
+    header.checkpoint_identity();
     const int disk_schema_version = static_cast<int>(
         signed_integer(header.value("schema_version"), "schema_version"));
-    if (disk_schema_version != 1 && disk_schema_version != checkpoint_schema_version) {
+    if (disk_schema_version != 1 && disk_schema_version != 2 &&
+        disk_schema_version != checkpoint_schema_version) {
         reject("schema_version mismatch");
     }
     same(header.value("amrex_release"), AVWIS_LOCKED_VERSION, "AMReX release");
@@ -308,7 +331,37 @@ void AVWiSSolver::read_checkpoint(std::string const& path)
     same(header.value("backend"), "CPU", "backend");
     same_integer(header.value("levels"), 1, "level count");
     same_integer(header.value("ranks"), 1, "rank count");
-    same(header.value("coordinate_system"), "Cartesian", "coordinate system");
+    if (disk_schema_version < 3) {
+        if (m_mapping_operator.coordinates != CoordinateSystemMode::Cartesian) {
+            reject("legacy Cartesian checkpoint cannot restore a mapped configuration");
+        }
+        same(header.value("coordinate_system"), "Cartesian", "coordinate system");
+    } else {
+        same(header.value("coordinate_system"),
+             coordinate_system_mode_name(m_mapping_operator.coordinates),
+             "coordinate system");
+        same(header.value("mapping_type"), m_mapping_operator.mapping_type,
+             "mapping type");
+        same(header.value("projection_operator"),
+             projection_operator_mode_name(m_mapping_operator.projection),
+             "projection operator");
+        same(header.value("metric_discretization"),
+             MetricData::discretization_version, "metric discretization");
+        auto check_mapping_vector = [&](std::string const& key,
+                                        amrex::Array<amrex::Real, AMREX_SPACEDIM> const& expected) {
+            auto token = words(header.value(key));
+            if (token.size() != AMREX_SPACEDIM) reject(key + " length mismatch");
+            for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+                if (real_number(token[dir], key.c_str()) != expected[dir]) {
+                    reject(key + " mismatch");
+                }
+            }
+        };
+        check_mapping_vector("mapping_scale", m_mapping_operator.analytic_parameters.scale);
+        check_mapping_vector("mapping_stretch", m_mapping_operator.analytic_parameters.stretch);
+        same(header.value("mapping_provenance_checksum"),
+             mapping_provenance(m_mapping_operator), "mapping provenance checksum");
+    }
 
     amrex::Real restored_time = real_number(header.value("time"), "time");
     std::uint64_t restored_step = unsigned_integer(header.value("step"), "step");
@@ -348,13 +401,27 @@ void AVWiSSolver::read_checkpoint(std::string const& path)
     check_real_vector("prob_hi", prob_hi);
     check_real_vector("dx", dx);
     check_int_vector("periodic", periodic);
-    same_integer(header.value("box_count"), m_ba.size(), "box count");
-    for (int index = 0; index < m_ba.size(); ++index) {
-        std::vector<int> expected_box;
-        auto const& box = m_ba[index];
-        for (int d = 0; d < AMREX_SPACEDIM; ++d) expected_box.push_back(box.smallEnd(d));
-        for (int d = 0; d < AMREX_SPACEDIM; ++d) expected_box.push_back(box.bigEnd(d));
-        check_int_vector("box_" + std::to_string(index), expected_box);
+    int const disk_box_count = static_cast<int>(
+        signed_integer(header.value("box_count"), "box count"));
+    if (disk_box_count <= 0) reject("invalid box count");
+    amrex::BoxList disk_box_list(amrex::IndexType::TheCellType());
+    for (int index = 0; index < disk_box_count; ++index) {
+        auto token = words(header.value("box_" + std::to_string(index)));
+        if (token.size() != 2 * AMREX_SPACEDIM) reject("box layout mismatch");
+        amrex::IntVect small, big;
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            small[d] = static_cast<int>(signed_integer(token[d], "box lower bound"));
+            big[d] = static_cast<int>(signed_integer(
+                token[AMREX_SPACEDIM+d], "box upper bound"));
+        }
+        amrex::Box box(small, big);
+        if (!box.ok() || !domain.contains(box)) reject("box layout outside domain");
+        disk_box_list.push_back(box);
+    }
+    amrex::BoxArray disk_cell_boxes(std::move(disk_box_list));
+    if (!disk_cell_boxes.isDisjoint() || disk_cell_boxes.minimalBox() != domain ||
+        disk_cell_boxes.numPts() != domain.numPts()) {
+        reject("box layout does not exactly cover domain");
     }
 
     same_integer(header.value("boundary_enabled"), static_cast<int>(m_boundary.enabled), "boundary enabled");
@@ -411,13 +478,25 @@ void AVWiSSolver::read_checkpoint(std::string const& path)
     for (std::size_t index = 0; index < payloads.size(); ++index) {
         if (!amrex::VisMF::Exist(files[index].string())) reject("missing payload " + payloads[index].name);
         amrex::VisMF disk(files[index].string());
+        amrex::BoxArray expected_disk_boxes = amrex::convert(
+            disk_cell_boxes, payloads[index].data->ixType());
         if (disk.nComp() != payloads[index].components || disk.nGrowVect() != expected_ngrow ||
-            disk.boxArray() != payloads[index].data->boxArray()) {
+            disk.boxArray() != expected_disk_boxes) {
             reject("VisMF layout/components/ghost mismatch for " + payloads[index].name);
         }
     }
     for (std::size_t index = 0; index < payloads.size(); ++index) {
-        amrex::VisMF::Read(*payloads[index].data, files[index].string());
+        amrex::VisMF disk(files[index].string());
+        if (disk.boxArray() == payloads[index].data->boxArray()) {
+            amrex::VisMF::Read(*payloads[index].data, files[index].string());
+        } else {
+            amrex::MultiFab disk_data;
+            amrex::VisMF::Read(disk_data, files[index].string());
+            payloads[index].data->setVal(0.0);
+            payloads[index].data->ParallelCopy(
+                disk_data, 0, 0, payloads[index].components, 0, 0,
+                m_geom.periodicity());
+        }
     }
 
     m_time = restored_time;

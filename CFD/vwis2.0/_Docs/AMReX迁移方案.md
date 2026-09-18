@@ -1,6 +1,6 @@
 # VFS-Wind 到 AMReX 迁移方案
 
-> 审阅校正（2026-09-01）：AMReX 提供 `Geometry/BoxArray/DistributionMapping/MultiFab`、`MFIter`、ghost、MLMG、I/O 和 EB/AMR 基础设施，但不会自动保持曲线 metric、IBM 插值、压力零空间、守恒或稳定性。`amrex_port/` 已形成受限的单层均匀 Cartesian 求解基线，并完成 P5-003/C2.2 的解析 separable orthogonal 几何、mapped gradient/divergence、对角变换及正交投影增量；C5.1/C5.2 又完成该路径的 no-slip/periodic、inlet/fixed-pressure outlet、tangential moving wall、slip 与 symmetry 物理边界子集，默认仍为 Cartesian。一般非正交/曲面 BC、mapped RHS/time、restart、MPI/CUDA 与非正交项尚未完成，不能据此声称 G1 或完整曲线支持已经完成。
+> 进度更新（2026-09-18）：受限单层 Cartesian 基线已增加综合 Taylor–Green MMS 与 legacy `-second_order` source-stencil reference。separable analytic-orthogonal 路径已完成 C2.3 mapped 对流、常系数黏性、显式推进、C6 mapping-provenance restart，以及 C8-G1 压力梯度驱动 Poiseuille 物理 reference。CPU 完整 CTest 为 45/45；RTX 4060 `sm_89` 上此前的完整适用集为 36/36，本次壁面黏性通量改动后的 mapped 定向集为 8/8。一般非正交/曲面、MPI、legacy 整机复演、IBM/FSI 与 AMR 仍未完成，不能据此声称完整曲线支持已经完成。
 
 本文面向 VFS-Wind 当前基于 PETSc DMDA/HYPRE 的结构化曲线网格求解器，说明如何把核心算法迁移到 AMReX 生态。目标不是逐行翻译旧代码，而是在保持 `Ucont/Ucat/P/Nvert` 等数值语义可追踪的前提下，逐步替换为 AMReX 原生的数据结构、AMR 层级、几何多重网格和 GPU-friendly kernel。
 
@@ -16,8 +16,9 @@
 $\widehat U_f=\mathbf u_f\cdot\mathbf A_f$；它不是 `MacProjector` 通常接收的
 face-normal velocity。后续 P3--P8 已增加受限的 Cartesian BC、投影、RHS、显式推进、
 checkpoint/restart 和诊断证据；analytic orthogonal `MetricData` 只进入显式 opt-in 的
-C2.2 gradient/divergence/transform/projection 与 C5.1/C5.2 separable-orthogonal BC 路径，
-未进入 Cartesian 默认路径或 mapped advection、viscosity、time、restart。
+C2.1--C2.3 gradient/divergence/transform/projection/RHS/time、C5.1/C5.2
+separable-orthogonal BC、C6 restart 及 C8-G1 physical-reference 路径；它们仍不改变
+Cartesian 默认配置。
 
 ## 当前状态、剩余工作与下一步路线
 
@@ -31,25 +32,25 @@ C2.2 gradient/divergence/transform/projection 与 C5.1/C5.2 separable-orthogonal
 | 基线 | 已具备 | 尚未证明 |
 | --- | --- | --- |
 | Cartesian solver | 单层均匀 Cartesian 的 cell `Ucat/P/Phi/Nvert`、face `Ucont`，多 Box/ghost；受限物理 BC；Cartesian MLMG 投影；保守对流、常系数分量 Laplacian、显式 Euler；单进程 CPU checkpoint/restart、采样诊断与方腔工程演示 | 完整 CFD/legacy 数值等价；MPI/GPU 生产运行；AMR、IBM/FSI、LES；曲线网格 |
-| 曲线 C0–C2.2/C5.2 | 独立生产 `CoordinateMapping/MetricData` 与显式 mapped operator；identity/analytic separable provider；gradient/divergence、对角 `Ucat↔Ucont`、orthogonal MLMG 投影；no-slip/periodic、inlet/outlet、tangential moving、slip/symmetry 边界子集；CPU 多 Box/ghost、GCL、互反、free-stream、三网格 MMS 与严格配置拒绝 | 一般非正交/曲面 BC、mapped advection/viscosity/time、restart provenance、MPI/GPU；弱/一般非正交与物理 case |
+| 曲线 C0–C2.3/C5.2/C6/C8-G1 | 独立 `CoordinateMapping/MetricData`；identity/analytic separable provider；gradient/divergence、对角 `Ucat↔Ucont`、orthogonal MLMG 投影；mapped 对流/黏性/显式推进；受限物理 BC；mapping-provenance CPU restart；CPU/CUDA metric 与三网格 MMS；正交 stretched channel Poiseuille 物理 reference | 一般非正交/曲面 BC；MPI 与 GPU restart；弱/一般非正交；legacy 可执行程序同 case 复演 |
 
 > **计数口径：** `P5-003` 曲线路线共 9 个可验收子模块。当前 C0、C1 已完成，
-> C2 的最小 C2.2 operator/projection 增量已完成，但完整 G1 仍受 C5–C8 证据约束。这是
+> C2.1--C2.3、C6 与 C8-G1 已完成，但完整 G1 仍受 C5、C7 和一般曲线证据约束。这是
 > P5-003 内部执行口径，不改变主清单 53 个 P 级任务的统计。P5-003 本身仍为
-> “进行中”；C2.2 不是 G1 总门，更不是完整曲线坐标支持。
+> “进行中”；正交子集不是 G1 总门，更不是完整曲线坐标支持。
 
 ### 剩余模块
 
 | ID | 模块 | 目标与主要位置 | 依赖 | 验收证据 | 状态 |
 | --- | --- | --- | --- | --- | --- |
 | C1 / G0.2 | Identity adapter 接入 solver | `AVWiSSolver` 持有/消费 identity `MetricData`，现有 integrated-flux divergence 只除一次 `cell_volume_cc` | C0/G0.1；P2/P4 Cartesian 基线 | identity 新旧紧容差一致；完整 Cartesian CTest；epoch/layout/非 identity 拒绝 | 已完成 |
-| C2 / G1 | 解析正交 mapping | C2.1 provider/geometry；C2.2 mapped gradient/divergence、对角变换与正交投影 | C1 | 常量/线性、identity 紧等价、三网格 gradient MMS、只除一次体积、多 Box/ghost、严格模式/epoch/layout 拒绝、全周期 solver 投影散度下降 | 进行中：C2.2 最小增量已完成；完整 G1 尚缺 C5/C6/C7/C8 |
+| C2 / G1 | 解析正交 mapping | C2.1 provider/geometry；C2.2 mapped gradient/divergence、对角变换与正交投影；C2.3 orthogonal mapped 对流、黏性和时间推进 | C1 | 常量/线性、identity 紧等价、三网格 operator MMS、只除一次体积、多 Box/ghost、严格拒绝、非平凡一步与 free stream | C2.1--C2.3 已完成；完整 G1 仍进行中 |
 | C3 / G2 | 弱非正交与 metric-aware RHS | 增加带可调 skew 的光滑 mapping、完整 cross face gradient，并使对流/黏性通量只除一次 `cell_volume_cc`；`AVWiSAdvection.cpp`、`AVWiSViscosity.cpp`、`AVWiSMetricData.*`、`tests/curvilinear/` | C2；M2/M4/M6 的证据化决策 | `epsilon=0` 连续退化到 G1；cross-term 单项测试；非正交 MMS、守恒、能量/通量诊断、强度扫描；deferred correction 报告全残差与收敛范围 | 未开始 |
 | C4 / G3 | 一般非正交与 19 点压力算子 | 实现并验证 custom 19 点或经证实等价的完整非正交压力路径，保持 operator/correction 共用面梯度通量；`AVWiSProjection.cpp`、目标自定义 operator、legacy `vwis2.0/PoissonSolver.C` | C3；M3/M4/M5；冻结 legacy 对照 case | matrix-free 与显式 19 点 action 对照、逐项 stencil、null space/BC、投影散度、legacy case、MPI 分块、收敛及性能/内存审查全部通过 | 未开始 |
 | C5 | 曲线 BC 与 ghost | 把逻辑边界到物理法向/面积通量的映射纳入固定 halo→physical BC→face owner 顺序；`AVWiSBoundary.cpp`、`CartesianBoundaryConfig.*`、`AVWiSMetricData.*`、legacy `BcsUtility.C` | C1 后可做 identity 契约；曲线关闭依赖 C2/C3 和 M3 | C5.1/C5.2 已覆盖 analytic orthogonal no-slip、inlet/outlet、tangential moving、slip/symmetry、周期平移、角 ghost、多 Box owner、stale/非法配置拒绝及 Dirichlet/Neumann 投影；一般曲面、MPI 尚缺 | 进行中：C5.2 受限子集已完成 |
-| C6 | 曲线 checkpoint/restart | 保存并校验 mapping 类型、参数/checksum、metric 离散版本与 epoch，重建后验证 metric，再恢复流场；`AVWiSCheckpoint.cpp`、`AVWiSMetricData.*`、`tests/p8_*` | C1；mapping schema 依赖 C2；BC schema 依赖 C5 | 同 mapping/config CPU 同分解 bitwise；跨分解紧容差；mapping/checksum/版本不匹配和损坏 Header 严格拒绝；不得把现有 Cartesian P8 结果外推到曲线 | 未开始 |
-| C7 | MPI/GPU runtime | 对 C1--C6 的生产 kernels、owner/halo、归约和 restart 做多 rank 与 GPU runtime 验证；`amrex_port/CMakeLists.txt`、相关 `src/` 与测试 runner | 各模块先有 CPU 参考；可按增量并行补证，最终关闭依赖 C1--C6 | 1/2/4 rank 和不同分块的 norm 一致性；至少一个 GPU 后端与 CPU 紧容差；无意外 host copy；记录硬件、版本、命令和性能 | 阻塞：当前 G0.1 报告所用包为 MPI/CUDA OFF，且既有环境曾受 PMIx 权限和不可见 GPU 限制 |
-| C8 | 物理曲线 case 与回归 | 建立可复现 curved-channel/legacy 曲线 case、输入 provenance、参考量与分阶段发布门；目标 `amrex_port/cases/`、`benchmarks/`、`tests/curvilinear/`、`run_cases/` 和增量报告 | G1 case 依赖 C2/C5/C6；一般曲线声明依赖 C3/C4/C7 | 预冻结网格与容差；速度/去 datum 压力的 $L_2/L_\infty$、质量、壁面剪切、流量、迭代历史和网格收敛；一般曲线还需 legacy 对照 | 未开始 |
+| C6 | 曲线 checkpoint/restart | schema-v3 保存并校验 mapping 类型、参数/checksum、metric 离散版本，构造 solver 时重建并验证 metric，再恢复流场；`AVWiSCheckpoint.cpp`、`tests/c6_*` | C1、C2、C5 | 同 mapping/config CPU continuation bitwise；跨 Box 分解恢复；mapping 错配及损坏 Header 严格拒绝 | 已完成：CPU 单 rank；不外推到 MPI/GPU/AMR restart |
+| C7 | MPI/GPU runtime | 对 C1--C6 的生产 kernels、owner/halo、归约和 restart 做多 rank 与 GPU runtime 验证；`amrex_port/CMakeLists.txt`、相关 `src/` 与测试 runner | 各模块先有 CPU 参考；最终关闭依赖 C1--C6 | 1/2/4 rank 和不同分块的 norm 一致性；CPU/GPU 紧容差；无意外 host copy；记录硬件、版本、命令和性能 | 进行中：RTX 4060 `sm_89` 完整适用 CTest 36/36 通过；MPI、GPU restart 与性能尚缺 |
+| C8 | 物理曲线 case 与回归 | 建立可复现 curved-channel/legacy 曲线 case、输入 provenance、参考量与分阶段发布门；`MappedChannelReferenceCase.*`、`inputs/c8_*`、`tests/c8_*` | G1 case 依赖 C2/C5/C6；一般曲线声明依赖 C3/C4/C7 | C8-G1 已冻结正交 stretched-channel Poiseuille 解析解，三网格速度/残差/流量近二阶，压力 datum-free 误差与散度为零，并追溯 legacy profile/pressure-gradient 源码；一般曲线和 legacy 整机对照仍缺 | 进行中：C8-G1 已完成 |
 
 这些模块按“先隔离数值语义，再增加几何复杂度”的顺序推进。C5--C7 可在对应
 算子具备 CPU 参考后穿插补证，但不能用后端构建成功替代 runtime，也不能用 G1/G2
@@ -63,14 +64,15 @@ flowchart LR
     g01([✅ C0 G0.1 complete]) --> c1([✅ C1 G0.2 complete])
     c1 --> c21([✅ C2.1 provider and geometry])
     c21 --> c2([✅ C2.2 orthogonal operators])
-    c2 --> c3[📐 C3 weak non-orthogonal]
+    c2 --> c23([✅ C2.3 mapped RHS and time])
+    c23 --> c3[📐 C3 weak non-orthogonal]
     c3 --> c4[⚙️ C4 general 19-point]
     c1 --> c5[🔗 C5.2 mapped BC and ghost]
-    c2 --> c6[💾 C6 mapped restart]
+    c23 --> c6([✅ C6 mapped restart])
     c5 --> c6
     c1 -.-> c7[🖥️ C7 MPI and GPU runtime]
     c4 --> c7
-    c2 --> c8[🧪 C8 physical regression]
+    c2 --> c8[✅ C8-G1 physical reference]
     c5 --> c8
     c6 --> c8
     c7 --> c8
@@ -81,30 +83,31 @@ flowchart LR
     classDef pending fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#1f2937
     classDef blocked fill:#fef9c3,stroke:#ca8a04,stroke-width:2px,color:#713f12
 
-    class g01,c1,c21,accepted complete
-    class c2 complete
-    class c3,c4,c6,c8 pending
+    class g01,c1,c21,c2,c23,c6,c8,accepted complete
+    class c3,c4 pending
     class c5 next
     class c7 blocked
 ```
 
-### C2.2 已完成切片与下一接缝
+### C2.3、C6 与 C8-G1 已完成切片及下一接缝
 
-已把 analytic orthogonal metric 接到独立 mapped operator，并以显式配置接入全周期
-solver 投影；默认 Cartesian solver 未改变：
+analytic orthogonal metric 已接入独立 mapped operator、全周期 solver 投影、动量 RHS、
+显式推进与版本化 restart；默认 Cartesian 配置未改变：
 
 1. `AVWiSMappedOperators.*` 提供 metric-aware cell gradient、integrated-flux divergence、对角 face gradient flux 和 orthogonal `Ucat↔Ucont`。
 2. C2.2 验收时 `AVWiSSolver::project_orthogonal()` 只接受全周期 `mapped + identity|analytic_orthogonal + orthogonal_mlmg`，operator 与 correction 共享对角 `Q` 离散。
 3. 常量/线性、三网格 MMS、投影散度下降、identity 紧容差、多 Box/ghost 及非法配置/旧 epoch 均有 CPU double contract。
-4. C2.2 验收时 mapped 模式进入 Cartesian 对流、黏性、时间推进、物理 BC 或 checkpoint 时明确拒绝。
+4. C2.3 以 metric 面通量/体积实现 mapped conservative advection 和 physical Laplacian，三网格误差比达到二阶，并验证非平凡一步与 free stream。
+5. C6 checkpoint schema-v3 记录 mapping 类型、scale/stretch、projection、metric 离散版本和 FNV-1a provenance；同布局 continuation bitwise、跨 Box 分解恢复与错配拒绝均通过。
+6. C8-G1 增加沿 $z$ 方向均匀体力驱动的正交 stretched-channel Poiseuille reference；`16/32/64` 三网格的速度、稳态残差和流量误差均接近二阶，压力 datum-free 误差与散度为零。验证中发现并修复了 mapped Dirichlet 壁面黏性通量的一阶镜像导数，现改用非均匀单侧二次重构。
 
 C5.1/C5.2 随后只对 `analytic_orthogonal` 增加受限的 mapped physical BC 与其匹配的
-Dirichlet/Neumann projection；它不改变上述 C2.2 历史验收范围，也不放开 mapped
-RHS/time/restart 或一般非正交消费者。
+Dirichlet/Neumann projection；C2.3/C6 仍只接受该 separable-orthogonal 子集，不放开
+一般非正交消费者。
 
-下一接缝是按清单关闭 C5 剩余范围及 C6/C7 的 restart 与 MPI/GPU 证据，并由 C8 增加
-物理曲线 case；这些完成后才能
-关闭完整 G1；不能提前写成“曲线坐标已支持”。
+下一接缝是按清单补齐 C7 的 MPI/后端对照，并取得可复演的 legacy 输入/网格/输出包；
+随后按 C3→C4 扩展到一般非正交并用一般 curved-channel C8 关闭能力声明。C8-G1 的完成
+只证明 separable-orthogonal 物理 reference，不能提前写成“曲线坐标已支持”。
 
 ## 1. 架构映射
 

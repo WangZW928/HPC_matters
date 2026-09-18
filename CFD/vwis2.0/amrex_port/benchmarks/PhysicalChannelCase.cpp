@@ -15,8 +15,8 @@ void AVWiSCaseRunnerAccess::run_physical_channel_benchmark_impl(
     AVWiSSolver& solver, amrex::Real dt, int steps, amrex::Real viscosity,
     std::string const& report_path)
 {
-    if (!(dt > 0.0) || steps <= 0 || !(viscosity >= 0.0) || report_path.empty()) {
-        throw std::runtime_error("physical channel benchmark requires positive dt/steps, non-negative viscosity, and report path");
+    if (!(dt > 0.0) || steps <= 0 || !(viscosity > 0.0) || report_path.empty()) {
+        throw std::runtime_error("physical channel benchmark requires positive dt/steps/viscosity and report path");
     }
     if (solver.m_geom.isPeriodic(0) || !solver.m_geom.isPeriodic(2) || !solver.m_boundary.enabled ||
         solver.m_boundary.sides[0].velocity != CartesianBC::Inflow ||

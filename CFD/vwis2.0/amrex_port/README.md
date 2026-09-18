@@ -1,4 +1,4 @@
-# AVWiS (AMReX–VWiS) Cartesian contract and P5-003 C5.2 mapped boundaries
+# AVWiS (AMReX–VWiS) Cartesian and separable-orthogonal mapped baseline
 
 ## Naming convention
 
@@ -10,8 +10,8 @@ alias; new inputs and documentation use `avwis.*`. The boundary namespace
 follows the same rule: `avwisbcs.*` is canonical and `vwisbcs.*` is legacy.
 
 `amrex_port/` is independent of the original `vwis2.0/` PETSc/HYPRE solver.
-It is a single-level Cartesian data/runtime framework with a narrow pressure
-projection and conservative advective/viscous RHS, not a complete CFD solver. `project_cartesian()` forms a pressure
+It is a single-level Cartesian and opt-in separable-orthogonal mapped baseline,
+not a complete CFD solver. `project_cartesian()` forms a pressure
 RHS from integrated face flux, solves a Cartesian cell-centred Poisson problem
 with MLMG, corrects face flux, and synchronizes `Ucat`.
 `compute_cartesian_advection_rhs()` and `compute_cartesian_viscous_rhs()` form
@@ -19,22 +19,25 @@ the P5-001 convective and P5-002 constant-coefficient viscous parts of the
 momentum RHS. P5-004 adds a provisional explicit Euler predictor followed by
 the P4 projection, with explicit `n/n-1/n-2` state rotation. This is not the
 legacy SNES residual solve and does not implement semi-implicit or BDF2
-advancement. P8-001/P8-002 now add a versioned single-level CPU
+advancement. P8-001/P8-002 and C6 provide a versioned single-level CPU
 checkpoint/restart payload using AMReX `VisMF`, including all three fluid time
-layers and strict Header validation. There is still no LES, IBM/EB, FSI,
-general curvilinear operator, AMR, plotfile/HDF5 output, MPI/GPU restart, or full
-CFD case validation. P5-003 C1 makes each solver own an immutable identity
+layers, strict Header validation, and mapped provenance. There is still no LES,
+IBM/EB, FSI, general non-orthogonal operator, AMR, plotfile/HDF5 output,
+MPI/GPU restart, legacy executable parity, or full CFD case validation. P5-003 C1 makes each solver own an immutable identity
 `MetricData` on its exact `BoxArray/DistributionMapping` and uses a narrow
 adapter as the cell-volume source for the existing integrated-flux divergence.
 P5-003 C2.1 adds a production analytic orthogonal metric provider and geometry
 contract. C2.2 adds explicit metric-aware gradient/divergence, the diagonal
 orthogonal `Ucat<->Ucont` transform, and a periodic orthogonal MLMG projection
-path. The analytic path is deliberate opt-in; Cartesian identity remains the
-default. C5.1 adds stationary no-slip walls and periodic pairs; C5.2 extends
+path. C2.3 adds conservative mapped advection, metric-aware constant-coefficient
+viscosity, stability guards and explicit time advancement. The analytic path is
+deliberate opt-in; Cartesian identity remains the default. C5.1 adds stationary no-slip walls and periodic pairs; C5.2 extends
 that same analytic separable-orthogonal path with mapped inlet/fixed-pressure
-outlet, tangential moving wall, slip, and symmetry modes. Mapped advection,
-viscosity, time advancement, checkpoint/restart, general non-orthogonal
-surfaces, and non-orthogonal pressure terms remain rejected.
+outlet, tangential moving wall, slip, and symmetry modes. General non-orthogonal
+surfaces, cross terms, and the legacy 19-point pressure path remain rejected.
+C8-G1 adds a CPU/single-rank pressure-gradient-driven Poiseuille reference on
+the analytic stretched orthogonal mesh, including velocity, datum-free pressure,
+divergence, flow-rate, wall-shear, and steady-residual convergence metrics.
 P8-003 adds CPU/single-rank uniform-grid point probes,
 plane summaries/CSV extraction, reusable flow statistics, and equal-spacing
 post-step time averages in the physical channel report. These CSV/JSON files
@@ -45,9 +48,10 @@ The Cartesian boundary vocabulary also includes `moving_wall`, with
 must be zero. Cell ghosts use mirror Dirichlet data
 `Ughost=2*Uwall-Uinterior`, tangential face-flux ghosts use the same wall
 state after face-area scaling, and the physical normal face flux remains zero.
-Existing `noslip` behavior is unchanged. Checkpoint schema version 2 records
-and strictly checks the moving-wall vector in addition to the prior P8 state;
-the reader still accepts schema-v1 checkpoints that predate this field.
+Existing `noslip` behavior is unchanged. Checkpoint schema version 3 records
+and strictly checks coordinate mode, mapping type and parameters, projection,
+metric discretization and a deterministic provenance checksum. The reader
+still accepts schema-v1/v2 Cartesian checkpoints.
 
 ## Version and configuration contract
 
@@ -57,6 +61,13 @@ not proof that a compatible package has been built on a host: the test-result
 record must name the install prefix and enabled backend. CMake gives a direct diagnostic if
 `AMReXConfig.cmake` is unavailable and rejects a different exported AMReX
 version unless the build is explicitly labelled exploratory.
+
+Build the locked dependency from a Git checkout/worktree at the recorded SHA.
+The upstream `26.04` tag's archive fallback reads the first heading of
+`CHANGES.md`, which is still `26.03` at that commit; a source tree stripped of
+`.git` therefore exports package version `26.03` and is correctly rejected by
+this project. Do not hide that provenance loss with
+`AVWIS_ALLOW_VERSION_MISMATCH` when producing validation evidence.
 
 ```bash
 cmake -S amrex_port -B build/amrex_port \
@@ -92,6 +103,8 @@ The accepted values are:
   the focused Cartesian P5 contracts.
 - `contract_p5_orthogonal`: run the focused periodic analytic-orthogonal C2.2
   solver projection contract.
+- `contract_p5_orthogonal_time`: run the C2.3 three-grid mapped advection,
+  viscosity, non-trivial explicit-step, and free-stream contract.
 - `contract_p5_mapped_boundary`: run the focused C5.1 analytic-orthogonal wall,
   periodic translation, ghost, ownership, validation, and projection contract.
 - `contract_p5_mapped_boundary_c52`: run the C5.2 inlet/outlet,
@@ -99,8 +112,11 @@ The accepted values are:
   pressure-projection contracts.
 - `contract_p8_restart` and `contract_p8_sampling`: run the restart or uniform
   sampling/statistics contract.
-- `benchmark_cartesian` and `benchmark_physical_channel`: run the manufactured
-  Cartesian or physical plane-channel benchmark.
+- `benchmark_cartesian`, `benchmark_cartesian_mms`, and
+  `benchmark_physical_channel`: run the baseline Cartesian report, the
+  Taylor–Green MMS/legacy-stencil comparison, or physical plane-channel benchmark.
+- `benchmark_mapped_channel_reference`: run the C8-G1 analytic-orthogonal
+  pressure-gradient-driven Poiseuille reference and write JSON/CSV evidence.
 - `case_lid_cavity`: run the lid-driven-cavity engineering case.
 
 For example:
@@ -112,6 +128,7 @@ avwis.is_periodic = 1 1 1
 avwis.run_steps = 8
 avwis.dt = 1.0e-3
 avwis.viscosity = 0.1
+avwis.body_force = 0.0 0.0 0.0
 ```
 
 The former independent `vwis.run_*` boolean selectors are not retained as a
@@ -125,8 +142,8 @@ diagnostic. This makes simultaneous operations impossible by construction.
 lifecycle, Cartesian operators and boundary handling, checkpoint/restart,
 runtime diagnostic APIs, and the `CoordinateMapping`/`MetricData` geometry
 module plus its explicit identity/orthogonal mapped operator layer.
-`benchmarks/` owns the manufactured Cartesian and
-physical channel runners, while `cases/` owns the lid-driven cavity runner.
+`benchmarks/` owns the manufactured Cartesian, physical channel, and mapped
+Poiseuille reference runners, while `cases/` owns the lid-driven cavity runner.
 `tests/contracts/` owns the P1--P8 contract-runner facade, its test-only access
 bridge, and every manufactured/regression contract implementation. Contract checks may call
 production operators through the composed bridge, but the checks themselves are
@@ -201,14 +218,17 @@ explicit datum policy below; deferred legacy cases still need case review.
 `FillBoundary`; it never supplies non-periodic physical ghosts.
 `fill_physical_ghost_cells()` is a separate P3 operation and refuses to run if
 the halo epoch is stale. `apply_boundary_pipeline()` fixes the order as halo
-first, physical cell ghosts/boundary faces second, diagnostics last. Any valid
-write invalidates both freshness epochs. Long-lived temporaries must be
-class-owned; do not allocate an owning `MultiFab` inside `MFIter`.
+first and physical cell ghosts/boundary faces second. Expensive P3 diagnostics
+are explicit observation points rather than unconditional hot-path reductions.
+Any valid write invalidates both freshness epochs. Long-lived temporaries must
+be class-owned; do not allocate an owning `MultiFab` inside `MFIter`.
 
 `write_metadata_manifest` writes rank-0 JSON schema only when
 `avwis.metadata_file` is set. The P8 checkpoint path is separate: it writes a
-versioned `Header` plus AMReX `VisMF` payloads. It is intentionally limited to
-one CPU rank and must not be confused with a plotfile or MPI restart.
+versioned `Header` plus AMReX `VisMF` payloads. Cartesian and analytic
+orthogonal mapped state are supported, including cross-Box decomposition
+restore; execution is intentionally limited to one CPU rank and must not be
+confused with a plotfile or MPI restart.
 
 `p1_contract.in` invokes only the base runtime check: it checks the field
 schema and zero initialization, fills a global-index field over a multi-box
@@ -333,13 +353,29 @@ avwis.projection.operator = orthogonal_mlmg
 avwis.is_periodic = 1 1 1
 ```
 
-This is not complete curvilinear solver support. C2.2 is limited to reusable
-orthogonal operators and projection. C5.1/C5.2 extend it with the supported
-mapped boundary vocabulary described below. Mapped advection/viscosity/time
-advance, restart provenance, MPI/CUDA runtime, non-orthogonal cross terms, the
-19-point pressure path, and a physical curved case remain outside the
-increment. See
-`_Docs/AMReX_P5-003_C2.2_orthogonal_operators_20260901.md`.
+This is not complete curvilinear solver support. C2.3 is limited to separable
+orthogonal operators, projection, conservative advection, constant-coefficient
+viscosity and explicit Euler. C5.1/C5.2 supply the mapped boundary vocabulary,
+and C6 supplies CPU restart provenance. C8-G1 supplies one analytic orthogonal
+physical reference. MPI, non-orthogonal cross terms, the 19-point pressure path,
+general curved surfaces, and legacy executable parity remain outside this slice.
+
+## C8-G1 mapped channel physical reference
+
+`benchmark_mapped_channel_reference` uses an analytic-orthogonal mesh stretched
+only in the wall-normal `y` direction, periodic `x/z`, no-slip `y` walls,
+constant viscosity `0.01`, and body force `f_z=0.12`. The exact steady solution
+is `w(y)=6 y(1-y)`, with unit bulk flow and wall-shear magnitude `0.06`. The
+`16/32/64` inputs start from the exact velocity and advance 100 steps to check
+the production RHS/time path rather than a benchmark-only operator.
+
+The validation also changed mapped no-slip/moving-wall viscous face fluxes to a
+nonuniform one-sided quadratic wall derivative. Mirror ghosts remain the public
+boundary-state contract; only the viscous wall-flux reconstruction changed.
+The CTest requires near-second-order velocity, steady residual, and flow-rate
+trends, at least first-order wall-shear convergence, and roundoff-level pressure
+and divergence. The full values and legacy-source provenance boundary are in
+`_Docs/AMReX_C8-G1_正交mapped通道物理reference_20260918.md`.
 
 ## P5-003 C5.1/C5.2 mapped physical boundaries
 
@@ -535,31 +571,34 @@ The legacy `Integrator::SolveFunction` remains materially different: its
 reachable `timeCoeff=1` branch is a nonlinear SNES residual with current and old
 RHS weighted by one half, while its BDF2-shaped branch is unreachable because
 `UData::getTimeCoeff()` returns `1.0`. P5-004 does not erase that distinction;
-the semi-implicit/BDF2 solver decision remains P5-005 work. P8 now provides a
-separate restart payload for the validated single-level CPU path; it does not
-make the explicit integrator equivalent to legacy SNES or extend restart to
-MPI, GPU, metric, IBM, FSI, or AMR state.
+the semi-implicit/BDF2 solver decision remains P5-005 work. P8/C6 now provide a
+separate restart payload for the validated single-level Cartesian and
+separable-orthogonal CPU paths; this does not make the explicit integrator
+equivalent to legacy SNES or extend restart to MPI, GPU, IBM, FSI, or AMR state.
 
 ## P8-001/P8-002 checkpoint and restart
 
 The checkpoint directory contains a strict text `Header` and AMReX `VisMF`
-payloads. The Header records the schema/version, locked AMReX version and SHA,
-single-rank CPU scope, dimension/precision, domain/dx, boundary configuration,
-ghost width, component/layout contract, time/step/history depth, and the fixed
-field list. The payload stores `Ucat`, `Ucat_old`, `Ucat_older`, all three
+payloads. Schema v3 records the locked AMReX version/SHA, single-rank CPU scope,
+dimension/precision, domain/dx, boundary configuration, coordinate/mapping
+parameters, projection and metric-discretization provenance, ghost width,
+component/layout contract, time/step/history depth, and the fixed field list.
+The payload stores `Ucat`, `Ucat_old`, `Ucat_older`, all three
 `Ucont` history layers, `P`, `Phi`, and `Nvert`.
 
 Restart validates the Header before reading any field. It rejects an invalid
 magic/version, unsupported rank/backend, dimension or precision mismatch,
-field/layout mismatch, wrong geometry or BC configuration, missing payload, or
-unexpected extra field. A real regression runs an uninterrupted trajectory and
-a checkpoint-at-K trajectory to N steps, then compares every persistent field,
-time, step, and history depth. The current CPU result is bitwise identical.
+field/layout mismatch, wrong geometry, mapping or BC configuration, missing
+payload, or unexpected extra field. Metrics are immutable derived state: the
+configured mapping rebuilds and validates them before payload restore. A mapped
+regression compares uninterrupted and checkpoint-at-K trajectories bitwise;
+another restores the same payload into a different Box decomposition, and a
+negative test rejects changed mapping parameters.
 
-On 2026-08-29, the locked CPU build in `build/amrex_port_p8` passed the static
-contract check, clean rebuild, both P8 tests, all 20 CTests, and `git diff
---check`. MPI/GPU runtime and plotfile/HDF5 output remain outside this
-increment. Full evidence is recorded in the P8 report.
+The original Cartesian evidence is recorded in the P8 report. The 2026-09-18
+C6 extension and its current test commands/results are recorded in
+`_Docs/AMReX_P10-001_C2.3_C6_实施与验证_20260918.md`. MPI/GPU restart and
+plotfile/HDF5 output remain outside this increment.
 
 ## P8-003 uniform Cartesian sampling and statistics
 
@@ -617,11 +656,23 @@ the port in new build directories. Evidence is deliberately split by stage:
   CTest and direct runtime stopped during AMReX CUDA initialization with CUDA
   error 35. This is compile/device-link evidence only, not a CUDA runtime pass.
 
-The exact commands and error boundaries are recorded in
+The exact historical commands and error boundaries are recorded in
 `_Docs/AMReX_P3_边界与诊断设计及测试_20260824.md`. A host session that permits
-OpenMPI sockets is still required for the 2-rank result, and a host with a
-visible NVIDIA device and compatible driver is required for the final CUDA
-runtime result.
+OpenMPI sockets is still required for the 2-rank result. The earlier CUDA
+runtime blocker was closed on 2026-09-18 by the current `sm_89` evidence below.
+
+## Current CPU and CUDA verification on 2026-09-18
+
+Against locked AMReX 26.04 at the recorded SHA, the Release CPU build passes
+45/45 CTests, including C8-G1. A separate CUDA 12.6.85 build for an RTX 4060
+Laptop GPU (`sm_89`) previously passed 36/36 applicable CTests; after the C8-G1
+wall-flux correction it compiles cleanly and the affected mapped C2.3/C5/C5.2
+runtime subset passes 8/8. CMake does not register the explicitly CPU-only
+checkpoint/restart, host sampling, and physical cases in a CUDA suite; this is
+an honest scope boundary, not a skipped claim of GPU I/O support. Numerical
+tables and commands are recorded in
+`_Docs/AMReX_P10-001_C2.3_C6_实施与验证_20260918.md` and
+`_Docs/AMReX_C8-G1_正交mapped通道物理reference_20260918.md`.
 
 ## P4 host verification on 2026-08-26
 

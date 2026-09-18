@@ -1,0 +1,9 @@
+# P10-001 Cartesian Taylor-Green spatial and temporal MMS, medium grid.
+avwis.mode = benchmark_cartesian_mms
+avwis.n_cell = 32 32 4
+avwis.max_grid_size = 8
+avwis.nghost = 2
+avwis.is_periodic = 1 1 1
+avwis.dt = 1.0e-4
+avwis.final_time = 2.0e-4
+avwis.viscosity = 1.0e-2

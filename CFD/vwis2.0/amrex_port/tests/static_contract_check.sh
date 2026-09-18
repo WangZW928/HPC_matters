@@ -9,6 +9,7 @@ required+=("$port/tests/curvilinear/MetricAnalyticOrthogonalContract.cpp")
 required+=("$port/src/AVWiSMappedOperators.H" "$port/src/AVWiSMappedOperators.cpp" "$port/tests/curvilinear/MetricOrthogonalOperatorContract.cpp" "$port/tests/contracts/AVWiSC2ContractChecks.cpp" "$port/inputs/p5_analytic_orthogonal_projection.in" "$port/inputs/p5_mapped_cartesian_rejected.in")
 required+=("$port/tests/contracts/AVWiSC5ContractChecks.cpp" "$port/inputs/p5_c5_mapped_wall_boundary.in" "$port/inputs/p5_c5_mapped_periodic_boundary.in")
 required+=("$port/inputs/p5_c52_mapped_inflow_outflow.in" "$port/inputs/p5_c52_mapped_wall_modes.in" "$port/inputs/p5_c52_mapped_legacy_rejected.in" "$port/inputs/p5_c52_mapped_moving_normal_rejected.in" "$port/inputs/p5_c52_nonorthogonal_rejected.in")
+required+=("$port/benchmarks/MappedChannelReferenceCase.H" "$port/benchmarks/MappedChannelReferenceCase.cpp" "$port/tests/c8_mapped_channel_convergence.cmake" "$port/inputs/c8_mapped_channel_16.in" "$port/inputs/c8_mapped_channel_32.in" "$port/inputs/c8_mapped_channel_64.in")
 required+=("$root/_Docs/AMReX_P5-003_G0_identity_metric_20260831.md" "$root/_Docs/AMReX_P5-003_C1_identity_adapter_20260831.md" "$root/_Docs/AMReX_P5-003_C2_analytic_orthogonal_20260831.md")
 required+=("$root/_Docs/AMReX_P5-003_C2.2_orthogonal_operators_20260901.md")
 required+=("$root/_Docs/AMReX_P5-003_C5.1_mapped_boundary_20260901.md")
@@ -34,9 +35,10 @@ rg -q 'add_test\(NAME avwis_p5_c5_mapped_wall_boundary' "$port/CMakeLists.txt"
 rg -q 'add_test\(NAME avwis_p5_c5_mapped_periodic_boundary' "$port/CMakeLists.txt"
 rg -q 'add_test\(NAME avwis_p5_c52_mapped_inflow_outflow' "$port/CMakeLists.txt"
 rg -q 'add_test\(NAME avwis_p5_c52_mapped_wall_modes' "$port/CMakeLists.txt"
-rg -q 'add_test\(NAME avwis_p5_c52_mapped_legacy_rejected' "$port/CMakeLists.txt"
-rg -q 'add_test\(NAME avwis_p5_c52_mapped_moving_normal_rejected' "$port/CMakeLists.txt"
-rg -q 'add_test\(NAME avwis_p5_c52_nonorthogonal_rejected' "$port/CMakeLists.txt"
+rg -q 'avwis_p5_c52_mapped_legacy_rejected p5_c52_mapped_legacy_rejected.in' "$port/CMakeLists.txt"
+rg -q 'avwis_p5_c52_mapped_moving_normal_rejected p5_c52_mapped_moving_normal_rejected.in' "$port/CMakeLists.txt"
+rg -q 'avwis_p5_c52_nonorthogonal_rejected p5_c52_nonorthogonal_rejected.in' "$port/CMakeLists.txt"
+rg -q 'add_test\(NAME avwis_c8_g1_mapped_channel_reference' "$port/CMakeLists.txt"
 rg -q 'class CoordinateMapping' "$port/src/AVWiSCoordinateMapping.H"
 rg -q 'class IdentityCoordinateMapping' "$port/src/AVWiSCoordinateMapping.H"
 rg -q 'class AnalyticOrthogonalCoordinateMapping' "$port/src/AVWiSCoordinateMapping.H"
@@ -118,6 +120,7 @@ fi
 rg -q 'dispatch_run_mode\(solver, run\)' "$port/src/main.cpp"
 rg -q 'run_cartesian_benchmark\(solver,' "$port/src/RunMode.cpp"
 rg -q 'run_physical_channel_benchmark\(solver,' "$port/src/RunMode.cpp"
+rg -q 'run_mapped_channel_reference\(' "$port/src/RunMode.cpp"
 rg -q 'run_lid_driven_cavity_case\(' "$port/src/RunMode.cpp"
 rg -q 'AVWiSContractRunner contracts\(solver\)' "$port/src/RunMode.cpp"
 rg -q 'contracts.run_runtime_contract_checks\(\)' "$port/src/RunMode.cpp"
@@ -178,10 +181,11 @@ rg -q 'm_face_area\[dir\]' "$port/src/AVWiSProjection.cpp"
 rg -q 'no automatic mean subtraction is permitted' "$port/src/AVWiSProjection.cpp"
 rg -q 'LinOpBCType::Dirichlet' "$port/src/AVWiSProjection.cpp"
 rg -q 'LinOpBCType::Neumann' "$port/src/AVWiSProjection.cpp"
-rg -Fq 'sync_ucat_from_ucont_impl(false)' "$port/src/AVWiSProjection.cpp"
+rg -Fq 'velocity(i,j,k,dir) += correction_scale' "$port/src/AVWiSProjection.cpp"
+rg -q 'compute_metric_cell_gradient' "$port/src/AVWiSProjection.cpp"
 rg -q 'P4 Cartesian projection contract: PASS' "$port/tests/contracts/AVWiSContractChecks.cpp"
 rg -Fq 'fx(i+1,j,k) * 0.5 * (u(i,j,k,comp) + u(i+1,j,k,comp))' "$port/src/AVWiSAdvection.cpp"
-rg -q 'inverse_volume' "$port/src/AVWiSAdvection.cpp"
+rg -q 'cell_volume_cc' "$port/src/AVWiSAdvection.cpp"
 rg -q 'P5-001 periodic manufactured advection: PASS' "$port/tests/contracts/AVWiSContractChecks.cpp"
 rg -q 'P5-001 boundary/multi-Box advection: PASS' "$port/tests/contracts/AVWiSContractChecks.cpp"
 rg -q 'P5-002 periodic manufactured viscosity: PASS' "$port/tests/contracts/AVWiSContractChecks.cpp"
@@ -202,4 +206,8 @@ rg -q 'MovingWall' "$port/src/CartesianBoundaryConfig.H" "$port/src/CartesianBou
 rg -q 'target = moving_wall_velocity\[comp\]' "$port/src/AVWiSBoundary.cpp"
 rg -q 'moving_wall_reconstruction_max_error' "$port/cases/LidDrivenCavityCase.cpp" "$port/tests/lid_driven_cavity.cmake"
 rg -q 'demonstration / engineering result; not CFD validation' "$port/cases/LidDrivenCavityCase.cpp"
-echo 'static P0-P8-003 plus cavity AMReX contract check: PASS'
+rg -q 'body_force' "$port/src/RunMode.H" "$port/src/RunMode.cpp" "$port/src/AVWiSTime.cpp"
+rg -q 'quadratic_dirichlet_wall_derivative' "$port/src/AVWiSViscosity.cpp"
+rg -q 'benchmark_mapped_channel_reference' "$port/src/RunMode.cpp" "$port/inputs/c8_mapped_channel_16.in"
+rg -q 'steady_residual_l2' "$port/benchmarks/MappedChannelReferenceCase.cpp" "$port/tests/c8_mapped_channel_convergence.cmake"
+echo 'static P0-P8-003, cavity, and C8-G1 AMReX contract check: PASS'

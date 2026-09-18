@@ -17,6 +17,29 @@ FieldLocation face_location(int dir)
     return dir == 0 ? FieldLocation::XFace :
            (dir == 1 ? FieldLocation::YFace : FieldLocation::ZFace);
 }
+
+void sync_cartesian_ucat_from_ucont_kernel(
+    amrex::MultiFab& ucat,
+    amrex::Array<amrex::MultiFab const*, AMREX_SPACEDIM> const& ucont,
+    amrex::Array<amrex::Real, AMREX_SPACEDIM> const& face_area)
+{
+    for (amrex::MFIter mfi(ucat, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        auto const cell_velocity = ucat.array(mfi);
+        for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+            auto const face_flux = ucont[dir]->const_array(mfi);
+            const amrex::Real inverse_face_area = 1.0 / face_area[dir];
+            amrex::ParallelFor(
+                mfi.tilebox(), [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
+                    const int ip = i + (dir == 0);
+                    const int jp = j + (dir == 1);
+                    const int kp = k + (dir == 2);
+                    cell_velocity(i,j,k,dir) = 0.5
+                        * (face_flux(i,j,k) + face_flux(ip,jp,kp)) * inverse_face_area;
+                });
+        }
+    }
+    amrex::Gpu::streamSynchronize();
+}
 } // namespace
 
 AVWiSSolver::AVWiSSolver(
@@ -81,6 +104,8 @@ AVWiSSolver::AVWiSSolver(
     m_ucat_older.define(m_ba, m_dm, AMREX_SPACEDIM, m_nghost);
     m_projection_rhs.define(m_ba, m_dm, 1, 0);
     m_projection_bc.define(m_ba, m_dm, 1, 1);
+    m_advection_rhs.define(m_ba, m_dm, AMREX_SPACEDIM, 0);
+    m_viscous_rhs.define(m_ba, m_dm, AMREX_SPACEDIM, 0);
     for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
         amrex::BoxArray face_ba = amrex::convert(m_ba, amrex::IntVect::TheDimensionVector(dir));
         m_ucont[dir].define(face_ba, m_dm, 1, m_nghost);
@@ -186,6 +211,8 @@ void AVWiSSolver::initialize()
     }
     m_projection_rhs.setVal(0.0);
     m_projection_bc.setVal(0.0);
+    m_advection_rhs.setVal(0.0);
+    m_viscous_rhs.setVal(0.0);
     m_time = 0.0;
     m_step = 0;
     m_history_depth = 1;
@@ -246,24 +273,15 @@ void AVWiSSolver::sync_ucat_from_ucont_impl(bool reapply_boundary_flux)
             AMREX_D_DECL(&m_ucont[0], &m_ucont[1], &m_ucont[2])};
         sync_orthogonal_ucat_from_ucont(flux, m_metric_data, m_metric_epoch,
                                        m_mapping_operator, m_ucat);
-    } else for (amrex::MFIter mfi(m_ucat, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-        auto const ucat = m_ucat.array(mfi);
-        for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
-            auto const ucont = m_ucont[dir].const_array(mfi);
-            const amrex::Real inverse_face_area = 1.0 / m_face_area[dir];
-            amrex::ParallelFor(mfi.validbox(), [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-                const int ip = i + (dir == 0);
-                const int jp = j + (dir == 1);
-                const int kp = k + (dir == 2);
-                ucat(i, j, k, dir) = 0.5 * (ucont(i, j, k) + ucont(ip, jp, kp)) * inverse_face_area;
-            });
-        }
+    } else {
+        amrex::Array<amrex::MultiFab const*, AMREX_SPACEDIM> flux{
+            AMREX_D_DECL(&m_ucont[0], &m_ucont[1], &m_ucont[2])};
+        sync_cartesian_ucat_from_ucont_kernel(m_ucat, flux, m_face_area);
     }
     mark_valid_modified();
     if (m_boundary.enabled) {
         fill_ghost_cells();
         fill_physical_ghost_cells_impl(reapply_boundary_flux);
-        (void)p3_diagnostics("sync-ucat-from-ucont", true);
     } else {
         fill_ghost_cells();
     }

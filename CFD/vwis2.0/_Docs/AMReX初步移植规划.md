@@ -1,6 +1,6 @@
 # AMReX 初步移植规划（证据驱动）
 
-> 范围：这是对 `vwis2.0/` 的增量移植规划和 `amrex_port/` 独立骨架说明，**不替换、也不修改**当前 PETSc/HYPRE 求解器。证据只来自入口和关键调用链，未全量展开源码。状态：AMReX 骨架尚未在本机编译（见验证）。
+> 范围：这是 2026-08-20 形成的初始增量规划和历史基线，**不替换、也不修改**当前 PETSc/HYPRE 求解器。文中“当前”“尚未实现”等措辞只描述当时快照，不再作为进度依据；最新状态统一以 [`AMReX移植任务清单.md`](./AMReX移植任务清单.md) 和阶段实施报告为准。
 
 ## 1. 当前框架、模块地图与依赖
 
@@ -98,11 +98,15 @@ main/PETSc+MPI
 
 ## 5. 最小可行路线与延后项
 
-最小可行路线是 **P0 → P1 → P2 → P3（无 LES 或固定模型）→ P4 静态几何**：先在单层 Cartesian、固定几何上得到可复现实验的 MAC 质量守恒和动量基线，再决定 EB2 与 custom IBM 的取舍。`amrex_port/` 当前完成到限定 P2 Cartesian 数据/变换/布局 contract；`advance_one_step()` 仍是明确的 no-op，尚无质量守恒或动量基线。
+> **历史快照（2026-08-20）：** 以下完成度描述用于解释最初路线，不代表当前实现状态。
+
+最小可行路线是 **P0 → P1 → P2 → P3（无 LES 或固定模型）→ P4 静态几何**：先在单层 Cartesian、固定几何上得到可复现实验的 MAC 质量守恒和动量基线，再决定 EB2 与 custom IBM 的取舍。当时 `amrex_port/` 只完成到限定 P2 Cartesian 数据/变换/布局 contract，`advance_one_step()` 仍是 no-op；后续进展见主任务清单。
 
 不应过早做：AMR tagging/重网格、GPU 性能调优、曲线 metric 的强行 `MLMG` 替换、移动 IBM、FSI 强耦合、以及复刻 PETSc→HYPRE 复制路径。它们均会在基线、离散和 BC 尚未固定时掩盖数值差异。
 
 ## 6. 本次新增物与验证范围
+
+> **历史快照（2026-08-20）：** 本节只记录初次规划时的新增物与未实现项。
 
 - 规划：`_Docs/AMReX初步移植规划.md`。
 - 独立骨架：`amrex_port/CMakeLists.txt`、`amrex_port/src/main.cpp`、`amrex_port/src/AVWiSSolver.H/.cpp`、`amrex_port/README.md`。

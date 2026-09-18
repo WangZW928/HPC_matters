@@ -1,0 +1,20 @@
+# C8-G1 medium y resolution; all physical/reference parameters are frozen.
+avwis.mode = benchmark_mapped_channel_reference
+avwis.coordinates = mapped
+avwis.mapping.type = analytic_orthogonal
+avwis.mapping.scale = 1.0 1.0 1.0
+avwis.mapping.stretch = 0.0 0.35 0.0
+avwis.projection.operator = orthogonal_mlmg
+avwis.n_cell = 8 32 8
+avwis.max_grid_size = 8
+avwis.nghost = 2
+avwis.is_periodic = 1 0 1
+avwis.dt = 1.0e-4
+avwis.final_time = 1.0e-2
+avwis.viscosity = 1.0e-2
+avwis.body_force = 0.0 0.0 0.12
+
+avwisbcs.enabled = 1
+avwisbcs.geometry = mapped_orthogonal
+avwisbcs.lo = "" noslip ""
+avwisbcs.hi = "" noslip ""

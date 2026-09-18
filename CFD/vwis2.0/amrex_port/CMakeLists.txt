@@ -3,10 +3,24 @@ cmake_minimum_required(VERSION 3.20)
 # enabled when consuming an AMReX install configured with AMReX_MPI=ON.
 project(avwis_port LANGUAGES C CXX)
 
-# A different AMReX can change CMake targets, GPU defaults, and solver APIs.
-# An override is allowed only for an explicitly labelled exploratory build.
-set(AVWIS_EXPECTED_VERSION "26.04" CACHE STRING
-    "AMReX version recorded by amrex_version.lock")
+# Keep the build contract and runtime provenance sourced from one lock file.
+# A different AMReX can change CMake targets, GPU defaults, and solver APIs;
+# an override is allowed only for an explicitly labelled exploratory build.
+set(AVWIS_VERSION_LOCK "${CMAKE_CURRENT_SOURCE_DIR}/amrex_version.lock")
+file(STRINGS "${AVWIS_VERSION_LOCK}" AVWIS_LOCKED_VERSION_LINE
+     REGEX "^AMReX_VERSION=")
+file(STRINGS "${AVWIS_VERSION_LOCK}" AVWIS_LOCKED_GIT_SHA_LINE
+     REGEX "^AMReX_GIT_SHA=")
+if (NOT AVWIS_LOCKED_VERSION_LINE OR NOT AVWIS_LOCKED_GIT_SHA_LINE)
+    message(FATAL_ERROR "amrex_version.lock must define AMReX_VERSION and AMReX_GIT_SHA")
+endif()
+string(REGEX REPLACE "^AMReX_VERSION=" "" AVWIS_LOCKED_VERSION
+       "${AVWIS_LOCKED_VERSION_LINE}")
+string(REGEX REPLACE "^AMReX_GIT_SHA=" "" AVWIS_LOCKED_GIT_SHA
+       "${AVWIS_LOCKED_GIT_SHA_LINE}")
+set(AVWIS_EXPECTED_VERSION "${AVWIS_LOCKED_VERSION}")
+message(STATUS
+    "AVWiS dependency lock: AMReX ${AVWIS_EXPECTED_VERSION} (${AVWIS_LOCKED_GIT_SHA})")
 option(AVWIS_ALLOW_VERSION_MISMATCH
        "Permit an AMReX version other than AVWIS_EXPECTED_VERSION for exploratory builds" OFF)
 
@@ -64,7 +78,9 @@ set(AVWIS_TEST_MODE_SOURCES
     tests/contracts/AVWiSContractRunner.cpp)
 set(AVWIS_CASE_SOURCES
     benchmarks/CartesianBenchmarkCase.cpp
+    benchmarks/TaylorGreenMMSCase.cpp
     benchmarks/PhysicalChannelCase.cpp
+    benchmarks/MappedChannelReferenceCase.cpp
     cases/LidDrivenCavityCase.cpp)
 set(AVWIS_SOURCES
     ${AVWIS_PRODUCTION_SOURCES}
@@ -84,7 +100,7 @@ target_link_libraries(avwis PRIVATE avwis_metric AMReX::amrex)
 target_compile_features(avwis PRIVATE cxx_std_17)
 target_compile_definitions(avwis PRIVATE
     AVWIS_LOCKED_VERSION="${AVWIS_EXPECTED_VERSION}"
-    AVWIS_LOCKED_GIT_SHA="9219ba416b7ba2073dd1b12bf19fdce27391f17b")
+    AVWIS_LOCKED_GIT_SHA="${AVWIS_LOCKED_GIT_SHA}")
 if (AMReX_CUDA)
     set_source_files_properties(${AVWIS_SOURCES} ${AVWIS_METRIC_SOURCES} PROPERTIES LANGUAGE CUDA)
     # AMReX 26.04 CUDA archives are built with relocatable device code; the
@@ -98,6 +114,15 @@ endif()
 
 include(CTest)
 if (BUILD_TESTING)
+    function(add_avwis_rejection_test test_name input_file expected_text)
+        add_test(NAME ${test_name}
+                 COMMAND ${CMAKE_COMMAND}
+                    -Dexe=$<TARGET_FILE:avwis>
+                    -Dinput=${CMAKE_CURRENT_SOURCE_DIR}/inputs/${input_file}
+                    -Dexpected=${expected_text}
+                    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/expect_failure.cmake)
+    endfunction()
+
     add_executable(avwis_metric_identity_contract
         tests/curvilinear/MetricIdentityContract.cpp)
     target_link_libraries(avwis_metric_identity_contract PRIVATE avwis_metric AMReX::amrex)
@@ -155,8 +180,9 @@ if (BUILD_TESTING)
              COMMAND avwis ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p3_cartesian_boundary.in)
     add_test(NAME avwis_p3_legacy_supported
              COMMAND avwis ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p3_legacy_supported.in)
-    add_test(NAME avwis_p3_legacy_rejected
-             COMMAND avwis ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p3_legacy_rejected.in)
+    add_avwis_rejection_test(
+        avwis_p3_legacy_rejected p3_legacy_rejected.in
+        "unsupported legacy BC integer 8")
     add_test(NAME avwis_p4_periodic_projection
              COMMAND avwis ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p4_periodic_projection.in)
     add_test(NAME avwis_p4_closed_neumann_projection
@@ -179,6 +205,12 @@ if (BUILD_TESTING)
              COMMAND avwis ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p5_explicit_time.in)
     add_test(NAME avwis_p5_orthogonal_projection
              COMMAND avwis ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p5_analytic_orthogonal_projection.in)
+    add_test(NAME avwis_p5_c23_mapped_rhs_time
+             COMMAND ${CMAKE_COMMAND}
+                -Dexe=$<TARGET_FILE:avwis>
+                -Dinputs=${CMAKE_CURRENT_SOURCE_DIR}/inputs
+                -Dwork=${CMAKE_CURRENT_BINARY_DIR}/c23_mapped_convergence
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/c23_mapped_convergence.cmake)
     add_test(NAME avwis_p5_c5_mapped_wall_boundary
              COMMAND avwis ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p5_c5_mapped_wall_boundary.in)
     add_test(NAME avwis_p5_c5_mapped_periodic_boundary
@@ -187,64 +219,101 @@ if (BUILD_TESTING)
              COMMAND avwis ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p5_c52_mapped_inflow_outflow.in)
     add_test(NAME avwis_p5_c52_mapped_wall_modes
              COMMAND avwis ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p5_c52_mapped_wall_modes.in)
-    add_test(NAME avwis_p5_c52_mapped_legacy_rejected
-             COMMAND avwis ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p5_c52_mapped_legacy_rejected.in)
-    add_test(NAME avwis_p5_c52_mapped_moving_normal_rejected
-             COMMAND avwis ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p5_c52_mapped_moving_normal_rejected.in)
-    add_test(NAME avwis_p5_c52_nonorthogonal_rejected
-             COMMAND avwis ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p5_c52_nonorthogonal_rejected.in)
-    add_test(NAME avwis_p5_mapped_cartesian_rejected
-             COMMAND avwis ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p5_mapped_cartesian_rejected.in)
-    add_test(NAME avwis_p5_explicit_cfl_rejected
-             COMMAND avwis ${CMAKE_CURRENT_SOURCE_DIR}/inputs/p5_explicit_cfl_rejected.in)
-    add_test(NAME avwis_p8_restart_consistency
-             COMMAND ${CMAKE_COMMAND}
-                -Dexe=$<TARGET_FILE:avwis>
-                -Dinput=${CMAKE_CURRENT_SOURCE_DIR}/inputs/p8_restart.in
-                -Dwork=${CMAKE_CURRENT_BINARY_DIR}/p8_restart_consistency
-                -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/p8_restart_consistency.cmake)
-    add_test(NAME avwis_p8_strict_rejection
-             COMMAND ${CMAKE_COMMAND}
-                -Dexe=$<TARGET_FILE:avwis>
-                -Dinput=${CMAKE_CURRENT_SOURCE_DIR}/inputs/p8_checkpoint_write.in
-                -Drestart_input=${CMAKE_CURRENT_SOURCE_DIR}/inputs/p8_checkpoint_restart.in
-                -Dwork=${CMAKE_CURRENT_BINARY_DIR}/p8_strict_rejection
-                -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/p8_strict_rejection.cmake)
-    add_test(NAME avwis_p8_sampling_statistics
-             COMMAND ${CMAKE_COMMAND}
-                -Dexe=$<TARGET_FILE:avwis>
-                -Dinput=${CMAKE_CURRENT_SOURCE_DIR}/inputs/p8_sampling_statistics.in
-                -Dreport=${CMAKE_CURRENT_BINARY_DIR}/p8_sampling_statistics.json
-                -Dplane=${CMAKE_CURRENT_BINARY_DIR}/p8_plane_x1.csv
-                -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/p8_sampling_statistics.cmake)
+    add_avwis_rejection_test(
+        avwis_p5_c52_mapped_legacy_rejected p5_c52_mapped_legacy_rejected.in
+        "mapped physical boundaries require named BCs")
+    add_avwis_rejection_test(
+        avwis_p5_c52_mapped_moving_normal_rejected p5_c52_mapped_moving_normal_rejected.in
+        "moving_wall_velocity must have zero normal component")
+    add_avwis_rejection_test(
+        avwis_p5_c52_nonorthogonal_rejected p5_c52_nonorthogonal_rejected.in
+        "unknown coordinate mapping type 'general_nonorthogonal'")
+    add_avwis_rejection_test(
+        avwis_p5_mapped_cartesian_rejected p5_mapped_cartesian_rejected.in
+        "mapped coordinates currently require identity or analytic_orthogonal mapping")
+    add_avwis_rejection_test(
+        avwis_p5_explicit_cfl_rejected p5_explicit_cfl_rejected.in
+        "explicit step rejected: advective CFL and diffusive number must each be <= 1")
+    # Checkpoint/restart and host-side sampling are deliberately CPU-only.
+    # Do not register unsupported cases in a CUDA CTest suite: an explicit
+    # runtime rejection remains the production contract, not a GPU test pass.
+    if (NOT AMReX_CUDA)
+        add_test(NAME avwis_p8_restart_consistency
+                 COMMAND ${CMAKE_COMMAND}
+                    -Dexe=$<TARGET_FILE:avwis>
+                    -Dinput=${CMAKE_CURRENT_SOURCE_DIR}/inputs/p8_restart.in
+                    -Dwork=${CMAKE_CURRENT_BINARY_DIR}/p8_restart_consistency
+                    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/p8_restart_consistency.cmake)
+        add_test(NAME avwis_p6_mapped_restart_consistency
+                 COMMAND ${CMAKE_COMMAND}
+                    -Dexe=$<TARGET_FILE:avwis>
+                    -Dinput=${CMAKE_CURRENT_SOURCE_DIR}/inputs/p6_mapped_restart.in
+                    -Dwork=${CMAKE_CURRENT_BINARY_DIR}/p6_mapped_restart_consistency
+                    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/p8_restart_consistency.cmake)
+        add_test(NAME avwis_p6_mapped_provenance_rejected
+                 COMMAND ${CMAKE_COMMAND}
+                    -Dexe=$<TARGET_FILE:avwis>
+                    -Dinput=${CMAKE_CURRENT_SOURCE_DIR}/inputs/p6_mapped_checkpoint_write.in
+                    -Dmismatch_input=${CMAKE_CURRENT_SOURCE_DIR}/inputs/p6_mapped_checkpoint_mismatch.in
+                    -Dwork=${CMAKE_CURRENT_BINARY_DIR}/p6_mapped_provenance_rejection
+                    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/c6_mapped_provenance_rejection.cmake)
+        add_test(NAME avwis_p6_mapped_cross_layout_restart
+                 COMMAND ${CMAKE_COMMAND}
+                    -Dexe=$<TARGET_FILE:avwis>
+                    -Dproducer_input=${CMAKE_CURRENT_SOURCE_DIR}/inputs/p6_mapped_checkpoint_write.in
+                    -Dconsumer_input=${CMAKE_CURRENT_SOURCE_DIR}/inputs/p6_mapped_checkpoint_cross_layout.in
+                    -Dwork=${CMAKE_CURRENT_BINARY_DIR}/p6_mapped_cross_layout
+                    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/c6_mapped_cross_layout.cmake)
+        add_test(NAME avwis_p8_strict_rejection
+                 COMMAND ${CMAKE_COMMAND}
+                    -Dexe=$<TARGET_FILE:avwis>
+                    -Dinput=${CMAKE_CURRENT_SOURCE_DIR}/inputs/p8_checkpoint_write.in
+                    -Drestart_input=${CMAKE_CURRENT_SOURCE_DIR}/inputs/p8_checkpoint_restart.in
+                    -Dwork=${CMAKE_CURRENT_BINARY_DIR}/p8_strict_rejection
+                    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/p8_strict_rejection.cmake)
+        add_test(NAME avwis_p8_sampling_statistics
+                 COMMAND ${CMAKE_COMMAND}
+                    -Dexe=$<TARGET_FILE:avwis>
+                    -Dinput=${CMAKE_CURRENT_SOURCE_DIR}/inputs/p8_sampling_statistics.in
+                    -Dreport=${CMAKE_CURRENT_BINARY_DIR}/p8_sampling_statistics.json
+                    -Dplane=${CMAKE_CURRENT_BINARY_DIR}/p8_plane_x1.csv
+                    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/p8_sampling_statistics.cmake)
+    endif()
     add_test(NAME avwis_cartesian_benchmark
              COMMAND ${CMAKE_COMMAND}
                 -Dexe=$<TARGET_FILE:avwis>
                 -Dinput=${CMAKE_CURRENT_SOURCE_DIR}/inputs/p0_cartesian_benchmark.in
                 -Dreport=${CMAKE_CURRENT_BINARY_DIR}/cartesian_benchmark.json
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cartesian_benchmark.cmake)
-    add_test(NAME avwis_physical_channel
+    add_test(NAME avwis_p10_001_taylor_green_mms
              COMMAND ${CMAKE_COMMAND}
                 -Dexe=$<TARGET_FILE:avwis>
-                -Dinput=${CMAKE_CURRENT_SOURCE_DIR}/inputs/physical_channel.in
-                -Dreport=${CMAKE_CURRENT_BINARY_DIR}/physical_channel.json
-                -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/physical_channel.cmake)
-    add_test(NAME avwis_lid_driven_cavity_sanity
-             COMMAND ${CMAKE_COMMAND}
-                -Dexe=$<TARGET_FILE:avwis>
-                -Dinput=${CMAKE_CURRENT_SOURCE_DIR}/inputs/p10_lid_cavity_sanity.in
-                -Dwork=${CMAKE_CURRENT_BINARY_DIR}/lid_driven_cavity_sanity
-                -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/lid_driven_cavity.cmake)
-    add_test(NAME avwis_unknown_mode_rejected
-             COMMAND avwis ${CMAKE_CURRENT_SOURCE_DIR}/inputs/unknown_mode.in)
-    # The source error text is also pinned by static_contract_check.sh.  CTest's
-    # WILL_FAIL inverts the nonzero process status; combining it with
-    # PASS_REGULAR_EXPRESSION has version-dependent inversion semantics.
-    set_tests_properties(avwis_p3_legacy_rejected avwis_p5_explicit_cfl_rejected
-                         avwis_p5_mapped_cartesian_rejected
-                         avwis_p5_c52_mapped_legacy_rejected
-                         avwis_p5_c52_mapped_moving_normal_rejected
-                         avwis_p5_c52_nonorthogonal_rejected
-                         avwis_unknown_mode_rejected
-                         PROPERTIES WILL_FAIL TRUE)
+                -Dinputs=${CMAKE_CURRENT_SOURCE_DIR}/inputs
+                -Dwork=${CMAKE_CURRENT_BINARY_DIR}/p10_taylor_green_mms
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/p10_taylor_green_convergence.cmake)
+    if (NOT AMReX_CUDA)
+        add_test(NAME avwis_c8_g1_mapped_channel_reference
+                 COMMAND ${CMAKE_COMMAND}
+                    -Dexe=$<TARGET_FILE:avwis>
+                    -Dinputs=${CMAKE_CURRENT_SOURCE_DIR}/inputs
+                    -Dwork=${CMAKE_CURRENT_BINARY_DIR}/c8_g1_mapped_channel
+                    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/c8_mapped_channel_convergence.cmake)
+    endif()
+    if (NOT AMReX_CUDA)
+        add_test(NAME avwis_physical_channel
+                 COMMAND ${CMAKE_COMMAND}
+                    -Dexe=$<TARGET_FILE:avwis>
+                    -Dinput=${CMAKE_CURRENT_SOURCE_DIR}/inputs/physical_channel.in
+                    -Dreport=${CMAKE_CURRENT_BINARY_DIR}/physical_channel.json
+                    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/physical_channel.cmake)
+        add_test(NAME avwis_lid_driven_cavity_sanity
+                 COMMAND ${CMAKE_COMMAND}
+                    -Dexe=$<TARGET_FILE:avwis>
+                    -Dinput=${CMAKE_CURRENT_SOURCE_DIR}/inputs/p10_lid_cavity_sanity.in
+                    -Dwork=${CMAKE_CURRENT_BINARY_DIR}/lid_driven_cavity_sanity
+                    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/lid_driven_cavity.cmake)
+    endif()
+    add_avwis_rejection_test(
+        avwis_unknown_mode_rejected unknown_mode.in
+        "unknown avwis.mode 'definitely_not_a_mode'")
 endif()

@@ -46,6 +46,13 @@ void AVWiSContractRunner::run_p5_orthogonal_projection_contract_checks(
         dt, time_coefficient);
 }
 
+void AVWiSContractRunner::run_p5_orthogonal_time_contract_checks(
+    std::string const& report_path, amrex::Real dt, amrex::Real viscosity)
+{
+    AVWiSContractTestAccess(m_solver).run_p5_orthogonal_time_contract_checks(
+        report_path, dt, viscosity);
+}
+
 void AVWiSContractRunner::run_p5_mapped_boundary_contract_checks(
     amrex::Real dt, amrex::Real time_coefficient)
 {

@@ -1,0 +1,13 @@
+avwis.mode = solve
+avwis.coordinates = mapped
+avwis.mapping.type = analytic_orthogonal
+avwis.mapping.scale = 1.1 0.9 1.05
+avwis.mapping.stretch = 0.25 -0.15 0.1
+avwis.projection.operator = orthogonal_mlmg
+avwis.n_cell = 8 8 8
+avwis.max_grid_size = 4
+avwis.nghost = 2
+avwis.is_periodic = 1 1 1
+avwis.dt = 1.0e-4
+avwis.viscosity = 0.01
+avwis.run_steps = 2

@@ -670,7 +670,7 @@ void AVWiSContractTestAccess::run_p5_viscous_contract_checks(amrex::Real viscosi
     for (amrex::MFIter mfi(m_ucat, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
         auto const u = m_ucat.array(mfi);
         amrex::ParallelFor(
-            mfi.validbox(), AMREX_SPACEDIM,
+            mfi.tilebox(), AMREX_SPACEDIM,
             [=] AMREX_GPU_DEVICE (int i, int j, int k, int comp) noexcept {
                 const amrex::Real x = xlo + (static_cast<amrex::Real>(i) + 0.5) * dx;
                 u(i,j,k,comp) = amplitudes[comp] * amrex::Math::sinpi(2.0 * (x-xlo) / length);

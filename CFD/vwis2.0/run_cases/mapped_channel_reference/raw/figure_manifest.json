@@ -1,0 +1,28 @@
+{
+  "schema": "avwis-c8-g1-figure-manifest-v1",
+  "source_data": [
+    "raw/mapped_channel_16.csv",
+    "raw/mapped_channel_16.json",
+    "raw/mapped_channel_32.csv",
+    "raw/mapped_channel_32.json",
+    "raw/mapped_channel_64.csv",
+    "raw/mapped_channel_64.json"
+  ],
+  "outputs": [
+    "figures/profiles.png",
+    "figures/profiles.svg",
+    "figures/convergence.png",
+    "figures/convergence.svg"
+  ],
+  "transformations": [
+    "absolute value of the signed pointwise velocity error for log display",
+    "logarithmic axes applied only to strictly positive error and residual values",
+    "continuous analytic profile w=6*y*(1-y) sampled at 401 points",
+    "O(N_y^-2) and O(N_y^-1) reference guides normalized at N_y=16",
+    "no filtering, smoothing, exclusion, or interpolation of numerical observations"
+  ],
+  "matplotlib_version": "3.11.1",
+  "png_dpi": 301,
+  "figure_width_mm": 180,
+  "background": "opaque white"
+}

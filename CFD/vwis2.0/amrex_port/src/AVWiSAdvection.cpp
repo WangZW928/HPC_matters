@@ -13,11 +13,22 @@
 
 void AVWiSSolver::compute_cartesian_advection_rhs(amrex::MultiFab& rhs)
 {
-    if (rhs.boxArray() != m_ba || rhs.nComp() != AMREX_SPACEDIM) {
-        throw std::runtime_error("P5 Cartesian advection RHS must be a three-component cell MultiFab");
+    if (m_mapping_operator.coordinates != CoordinateSystemMode::Cartesian) {
+        throw std::runtime_error(
+            "P5 Cartesian advection entry point requires Cartesian coordinates");
+    }
+    compute_advection_rhs(rhs);
+}
+
+void AVWiSSolver::compute_advection_rhs(amrex::MultiFab& rhs)
+{
+    if (!rhs.boxArray().ixType().cellCentered() || rhs.boxArray() != m_ba ||
+        rhs.DistributionMap() != m_dm || rhs.nComp() != AMREX_SPACEDIM) {
+        throw std::runtime_error(
+            "P5 advection RHS must match the solver cell layout and DistributionMapping");
     }
     if (m_nghost < 1) {
-        throw std::runtime_error("P5 Cartesian advection requires avwis.nghost>=1");
+        throw std::runtime_error("P5 advection requires avwis.nghost>=1");
     }
     if (m_boundary.enabled) {
         apply_boundary_pipeline("pre-p5-advection");
@@ -25,17 +36,17 @@ void AVWiSSolver::compute_cartesian_advection_rhs(amrex::MultiFab& rhs)
         for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
             if (!m_geom.isPeriodic(dir)) {
                 throw std::runtime_error(
-                    "P5 Cartesian advection requires explicit vwisbcs on non-periodic directions");
+                    "P5 advection requires explicit avwisbcs on non-periodic directions");
             }
         }
         fill_ghost_cells();
     }
-    require_ghosts_fresh("P5 Cartesian advection");
+    require_ghosts_fresh("P5 momentum advection");
 
-    const amrex::Real inverse_volume = 1.0 / m_cell_volume;
     for (amrex::MFIter mfi(rhs, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
         auto const adv = rhs.array(mfi);
         auto const u = m_ucat.const_array(mfi);
+        auto const volume = m_metric_data.cell_volume_cc().const_array(mfi);
         auto const fx = m_ucont[0].const_array(mfi);
         auto const fy = m_ucont[1].const_array(mfi);
         auto const fz = m_ucont[2].const_array(mfi);
@@ -50,7 +61,7 @@ void AVWiSSolver::compute_cartesian_advection_rhs(amrex::MultiFab& rhs)
                 const amrex::Real flux_z_lo = fz(i,j,k)   * 0.5 * (u(i,j,k-1,comp) + u(i,j,k,comp));
                 adv(i,j,k,comp) = -((flux_x_hi-flux_x_lo) +
                                      (flux_y_hi-flux_y_lo) +
-                                     (flux_z_hi-flux_z_lo)) * inverse_volume;
+                                     (flux_z_hi-flux_z_lo)) / volume(i,j,k);
             });
     }
     amrex::Gpu::streamSynchronize();

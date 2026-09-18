@@ -3,6 +3,8 @@
 #include "CartesianBenchmarkCase.H"
 #include "LidDrivenCavityCase.H"
 #include "PhysicalChannelCase.H"
+#include "MappedChannelReferenceCase.H"
+#include "TaylorGreenMMSCase.H"
 #include "AVWiSSolver.H"
 #include "AVWiSContractRunner.H"
 
@@ -30,9 +32,10 @@ RunMode parse_run_mode(amrex::ParmParse& pp)
             "avwis.mode is required; expected solve, contract_base, contract_base_p2, "
             "contract_p2, contract_p3, contract_p4, contract_p5_advection, contract_p5_viscous, "
             "contract_p5_time, contract_p5_orthogonal, contract_p5_mapped_boundary, "
-            "contract_p5_mapped_boundary_c52, "
+            "contract_p5_orthogonal_time, contract_p5_mapped_boundary_c52, "
             "contract_p8_restart, contract_p8_sampling, "
-            "benchmark_cartesian, benchmark_physical_channel, or case_lid_cavity");
+            "benchmark_cartesian, benchmark_cartesian_mms, benchmark_physical_channel, "
+            "benchmark_mapped_channel_reference, or case_lid_cavity");
     }
 
     static const std::unordered_map<std::string, RunMode> modes = {
@@ -46,12 +49,15 @@ RunMode parse_run_mode(amrex::ParmParse& pp)
         {"contract_p5_viscous", RunMode::ContractP5Viscous},
         {"contract_p5_time", RunMode::ContractP5Time},
         {"contract_p5_orthogonal", RunMode::ContractP5Orthogonal},
+        {"contract_p5_orthogonal_time", RunMode::ContractP5OrthogonalTime},
         {"contract_p5_mapped_boundary", RunMode::ContractP5MappedBoundary},
         {"contract_p5_mapped_boundary_c52", RunMode::ContractP5MappedBoundaryC52},
         {"contract_p8_restart", RunMode::ContractP8Restart},
         {"contract_p8_sampling", RunMode::ContractP8Sampling},
         {"benchmark_cartesian", RunMode::BenchmarkCartesian},
+        {"benchmark_cartesian_mms", RunMode::BenchmarkCartesianMMS},
         {"benchmark_physical_channel", RunMode::BenchmarkPhysicalChannel},
+        {"benchmark_mapped_channel_reference", RunMode::BenchmarkMappedChannelReference},
         {"case_lid_cavity", RunMode::CaseLidCavity},
     };
     const auto found = modes.find(name);
@@ -71,7 +77,7 @@ void require_file(std::string const& value, char const* message)
 void run_solve_loop(AVWiSSolver& solver, RunConfiguration const& config)
 {
     for (int step = 0; step < config.run_steps; ++step) {
-        solver.advance_one_step(config.dt, config.viscosity);
+        solver.advance_one_step(config.dt, config.viscosity, config.body_force);
     }
     if (!config.checkpoint_file.empty()) {
         solver.write_checkpoint(config.checkpoint_file);
@@ -105,6 +111,12 @@ RunConfiguration read_run_configuration(amrex::ParmParse& pp)
     pp.query("viscosity", config.viscosity);
     pp.query("final_time", config.final_time);
     pp.query("projection_time_coefficient", config.projection_time_coefficient);
+    amrex::Vector<amrex::Real> body_force(
+        config.body_force.begin(), config.body_force.end());
+    pp.queryarr("body_force", body_force, 0, AMREX_SPACEDIM);
+    for (int comp = 0; comp < AMREX_SPACEDIM; ++comp) {
+        config.body_force[comp] = body_force[comp];
+    }
     pp.query("metadata_file", config.metadata_file);
     pp.query("checkpoint_file", config.checkpoint_file);
     pp.query("restart_file", config.restart_file);
@@ -177,6 +189,15 @@ void dispatch_run_mode(AVWiSSolver& solver, RunConfiguration const& config)
             config.dt, config.projection_time_coefficient);
         return;
         }
+    case RunMode::ContractP5OrthogonalTime:
+        {
+        require_file(config.metadata_file,
+                     "avwis.metadata_file is required for the C2.3 mapped time contract");
+        AVWiSContractRunner contracts(solver);
+        contracts.run_p5_orthogonal_time_contract_checks(
+            config.metadata_file, config.dt, config.viscosity);
+        return;
+        }
     case RunMode::ContractP5MappedBoundary:
         {
         AVWiSContractRunner contracts(solver);
@@ -222,11 +243,26 @@ void dispatch_run_mode(AVWiSSolver& solver, RunConfiguration const& config)
         run_cartesian_benchmark(solver, config.dt, config.run_steps, config.viscosity,
                                 config.metadata_file);
         return;
+    case RunMode::BenchmarkCartesianMMS:
+        require_file(config.metadata_file,
+                     "avwis.metadata_file is required for the Cartesian MMS benchmark");
+        run_taylor_green_mms(solver, config.dt, config.final_time,
+                             config.viscosity, config.metadata_file);
+        return;
     case RunMode::BenchmarkPhysicalChannel:
         require_file(config.metadata_file,
                      "avwis.metadata_file is required for the physical benchmark");
         run_physical_channel_benchmark(solver, config.dt, config.run_steps,
                                        config.viscosity, config.metadata_file);
+        return;
+    case RunMode::BenchmarkMappedChannelReference:
+        if (config.metadata_file.empty() || config.plane_file.empty()) {
+            throw std::runtime_error(
+                "mapped channel reference requires avwis.metadata_file and plane_file");
+        }
+        run_mapped_channel_reference(
+            solver, config.dt, config.final_time, config.viscosity,
+            config.body_force, config.metadata_file, config.plane_file);
         return;
     case RunMode::CaseLidCavity:
         if (config.metadata_file.empty() || config.field_file.empty() ||

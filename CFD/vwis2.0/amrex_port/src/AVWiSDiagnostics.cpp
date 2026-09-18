@@ -16,7 +16,7 @@
 
 namespace {
 
-void require_p8_diagnostics_scope()
+void require_p8_diagnostics_scope(CoordinateSystemMode coordinates)
 {
     if (amrex::ParallelDescriptor::NProcs() != 1) {
         throw std::runtime_error("P8 diagnostics rejected: sampling/section output supports exactly one MPI rank");
@@ -24,6 +24,10 @@ void require_p8_diagnostics_scope()
 #ifdef AMREX_USE_GPU
     throw std::runtime_error("P8 diagnostics rejected: sampling/section output is validated only for an AMReX CPU build");
 #endif
+    if (coordinates != CoordinateSystemMode::Cartesian) {
+        throw std::runtime_error(
+            "P8 uniform sampling/section diagnostics require Cartesian coordinates");
+    }
 }
 
 struct PlaneRow {
@@ -64,20 +68,11 @@ P3Diagnostics AVWiSSolver::p3_diagnostics(char const* stage, bool require_fresh)
     }
 
     amrex::MultiFab divergence(m_ba, m_dm, 1, 0);
-    for (amrex::MFIter mfi(divergence, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-        auto const div = divergence.array(mfi);
-        auto const fx = m_ucont[0].const_array(mfi);
-        auto const fy = m_ucont[1].const_array(mfi);
-        auto const fz = m_ucont[2].const_array(mfi);
-        const amrex::Real inverse_volume = 1.0 / m_cell_volume;
-        amrex::ParallelFor(mfi.validbox(), [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept {
-            div(i,j,k) = ((fx(i+1,j,k)-fx(i,j,k)) + (fy(i,j+1,k)-fy(i,j,k))
-                         + (fz(i,j,k+1)-fz(i,j,k))) * inverse_volume;
-        });
-    }
-    amrex::Gpu::streamSynchronize();
-    amrex::Real local_integral = divergence.sum(0, true) * m_cell_volume;
+    compute_cartesian_divergence(divergence);
     amrex::Real local_max = divergence.norm0(0, 0, true);
+    amrex::MultiFab::Multiply(
+        divergence, m_metric_data.cell_volume_cc(), 0, 0, 1, 0);
+    amrex::Real local_integral = divergence.sum(0, true);
     amrex::ParallelDescriptor::ReduceRealSum(local_integral);
     amrex::ParallelDescriptor::ReduceRealMax(local_max);
     result.integrated_divergence = local_integral;
@@ -122,16 +117,14 @@ void AVWiSSolver::diagnostics() const
 
 void AVWiSSolver::write_metadata_manifest(std::string const& path) const
 {
-    if (m_mapping_operator.coordinates != CoordinateSystemMode::Cartesian) {
-        throw std::runtime_error(
-            "C2.2 mapped mode has no mapping-provenance metadata/checkpoint schema");
-    }
     if (!amrex::ParallelDescriptor::IOProcessor()) return;
     std::ofstream output(path);
     if (!output) throw std::runtime_error("cannot write P5 metadata manifest: " + path);
-    output << "{\n  \"schema\": \"avwis-amrex-p5-cartesian-contract-v1\",\n"
+    output << "{\n  \"schema\": \"avwis-amrex-state-metadata-v2\",\n"
            << "  \"payload_written\": false,\n"
-           << "  \"note\": \"Not a plotfile or checkpoint; P5-004 history cannot be restarted from this metadata.\",\n"
+           << "  \"note\": \"Not a plotfile or checkpoint; restart requires the C6 checkpoint payload.\",\n"
+           << "  \"coordinate_system\": \""
+           << coordinate_system_mode_name(m_mapping_operator.coordinates) << "\",\n"
            << "  \"fields\": [\n";
     for (std::size_t i = 0; i < m_fields.size(); ++i) {
         auto const& field = m_fields[i];
@@ -143,8 +136,23 @@ void AVWiSSolver::write_metadata_manifest(std::string const& path) const
                << "\", \"ownership\": \"" << field.ownership << "\"}"
                << (i + 1 == m_fields.size() ? "\n" : ",\n");
     }
-    output << "  ],\n  \"cartesian\": {\"dx\": [" << m_dx[0] << ", " << m_dx[1] << ", " << m_dx[2]
-           << "], \"cell_volume\": " << m_cell_volume << "},\n  \"metrics\": [\n";
+    output << "  ],\n  \"logical_grid\": {\"spacing\": [" << m_dx[0] << ", "
+           << m_dx[1] << ", " << m_dx[2] << "]},\n"
+           << "  \"mapping\": {\"type\": \"" << m_mapping_operator.mapping_type
+           << "\", \"projection_operator\": \""
+           << projection_operator_mode_name(m_mapping_operator.projection)
+           << "\", \"metric_discretization\": \"" << MetricData::discretization_version
+           << "\", \"scale\": [";
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+        output << (dir == 0 ? "" : ", ")
+               << m_mapping_operator.analytic_parameters.scale[dir];
+    }
+    output << "], \"stretch\": [";
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+        output << (dir == 0 ? "" : ", ")
+               << m_mapping_operator.analytic_parameters.stretch[dir];
+    }
+    output << "]},\n  \"metrics\": [\n";
     for (std::size_t i = 0; i < m_metrics.size(); ++i) {
         auto const& metric = m_metrics[i];
         output << "    {\"name\": \"" << metric.name << "\", \"location\": \"" << metric.location
@@ -154,14 +162,15 @@ void AVWiSSolver::write_metadata_manifest(std::string const& path) const
     output << "  ],\n"
            << "  \"time_state\": {\"time\": " << m_time << ", \"step\": " << m_step
            << ", \"history_depth\": " << m_history_depth << "},\n"
-           << "  \"advance_one_step\": \"provisional explicit Euler RHS plus Cartesian projection; not legacy SNES\",\n"
-           << "  \"projection\": \"single-level Cartesian MLPoisson/MLMG; used by the provisional explicit baseline\"\n}\n";
+           << "  \"advance_one_step\": \"explicit Euler conservative RHS plus coordinate-matched projection; not legacy SNES\",\n"
+           << "  \"projection\": \"single-level "
+           << projection_operator_mode_name(m_mapping_operator.projection) << "\"\n}\n";
 }
 
 UniformPointSample AVWiSSolver::sample_uniform_point(
     amrex::Array<amrex::Real, AMREX_SPACEDIM> const& position) const
 {
-    require_p8_diagnostics_scope();
+    require_p8_diagnostics_scope(m_mapping_operator.coordinates);
     UniformPointSample result;
     const amrex::Box& domain = m_geom.Domain();
     for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
@@ -197,7 +206,7 @@ UniformPointSample AVWiSSolver::sample_uniform_point(
 UniformPlaneStatistics AVWiSSolver::uniform_plane_statistics(
     int direction, int cell_index) const
 {
-    require_p8_diagnostics_scope();
+    require_p8_diagnostics_scope(m_mapping_operator.coordinates);
     const amrex::Box& domain = m_geom.Domain();
     if (direction < 0 || direction >= AMREX_SPACEDIM ||
         cell_index < domain.smallEnd(direction) || cell_index > domain.bigEnd(direction)) {
@@ -248,7 +257,7 @@ UniformPlaneStatistics AVWiSSolver::uniform_plane_statistics(
 
 UniformFlowDiagnostics AVWiSSolver::uniform_flow_diagnostics() const
 {
-    require_p8_diagnostics_scope();
+    require_p8_diagnostics_scope(m_mapping_operator.coordinates);
     UniformFlowDiagnostics result;
     amrex::MultiFab divergence(m_ba, m_dm, 1, 0);
     compute_cartesian_divergence(divergence);
@@ -303,7 +312,7 @@ UniformFlowDiagnostics AVWiSSolver::uniform_flow_diagnostics() const
 void AVWiSSolver::write_uniform_plane_csv(
     std::string const& path, int direction, int cell_index) const
 {
-    require_p8_diagnostics_scope();
+    require_p8_diagnostics_scope(m_mapping_operator.coordinates);
     (void)uniform_plane_statistics(direction, cell_index); // validates the request
     amrex::MultiFab divergence(m_ba, m_dm, 1, 0);
     compute_cartesian_divergence(divergence);

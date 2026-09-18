@@ -107,9 +107,10 @@ struct MetricSpec {
  * Thus DistributionMapping is the sole MPI ownership authority; valid cells
  * may be written independently and only fill_ghost_cells() exchanges halos.
  * P4 adds a single-level Cartesian pressure projection of integrated face
- * volume flux. P5 adds conservative Cartesian advective and constant-
- * coefficient viscous RHS operators and a minimal explicit fractional step; no variable viscosity,
- * curvilinear operator, LES, IBM, or FSI exists.
+ * volume flux. P5 adds conservative Cartesian and separable-orthogonal
+ * mapped advective/constant-coefficient viscous RHS operators plus a minimal
+ * explicit fractional step; no variable viscosity, general non-orthogonal
+ * operator, LES, IBM, or FSI exists.
  */
 class AVWiSSolver {
 public:
@@ -131,10 +132,14 @@ public:
     void fill_ghost_cells();
     /** Fill non-periodic physical ghosts and impose boundary-normal Ucont faces. */
     void fill_physical_ghost_cells();
+    /** Internal variant used after projection; public for CUDA extended-lambda compilation. */
+    void fill_physical_ghost_cells_impl(bool impose_boundary_flux);
     /** Required order: same-level/MPI/periodic halo, then physical ghosts/faces. */
-    void apply_boundary_pipeline(char const* stage);
-    /** Provisional explicit Euler predictor plus Cartesian projection; not legacy SNES. */
-    void advance_one_step(amrex::Real dt, amrex::Real viscosity = 0.1);
+    void apply_boundary_pipeline(char const* stage, bool emit_diagnostics = false);
+    /** Provisional explicit Euler predictor plus coordinate-matched projection; not legacy SNES. */
+    void advance_one_step(
+        amrex::Real dt, amrex::Real viscosity = 0.1,
+        amrex::Array<amrex::Real, AMREX_SPACEDIM> const& body_force = {});
     /** Conservative explicit-step diagnostics; limits are guards, not a nonlinear stability proof. */
     TimeStepDiagnostics time_step_diagnostics(amrex::Real dt, amrex::Real viscosity) const;
     /** Recover Cartesian velocity by averaging adjacent face volume-flux densities. */
@@ -149,6 +154,10 @@ public:
     void compute_cartesian_advection_rhs(amrex::MultiFab& rhs);
     /** Uniform Cartesian constant-coefficient nu*Laplacian(Ucat), component-wise. */
     void compute_cartesian_viscous_rhs(amrex::MultiFab& rhs, amrex::Real viscosity);
+    /** Coordinate-dispatched conservative momentum advection RHS. */
+    void compute_advection_rhs(amrex::MultiFab& rhs);
+    /** Coordinate-dispatched constant-coefficient physical Laplacian RHS. */
+    void compute_viscous_rhs(amrex::MultiFab& rhs, amrex::Real viscosity);
     /** Globally reduced P3 boundary/divergence/freshness report; diagnostic only, never a RHS. */
     P3Diagnostics p3_diagnostics(char const* stage, bool require_fresh = true) const;
     /** IO-rank layout/schema diagnostics, safe after initialization or a completed step. */
@@ -157,7 +166,7 @@ public:
     void write_metadata_manifest(std::string const& path) const;
     /** Write an AMReX VisMF checkpoint plus a strict, versioned Header manifest. */
     void write_checkpoint(std::string const& path) const;
-    /** Restore every persistent Cartesian field and time layer from a strict checkpoint. */
+    /** Restore persistent fields/time layers with strict Cartesian or mapped provenance. */
     void read_checkpoint(std::string const& path);
     /** Sample the containing cell; the current P8-003 implementation is CPU/single-rank. */
     UniformPointSample sample_uniform_point(
@@ -191,7 +200,6 @@ private:
     void require_ghosts_fresh(char const* consumer) const;
     amrex::Real boundary_flux(int dir, bool high) const;
     amrex::Real inlet_profile_integral(int dir, bool high) const;
-    void fill_physical_ghost_cells_impl(bool impose_boundary_flux);
     void sync_ucat_from_ucont_impl(bool reapply_boundary_flux);
     void compute_cartesian_divergence(amrex::MultiFab& divergence) const;
     amrex::Real validate_singular_rhs_compatibility(amrex::MultiFab const& rhs) const;
@@ -212,6 +220,10 @@ private:
     amrex::MultiFab m_ucat_older;
     amrex::MultiFab m_projection_rhs;
     amrex::MultiFab m_projection_bc;
+    // Reused Cartesian momentum workspaces; these are derived scratch fields,
+    // not checkpoint state or additional time layers.
+    amrex::MultiFab m_advection_rhs;
+    amrex::MultiFab m_viscous_rhs;
 
     // MAC face IndexType: each field has one normal volume-flux component.
     amrex::Array<amrex::MultiFab, AMREX_SPACEDIM> m_ucont;

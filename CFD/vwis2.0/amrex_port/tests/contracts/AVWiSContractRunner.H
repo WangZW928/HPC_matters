@@ -23,6 +23,8 @@ public:
                                      amrex::Real viscosity);
     void run_p5_orthogonal_projection_contract_checks(
         amrex::Real dt, amrex::Real time_coefficient);
+    void run_p5_orthogonal_time_contract_checks(
+        std::string const& report_path, amrex::Real dt, amrex::Real viscosity);
     void run_p5_mapped_boundary_contract_checks(
         amrex::Real dt, amrex::Real time_coefficient);
     void run_p5_mapped_boundary_c52_contract_checks(
