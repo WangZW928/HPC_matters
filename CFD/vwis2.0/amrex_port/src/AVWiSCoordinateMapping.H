@@ -99,9 +99,25 @@ private:
     AnalyticOrthogonalMappingParameters m_parameters;
 };
 
-/** Strict factory boundary for future input parsing; unknown types fail. */
+/** Fixed shear of a separable mesh: x=X+epsilon*(Y-ylo), y=Y, z=Z.
+ * Periodic translations form a parallelepiped. Restricted to |epsilon|<=0.25;
+ * no general curvilinear or legacy geometry equivalence is implied.
+ */
+class AnalyticShearCoordinateMapping final : public CoordinateMapping {
+public:
+    AnalyticShearCoordinateMapping(AnalyticOrthogonalMappingParameters parameters,
+                                   amrex::Real epsilon);
+    void fill_nodes(amrex::MultiFab&, LogicalGrid const&) const override;
+    std::string id() const override { return "analytic_shear"; }
+private:
+    AnalyticOrthogonalCoordinateMapping m_base;
+    amrex::Real m_epsilon;
+};
+
+/** Strict factory boundary for input parsing; unknown types fail. */
 std::unique_ptr<CoordinateMapping> make_coordinate_mapping(
     std::string const& type,
-    AnalyticOrthogonalMappingParameters const& analytic_parameters = {});
+    AnalyticOrthogonalMappingParameters const& analytic_parameters = {},
+    amrex::Real shear_epsilon = 0.0);
 
 #endif

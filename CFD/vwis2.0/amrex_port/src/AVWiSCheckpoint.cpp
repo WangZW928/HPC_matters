@@ -196,6 +196,10 @@ void same_real(std::string const& actual, amrex::Real expected, char const* key)
 
 void AVWiSSolver::write_checkpoint(std::string const& path) const
 {
+    if (m_mapping_operator.mapping_type == "analytic_shear")
+        reject("analytic_shear checkpoint/restart provenance is not implemented");
+    if (m_mapping_operator.pressure_contract == "incremental_pressure")
+        reject("incremental_pressure checkpoint/restart provenance is not implemented");
     require_cpu_single_rank();
     if (path.empty()) reject("empty checkpoint path");
 
@@ -311,6 +315,10 @@ void AVWiSSolver::write_checkpoint(std::string const& path) const
 
 void AVWiSSolver::read_checkpoint(std::string const& path)
 {
+    if (m_mapping_operator.mapping_type == "analytic_shear")
+        reject("analytic_shear checkpoint/restart provenance is not implemented");
+    if (m_mapping_operator.pressure_contract == "incremental_pressure")
+        reject("incremental_pressure checkpoint/restart provenance is not implemented");
     require_cpu_single_rank();
     if (path.empty()) reject("empty checkpoint path");
     std::filesystem::path root(path);

@@ -28,11 +28,15 @@ enum class RunMode {
     ContractP5MappedBoundaryC52,
     ContractP8Restart,
     ContractP8Sampling,
+    ContractC7Backend,
+    ContractC3Shear,
+    ContractC3Temporal,
     BenchmarkCartesian,
     BenchmarkCartesianMMS,
     BenchmarkPhysicalChannel,
     BenchmarkMappedChannelReference,
-    CaseLidCavity
+    CaseLidCavity,
+    CaseMappedPressureWave
 };
 
 struct RunConfiguration {

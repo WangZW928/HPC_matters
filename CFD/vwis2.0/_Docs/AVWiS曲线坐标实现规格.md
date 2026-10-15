@@ -1,5 +1,12 @@
 # AVWiS 曲线坐标实现规格
 
+> 最新生产算法增量（2026-10-12）：新增 opt-in `face_authoritative + incremental_pressure`，真实 `advance_one_step()` 使用旧 P 的面梯度 predictor，并以移位未知量 Q=P_old+Phi 求解现有 deferred MLMG；Phi 为当步压力增量，P 仅在全部候选通过原残差/散度门后提交。直接小增量 RHS 候选触及内层舍入底，已隔离；未放宽容差。默认 dual-state 与 instantaneous P=Phi 路径保持。连续物理压力、历史首步 CPU布局/CUDA P/Phi 门仍未关闭，C4 未开始、53项统计14/20/19不变。见 [增量压力实施报告](./AMReX_M2_增量压力状态与移位求解_20261012.md)。
+
+
+> 最新增量（2026-10-12）：复现并否决两种未安全关闭 P/Phi 门的 stencil 舍入候选，已恢复原实现。最终仅 face_authoritative 投影复用当次 Ucat 三分量最大范数，每次少六次局部扫描/全局 max 归约；公式、原门限与 fatal 语义不变。CPU/MPI/CUDA 定向 CTest 为18/19/18项全 PASS，旧路径各126字段及面权威全快照与本轮基线逐值一致。CPU布局/CUDA首步 P/Phi 仍 BLOCKED（1.11620e-12 / 1.19446e-12），MPI4限定337字段 PASS；M2/C3/M4 未关闭，14/20/19与C4未开始保持。见 [候选审计与范数复用报告](./AMReX_M2_后端舍入候选审计与M4范数复用_20261012.md)。
+
+> 最新 opt-in 数学合同（20261011）：定义N(F)=三方向积分面净通量，D(F)=N(F)/V。face_authoritative直接构造B=-(alpha/dt)N(U*)，inner右端为B+N(Gcross Phi_old)，两处共享x/y/z固定顺序局部运算；full acceptance仍为DG Phi+B/V，原gauge/门槛/入口语义不变。它不保证上游metric/面状态或全局归约bitwise一致。MPI4限定337字段PASS，CPU布局/CUDA首步压力门仍BLOCKED；连续物理压力、一般19点、shear restart与整步rollback未验收。统计14/20/19；见 [本轮生产证据](./AMReX_M2_积分RHS统一与首步压力门_20261011.md)。
+
 _面向 AVWiS（AMReX–VWiS）固定结构化曲线网格端口的设计、实现与评审基线；本文描述计划，不表示功能已经实现_
 
 ---
@@ -11,6 +18,12 @@ _面向 AVWiS（AMReX–VWiS）固定结构化曲线网格端口的设计、实�
 本文规定 AVWiS 单层、三维、固定结构化曲线网格路径的数据语义、离散算子、压力投影、边界顺序、生产 API 和分阶段验收门。目标是把原 VWiS 的 `Csi/Eta/Zet`、`Aj`、`Ucat/Ucont` 语义迁移到 AMReX `MultiFab`，同时保持共享面有限体积守恒和 Cartesian 基线可回归。
 
 > ⚠️ **当前状态（2026-09-01）：** `amrex_port/` 的 solver 仍是单层均匀 Cartesian 实现。它已有积分面体积通量、Cartesian 物理边界、MLMG 压力投影、保守对流 RHS、常系数黏性 RHS、显式推进及单层 CPU checkpoint/restart。P5-003 C0/G0.1 已建立独立生产 `CoordinateMapping/MetricData`，C1/G0.2 已将 identity `MetricData` 接入现有 integrated-flux divergence 路径；C2.1 新增了参数化 separable analytic orthogonal provider 及 G1 几何契约，但尚未接入 solver 算子。仍没有 mapped 梯度/投影、曲线 BC/restart、19 点压力算子、AMR、IBM/FSI 或 LES。此结论以当前 [`amrex_port/README.md`](../amrex_port/README.md#p5-003-c1g02-identity-metric-adapter-and-c21g1-geometry)、[`AVWiSCoordinateMapping.H`](../amrex_port/src/AVWiSCoordinateMapping.H)、[`AVWiSMetricData.H`](../amrex_port/src/AVWiSMetricData.H) 和 [`AVWiSProjection.cpp`](../amrex_port/src/AVWiSProjection.cpp) 为准。
+
+> 后续实施索引（2026-10-11）：上面的 2026-09-01 状态为历史快照。C2.3/C5.2/C6/C8-G1 与 C7 正交数值子门其后已落地；本轮 C3 新增固定 xy 弱剪切的生产 cross flux、周期 deferred projection 与 focused 验证。只完成受限数值切片，完整 G2/G3、一般 BC、legacy 19 点与全部决策门仍未关闭。主状态以任务清单为准，新数学特化、源码审计和与本规格的 Ucat 同步接缝见 [`AMReX_C3_弱剪切算子与算法决策_20261011.md`](./AMReX_C3_弱剪切算子与算法决策_20261011.md)。
+
+> C3 第二增量（2026-10-11）：solver 持有并复用 deferred scratch，梯度准备前置到 flow commit 之前；四步混合模态实际演化验证状态修正、历史轮转、守恒及 halo freshness。内层上限按持续收敛证据从 800 增至 1600，数值门槛不变。现行 Ucat 增量梯度/Ucont 守恒通量是受限双离散表示，不能把共同 halo epoch 解释为互逆同步；本规格的单一权威/per-field epoch 要求继续 OPEN。成本、失败诊断及最终证据见 [`AMReX_C3_多步状态与workspace_20261011.md`](./AMReX_C3_多步状态与workspace_20261011.md)；历史报告不改写。
+
+> C3 第三增量（2026-10-11）：新增长程真实推进、固定时间三档 dt 与 canonical 全场审计。速度/面通量差约一阶，但去 datum 累计 P 的时间差约按 0.5 比例变化，物理压力时间门 BLOCKED；细 dt 的 MPI/CPU-CUDA Phi L2 门也未全部通过。`state_contract=experimental_dual_state` 明确拒绝未验收单一权威/物理压力声明；数值公式、求解门与 workspace 不变。M2/M4、P5-005 和 C3 总门均未关闭，见 [时间审计及决策](./AMReX_C3_时间审计与M2拒绝契约_20261011.md)。
 
 当前 Cartesian 路径是本规格的强制回归基线，不得被描述为任意正交曲线坐标支持。原 VWiS 目标是一般结构化曲线网格；其非正交 metric 会产生交叉项，可能要求 19 点模板。因此只完成正交映射不等于完成 VWiS 曲线算子。
 
@@ -526,6 +539,19 @@ G0 必须首先证明 identity 映射不会改变当前 Cartesian 数值语义�
 
 ## ✅ 验证矩阵与容差
 
+### P5-005 运行输入时间系数契约（2026-10-11）
+
+生产 `read_run_configuration()` 在 solver/metric 分配前检查
+`projection_time_coefficient`。仅 `contract_p4`、`contract_p5_orthogonal`、
+`contract_p5_mapped_boundary`、`contract_p5_mapped_boundary_c52` 向独立 projector
+传递该值，保留其原有有限正值校验与 `alpha/dt`、`dt/alpha` 数学定义。
+其他运行模式只接受缺省或严格等于 1 的值；非 1、NaN/Inf 均明确拒绝，
+不静默忽略，也不据 3/2 系数宣称 BDF2。`vwis.*` alias 同样受此约束。
+该入口不改变 public projector 的可调 alpha，不引入压力/速度重构或逐字段 epoch。
+默认/显式 1 的短轨迹逐字段及投影诊断一致性通过；物理压力时间门与细 dt Phi
+后端门仍 BLOCKED，M2/M4/M5/P5-005 不因此关闭。证据及命令见
+[实施报告](./AMReX_P5-005_投影时间系数拒绝契约_20261011.md)。
+
 ### 测试矩阵
 
 以下容差针对 double、平滑且条件良好的映射，是初始门槛；若映射条件数放大 roundoff，调整必须按归一化误差模型和 convergence 证据逐测试批准，不能全局放宽。
@@ -654,3 +680,97 @@ flowchart LR
 | 当前生产/测试边界 | [`amrex_port/README.md` Source ownership](../amrex_port/README.md#source-ownership) | `src/` 只放可复用生产逻辑，断言放 `tests/` |
 
 本文不引用外部资料；所有事实性依据均为仓库内文档或源码。若后续采用 AMReX 新 operator API，实施记录必须补充锁定版本、官方 API 依据和最小原型结果。
+
+### 2026-10-11 Pressure/Phi reference 诊断增量
+
+新增最小压力 reference、独立串行 DG/DIC/diagonal/cross action 与同 RHS 重放，
+保持 `experimental_dual_state`、显式 Euler alpha=1、P 累计 correction 和原拒绝规则。
+初态 `DI(Ucat)=0.085266493` 与 `DG−DIC` 的约束缺陷一致；非恒定旧 P 扰动不改变
+真实一步的 Ucat/Phi。Box 布局、MPI4、CUDA 的短轨迹 Phi 原相对门仍 BLOCKED，
+但输入逐值相同 RHS 时差仅约 1e-16；把候选 RHS 交回 CPU 可恢复其 Phi 至同等精度。
+证据把本反例定位到状态/RHS 的舍入差经散度和 1/dt 放大，未发现需要换一般算子的依据。
+可选 MLMG trace 只观察既有残差/迭代数，默认无新增归约、容差或停止条件变更。
+这是诊断/契约进展，两个原门继续 BLOCKED；不改任何 P 级任务状态，
+53 项仍为 14 已完成、20 进行中、19 未开始。CPU 14/14、MPI 15/15、CUDA 14/14
+定向 CTest 与三后端单网格 C3 失败恢复契约通过；没有重复 480 步长测。
+详见 [Pressure/Phi reference 根因诊断](./AMReX_Pressure-Phi_reference根因诊断_20261011.md)。
+
+诊断接口仅在 `contract_c3_temporal` 测试模式读取 `pressure_reference=1`。
+`pressure_reference_warmup` 限制为 0..16；`pressure_reference_rhs` 读取不可变 canonical
+积分 RHS（x 最快、单分量、17 位文本、恰好 nx*ny*nz 项）。禁止 mean repair；不兼容
+RHS 必须失败并保留日志/快照。trace 记录每个 outer 的 inner 初末残差、inner iterations、
+移除的体积加权均值和 full physical residual；inner residual 的积分单位不可直接与
+physical full residual 比较。快照收集只发生在测试路径，不改变生产 flow owner/epoch。
+任何 isolated replay PASS 都不得替代原全字段 backend 或累计 P 时间门。
+下一决策必须冻结一致初态、DG 与 DIC 约束、旧压力是否进入 predictor，以及物理压力
+是瞬时 Lagrange multiplier 还是增量；P=Phi、增加旧 P 或重构速度均属算法语义改变。
+
+
+### 2026-10-11 M2 一致初态与失败事务诊断增量
+
+新增 test-only affine shear 离散 streamfunction 初态：cell 权威一次构造 Ucont=I(Ucat)，
+初态 DI/D 均约 6.62e-15，非零 DG multiplier 与独立 Fourier reference 通过；
+DIC source residual 约0.14645，even grid有8个checkerboard null modes，不能把DG当DIC。
+4/8/16步固定T=0.002的Ucat/三面差比近2，累计P约0.49999、末Phi约0.30083，仍BLOCKED。
+直接face重投影的flow字段幂等PASS但Phi被清零，全字段幂等BLOCKED；先I重建再投影不幂等。
+真实整步deferred exhaustion准确拒绝，current/history/epoch已改变，整步rollback BLOCKED。
+新affine CPUlayout16/MPI4/CUDA六transport字段对照PASS；CUDA全部诊断字段仍13项BLOCKED。
+这不是原stretched pressure/Phi门PASS：原门保留历史BLOCKED，本轮未重跑长矩阵。
+本轮生产源码保持起始hash；定向CTest CPU13/13、MPI14/14、CUDA13/13通过，
+数学决策strict driver准确exit=1并保留完整证据。当前主统计仍14/20/19（53项），
+M2/P5-005/M4/C3/C7进行中、C4未开始。
+详见 [M2一致初态与失败事务诊断](./AMReX_M2_一致初态与失败事务诊断_20261011.md)。
+
+
+### 2026-10-11 M2 opt-in 面守恒权威生产增量
+
+新增真实生产 `advance_one_step()` 分支，显式选择
+`state_contract=face_authoritative`、`pressure_contract=instantaneous_pressure`、
+`failure_contract=fatal`。仅支持非零 affine `analytic_shear`（stretch=0 0 0）、
+全周期、无物理 BC、现有 explicit Euler/component Laplacian；默认仍为
+`experimental_dual_state` + `accumulated_correction`，没有默认切换。
+新面 predictor 为 Ucont[n]+dt*I(advection+viscosity+force)，保持面权威；成功 DG
+投影后以现有六面归一化剪切重构 R 得 Ucat=R(Ucont)，不会先以 I(Ucat) 覆盖面状态。
+`instantaneous_pressure` 严格指该次 DG 投影的离散 face 约束乘子，P=Phi；其 RHS
+在显式 n 层评估，不能宣称发布于 n+1 的 P 已通过连续物理压力/时间层验收。
+旧累计输出为 P+=Phi correction history，旧 P 不消费于 predictor。
+
+投影面/cell 候选全部准备后才提交。真实 exhaustion 不提交 P/Ucat/投影修正，
+但面 predictor、history、epoch 可改变；整步仍 fatal，`failure_contract=rollback`
+准确拒绝。没有全 advance rollback、C4/SNES/BDF2/完整应力/IBM/FSI。
+固定 T=.002 的 CPU 4/8/16 步速度/面差比近2，P/Phi 离散乘子差比2.00143；
+限定时间子门通过不替代物理压力验收。layout16/MPI4/CUDA 完整337字段中
+首步 P/Phi 原 relative<=1e-12 门仍 BLOCKED，其余335字段 PASS；原 stretched
+压力/Phi门未重跑，保留 BLOCKED。主统计仍 **14 已完成、20 进行中、19 未开始**，
+M2/P5-005/M4/C3/C7 进行中，C4 未开始。实现、最终验证及边界见
+[面守恒权威生产增量报告](./AMReX_M2_面守恒权威生产增量_20261011.md)。
+
+### 2026-10-12 opt-in 投影尺度的当次范数复用
+
+`project_mapped()` 在 fresh Ucat 已确定、且尺度计算期间不修改它的前提下，
+仅对 `state_contract=face_authoritative` 将三个全局组件最大范数存于当次调用的
+`velocity_norms`。原尺度仍按 d=0..2、c=0..2 顺序累加 `u_max[c]*g_max[3*d+c]/h[d]`，
+不重排浮点求和、不缓存 metric norm、不改变 roundoff skip 门或 DG/full residual。
+速度范数本地扫描和全局 max 次数由9变3；metric 的9次保留。默认双状态分支仍
+逐次执行原范数和归约。该缓存不跨调用、不加入 workspace/checkpoint/epoch，
+失败重试重新取值；不能据此声明整个 advance rollback、bitwise 跨后端或 M4 加速门。
+两种候选 stencil（配对差分、配对差分+FMA）均已撤回，本规格的生产 stencil 不变。
+
+### 2026-10-12 增量压力离散契约
+
+新增 `pressure_contract=incremental_pressure`，仅与既有 face_authoritative/非零
+全周期 affine shear 组合。令 N 为带符号积分面净通量，D=V^-1 N，G_f 为共享
+metric 压力通量，I 为现有面插值，R 为现有六面重构；beta=1、Euler alpha=1。
+B=F^n+dt I(A^n)，F*=B-dt G_f(P^n)，(-N G_f)Phi=-N(F*)/dt。
+生产使用移位 Q=P^n+Phi，求 (-N G_f)Q=-N(B)/dt；再构造 Phi=Q-P^n、
+P_candidate=P^n+Phi，F_candidate=B-dt G_f(P_candidate)。无额外 dt 转换。
+压力尺度为运动学压力 L²/T²（实际代码为无量纲），绝非已确认的 Pa 或 n+1
+物理压力。Q 使用既有体积加权零 datum，P 保持到舍入精度。
+
+状态机为 Ready→Predictor→CorrectionReady→Ready；数值失败在发布前回 Ready，
+已接受 P/Phi/Ucont/Ucat/history/time 不变。候选 combined-P 必须再次通过原
+full relative residual≤1e-11 和 divergence≤1e-10；MLMG inner≤1e-12、
+compatibility、外迭代预算不改。standalone projection 明确拒绝增量提交；
+没有可被重复调用的 P+=Phi 发布接口。两个额外标量仅供 opt-in scratch，15个注册
+字段顺序不改。checkpoint、物理 BC、完整应力/时间格式均保持既有限制。
+该压力增量状态子门与物理压力/历史后端总门分别报告，参见本轮实施报告。

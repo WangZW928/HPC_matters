@@ -91,10 +91,15 @@ AVWiSSolver::AVWiSSolver(
     // validated analytic orthogonal mapping/operator combination.
     m_metric_data.define(m_ba, m_dm, 1);
     auto mapping = make_coordinate_mapping(m_mapping_operator.mapping_type,
-                                           m_mapping_operator.analytic_parameters);
+                                           m_mapping_operator.analytic_parameters,
+                                           m_mapping_operator.shear_epsilon);
     m_metric_data.build(*mapping, LogicalGrid::from_cartesian_geometry(m_geom), m_geom);
     m_metric_epoch = m_metric_data.epoch();
+    if (m_mapping_operator.mapping_type == "analytic_shear" && m_boundary.enabled)
+        throw std::runtime_error("AVWiS analytic_shear requires avwisbcs.enabled=0; physical BCs deferred");
     validate_mapping_operator_config(m_mapping_operator, m_metric_data, m_metric_epoch);
+    if (m_mapping_operator.pressure_contract == "incremental_pressure" && m_nghost < 1)
+        throw std::runtime_error("M2 incremental pressure requires at least one ghost cell");
 
     m_p.define(m_ba, m_dm, 1, m_nghost);
     m_phi.define(m_ba, m_dm, 1, m_nghost);
@@ -106,6 +111,14 @@ AVWiSSolver::AVWiSSolver(
     m_projection_bc.define(m_ba, m_dm, 1, 1);
     m_advection_rhs.define(m_ba, m_dm, AMREX_SPACEDIM, 0);
     m_viscous_rhs.define(m_ba, m_dm, AMREX_SPACEDIM, 0);
+    if (m_mapping_operator.pressure_contract == "incremental_pressure") {
+        m_pressure_increment = std::make_unique<PressureIncrementWorkspace>();
+        m_pressure_increment->phi.define(m_ba, m_dm, 1, m_nghost);
+        m_pressure_increment->pressure.define(m_ba, m_dm, 1, m_nghost);
+    }
+    if ((m_mapping_operator.mapping_type=="analytic_shear" && m_mapping_operator.shear_epsilon!=0.0) ||
+        m_mapping_operator.pressure_contract=="incremental_pressure")
+        m_deferred_workspace=std::make_unique<DeferredProjectionWorkspace>(m_metric_data);
     for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
         amrex::BoxArray face_ba = amrex::convert(m_ba, amrex::IntVect::TheDimensionVector(dir));
         m_ucont[dir].define(face_ba, m_dm, 1, m_nghost);
@@ -142,6 +155,17 @@ void AVWiSSolver::register_fields()
         m_fields.push_back({"Ucont_" + axis + "_older", face_location(dir), 1, m_nghost,
                             flux_units, "n-2", axis + "-normal volume flux", "overlapping face boxes; lowest global box owns shared faces"});
     }
+    if (m_mapping_operator.mapping_type == "analytic_shear" ||
+        m_mapping_operator.pressure_contract == "incremental_pressure") {
+        m_fields[0].units = m_mapping_operator.pressure_contract == "instantaneous_pressure"
+            ? "nondimensional instantaneous discrete face-constraint multiplier; physical pressure convergence unverified"
+            : "nondimensional accumulated projection correction; physical pressure convergence unverified";
+        m_fields[1].units = "nondimensional current projection multiplier; same scale as P";
+        if (m_mapping_operator.pressure_contract == "incremental_pressure") {
+            m_fields[0].units = "nondimensional cumulative pressure multiplier with old-P predictor; physical pressure convergence unverified";
+            m_fields[1].units = "nondimensional last accepted pressure increment; alpha=1, no extra dt conversion";
+        }
+    }
 }
 
 void AVWiSSolver::register_metric_metadata()
@@ -156,7 +180,9 @@ void AVWiSSolver::register_metric_metadata()
          m_mapping_operator.coordinates == CoordinateSystemMode::Cartesian ? "Cartesian" : "mapped",
          m_mapping_operator.coordinates == CoordinateSystemMode::Cartesian
              ? "orthogonal uniform Cartesian coordinates"
-             : "C2.2 separable analytic orthogonal coordinates"},
+             : (m_mapping_operator.mapping_type == "analytic_shear"
+                ? "C3 fixed weak shear of separable coordinates (periodic only)"
+                : "C2.2 separable analytic orthogonal coordinates")},
         {"dx", "level", real_text(m_dx[0]) + "," + real_text(m_dx[1]) + "," + real_text(m_dx[2]),
          "cell widths (dx,dy,dz) from Geometry"},
         {"cell_volume", "cell", real_text(m_cell_volume), "dx*dy*dz; no Jacobian factor"},
@@ -169,7 +195,9 @@ void AVWiSSolver::register_metric_metadata()
     if (m_mapping_operator.coordinates == CoordinateSystemMode::Mapped) {
         m_metrics = {
             {"coordinate_system", "level", "mapped",
-             "C2.2 separable analytic orthogonal coordinates"},
+             (m_mapping_operator.mapping_type == "analytic_shear"
+                ? "C3 fixed weak shear of separable coordinates (periodic only)"
+                : "C2.2 separable analytic orthogonal coordinates")},
             {"mapping_type", "level", m_mapping_operator.mapping_type,
              "immutable CoordinateMapping provider id"},
             {"projection_operator", "level",
@@ -178,6 +206,27 @@ void AVWiSSolver::register_metric_metadata()
             {"metric_discretization", "level", MetricData::discretization_version,
              "cell volume and face metric are stored fields; no constant Cartesian substitute"}
         };
+        if (m_mapping_operator.mapping_type == "analytic_shear") {
+            m_metrics.push_back({"mapping_epsilon", "level", real_text(m_mapping_operator.shear_epsilon),
+                                 "fixed physical shear x=X+epsilon*(Y-ylo)"});
+            m_metrics.push_back({"state_contract", "level", m_mapping_operator.state_contract,
+                                 "explicit velocity authority and predictor contract"});
+            m_metrics.push_back({"pressure_contract", "level", m_mapping_operator.pressure_contract,
+                                 "discrete multiplier time semantics; physical validation remains open"});
+            m_metrics.push_back({"failure_contract", "level", m_mapping_operator.failure_contract,
+                                 "failed advance is fatal; predictor/history rollback is not implemented"});
+            if (m_mapping_operator.pressure_contract == "incremental_pressure")
+                m_metrics.back().meaning = "numerical failure discards candidates before publication; runtime/device/MPI publication faults remain fatal";
+        }
+    }
+    if (m_mapping_operator.pressure_contract == "incremental_pressure" &&
+        m_mapping_operator.mapping_type != "analytic_shear") {
+        m_metrics.push_back({"state_contract", "level", m_mapping_operator.state_contract,
+                             "periodic face-authoritative predictor and cell reconstruction"});
+        m_metrics.push_back({"pressure_contract", "level", m_mapping_operator.pressure_contract,
+                             "old-P predictor; last accepted pressure increment; explicit n RHS"});
+        m_metrics.push_back({"failure_contract", "level", m_mapping_operator.failure_contract,
+                             "numerical failure discards candidates before publication; publication faults remain fatal"});
     }
 }
 
@@ -216,6 +265,7 @@ void AVWiSSolver::initialize()
     m_time = 0.0;
     m_step = 0;
     m_history_depth = 1;
+    m_last_step_projection = {};
     mark_valid_modified();
     if (m_boundary.enabled) apply_boundary_pipeline("initialize");
     else fill_ghost_cells();
@@ -271,7 +321,7 @@ void AVWiSSolver::sync_ucat_from_ucont_impl(bool reapply_boundary_flux)
     if (m_mapping_operator.coordinates == CoordinateSystemMode::Mapped) {
         amrex::Array<amrex::MultiFab const*, AMREX_SPACEDIM> flux{
             AMREX_D_DECL(&m_ucont[0], &m_ucont[1], &m_ucont[2])};
-        sync_orthogonal_ucat_from_ucont(flux, m_metric_data, m_metric_epoch,
+        sync_metric_ucat_from_ucont(flux, m_metric_data, m_metric_epoch,
                                        m_mapping_operator, m_ucat);
     } else {
         amrex::Array<amrex::MultiFab const*, AMREX_SPACEDIM> flux{
@@ -294,7 +344,7 @@ void AVWiSSolver::sync_ucont_from_ucat()
         else m_ucat.FillBoundary(m_geom.periodicity());
         amrex::Array<amrex::MultiFab*, AMREX_SPACEDIM> flux{
             AMREX_D_DECL(&m_ucont[0], &m_ucont[1], &m_ucont[2])};
-        sync_orthogonal_ucont_from_ucat(m_ucat, flux, m_metric_data, m_metric_epoch,
+        sync_metric_ucont_from_ucat(m_ucat, flux, m_metric_data, m_metric_epoch,
                                        m_mapping_operator, m_geom.periodicity());
         mark_valid_modified();
         if (m_boundary.enabled) apply_boundary_pipeline("mapped-sync-ucont-from-ucat");

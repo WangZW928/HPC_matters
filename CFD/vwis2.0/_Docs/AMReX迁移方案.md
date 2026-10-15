@@ -1,6 +1,17 @@
 # VFS-Wind 到 AMReX 迁移方案
 
+> 最新生产算法增量（2026-10-12）：新增 opt-in `face_authoritative + incremental_pressure`，真实 `advance_one_step()` 使用旧 P 的面梯度 predictor，并以移位未知量 Q=P_old+Phi 求解现有 deferred MLMG；Phi 为当步压力增量，P 仅在全部候选通过原残差/散度门后提交。直接小增量 RHS 候选触及内层舍入底，已隔离；未放宽容差。默认 dual-state 与 instantaneous P=Phi 路径保持。连续物理压力、历史首步 CPU布局/CUDA P/Phi 门仍未关闭，C4 未开始、53项统计14/20/19不变。见 [增量压力实施报告](./AMReX_M2_增量压力状态与移位求解_20261012.md)。
+
+
+> 最新增量（2026-10-12）：复现并否决两种未安全关闭 P/Phi 门的 stencil 舍入候选，已恢复原实现。最终仅 face_authoritative 投影复用当次 Ucat 三分量最大范数，每次少六次局部扫描/全局 max 归约；公式、原门限与 fatal 语义不变。CPU/MPI/CUDA 定向 CTest 为18/19/18项全 PASS，旧路径各126字段及面权威全快照与本轮基线逐值一致。CPU布局/CUDA首步 P/Phi 仍 BLOCKED（1.11620e-12 / 1.19446e-12），MPI4限定337字段 PASS；M2/C3/M4 未关闭，14/20/19与C4未开始保持。见 [候选审计与范数复用报告](./AMReX_M2_后端舍入候选审计与M4范数复用_20261012.md)。
+
+> 最新 M2 算法增量（20261011）：face-authoritative RHS与cross action统一为N(F)，保持原full物理残差、datum、停止规则及fatal语义；默认dual-state公式不变。MPI4限定337字段PASS，但CPU布局/CUDA首步P/Phi仍BLOCKED，同RHS重放Phi差仅0–1.33e-16，剩余主因是初始面舍入经1/dt传播。不得通过改阈值、删初步、修gauge或抹约束余量关闭门。M2/C3总门仍BLOCKED，统计14/20/19；下一步审阅可复现初始projection/面状态与成本。见 [积分RHS统一报告](./AMReX_M2_积分RHS统一与首步压力门_20261011.md)。
+
 > 进度更新（2026-09-18）：受限单层 Cartesian 基线已增加综合 Taylor–Green MMS 与 legacy `-second_order` source-stencil reference。separable analytic-orthogonal 路径已完成 C2.3 mapped 对流、常系数黏性、显式推进、C6 mapping-provenance restart，以及 C8-G1 压力梯度驱动 Poiseuille 物理 reference。CPU 完整 CTest 为 45/45；RTX 4060 `sm_89` 上此前的完整适用集为 36/36，本次壁面黏性通量改动后的 mapped 定向集为 8/8。一般非正交/曲面、MPI、legacy 整机复演、IBM/FSI 与 AMR 仍未完成，不能据此声称完整曲线支持已经完成。
+
+> 后续增量（2026-10-11）：C7 正交 MPI/CPU-CUDA 数值子门已补齐；本轮优先进入 C3，新增全周期固定 `analytic_shear`（abs(epsilon)≤0.25）的生产 cross flux、共享压力/黏性 stencil 与全残差 deferred projection。C3 保持进行中，C4/M3–M6 一般门仍开放。P5-005 的残差审计及显式算法选择/拒绝接口已落地，完整 SNES 替代尚未实现。最新证据见 [`AMReX_C3_弱剪切算子与算法决策_20261011.md`](./AMReX_C3_弱剪切算子与算法决策_20261011.md)；旧日期快照保留其当时边界。
+
+> C3 第二增量（2026-10-11）：solver 持有并复用 deferred scratch，梯度准备前置到 flow commit 之前；四步混合模态实际演化验证状态修正、历史轮转、守恒及 halo freshness。内层上限按持续收敛证据从 800 增至 1600，数值门槛不变。现行 Ucat 增量梯度/Ucont 守恒通量是受限双离散表示，不能把共同 halo epoch 解释为互逆同步；本规格的单一权威/per-field epoch 要求继续 OPEN。成本、失败诊断及最终证据见 [`AMReX_C3_多步状态与workspace_20261011.md`](./AMReX_C3_多步状态与workspace_20261011.md)；历史报告不改写。
 
 本文面向 VFS-Wind 当前基于 PETSc DMDA/HYPRE 的结构化曲线网格求解器，说明如何把核心算法迁移到 AMReX 生态。目标不是逐行翻译旧代码，而是在保持 `Ucont/Ucat/P/Nvert` 等数值语义可追踪的前提下，逐步替换为 AMReX 原生的数据结构、AMR 层级、几何多重网格和 GPU-friendly kernel。
 
@@ -45,11 +56,11 @@ Cartesian 默认配置。
 | --- | --- | --- | --- | --- | --- |
 | C1 / G0.2 | Identity adapter 接入 solver | `AVWiSSolver` 持有/消费 identity `MetricData`，现有 integrated-flux divergence 只除一次 `cell_volume_cc` | C0/G0.1；P2/P4 Cartesian 基线 | identity 新旧紧容差一致；完整 Cartesian CTest；epoch/layout/非 identity 拒绝 | 已完成 |
 | C2 / G1 | 解析正交 mapping | C2.1 provider/geometry；C2.2 mapped gradient/divergence、对角变换与正交投影；C2.3 orthogonal mapped 对流、黏性和时间推进 | C1 | 常量/线性、identity 紧等价、三网格 operator MMS、只除一次体积、多 Box/ghost、严格拒绝、非平凡一步与 free stream | C2.1--C2.3 已完成；完整 G1 仍进行中 |
-| C3 / G2 | 弱非正交与 metric-aware RHS | 增加带可调 skew 的光滑 mapping、完整 cross face gradient，并使对流/黏性通量只除一次 `cell_volume_cc`；`AVWiSAdvection.cpp`、`AVWiSViscosity.cpp`、`AVWiSMetricData.*`、`tests/curvilinear/` | C2；M2/M4/M6 的证据化决策 | `epsilon=0` 连续退化到 G1；cross-term 单项测试；非正交 MMS、守恒、能量/通量诊断、强度扫描；deferred correction 报告全残差与收敛范围 | 未开始 |
+| C3 / G2 | 弱非正交与 metric-aware RHS | 增加带可调 skew 的光滑 mapping、完整 cross face gradient，并使对流/黏性通量只除一次 `cell_volume_cc`；`AVWiSAdvection.cpp`、`AVWiSViscosity.cpp`、`AVWiSMetricData.*`、`tests/curvilinear/` | C2；M2/M4/M6 的证据化决策 | `epsilon=0` 连续退化到 G1；cross-term 单项测试；非正交 MMS、守恒、能量/通量诊断、强度扫描；deferred correction 报告全残差与收敛范围 | 进行中：2026-10-11 周期固定弱剪切切片已验证；一般 G2 未完成 |
 | C4 / G3 | 一般非正交与 19 点压力算子 | 实现并验证 custom 19 点或经证实等价的完整非正交压力路径，保持 operator/correction 共用面梯度通量；`AVWiSProjection.cpp`、目标自定义 operator、legacy `vwis2.0/PoissonSolver.C` | C3；M3/M4/M5；冻结 legacy 对照 case | matrix-free 与显式 19 点 action 对照、逐项 stencil、null space/BC、投影散度、legacy case、MPI 分块、收敛及性能/内存审查全部通过 | 未开始 |
 | C5 | 曲线 BC 与 ghost | 把逻辑边界到物理法向/面积通量的映射纳入固定 halo→physical BC→face owner 顺序；`AVWiSBoundary.cpp`、`CartesianBoundaryConfig.*`、`AVWiSMetricData.*`、legacy `BcsUtility.C` | C1 后可做 identity 契约；曲线关闭依赖 C2/C3 和 M3 | C5.1/C5.2 已覆盖 analytic orthogonal no-slip、inlet/outlet、tangential moving、slip/symmetry、周期平移、角 ghost、多 Box owner、stale/非法配置拒绝及 Dirichlet/Neumann 投影；一般曲面、MPI 尚缺 | 进行中：C5.2 受限子集已完成 |
 | C6 | 曲线 checkpoint/restart | schema-v3 保存并校验 mapping 类型、参数/checksum、metric 离散版本，构造 solver 时重建并验证 metric，再恢复流场；`AVWiSCheckpoint.cpp`、`tests/c6_*` | C1、C2、C5 | 同 mapping/config CPU continuation bitwise；跨 Box 分解恢复；mapping 错配及损坏 Header 严格拒绝 | 已完成：CPU 单 rank；不外推到 MPI/GPU/AMR restart |
-| C7 | MPI/GPU runtime | 对 C1--C6 的生产 kernels、owner/halo、归约和 restart 做多 rank 与 GPU runtime 验证；`amrex_port/CMakeLists.txt`、相关 `src/` 与测试 runner | 各模块先有 CPU 参考；最终关闭依赖 C1--C6 | 1/2/4 rank 和不同分块的 norm 一致性；CPU/GPU 紧容差；无意外 host copy；记录硬件、版本、命令和性能 | 进行中：RTX 4060 `sm_89` 完整适用 CTest 36/36 通过；MPI、GPU restart 与性能尚缺 |
+| C7 | MPI/GPU runtime | 对 C1--C6 的生产 kernels、owner/halo、归约和 restart 做多 rank 与 GPU runtime 验证；`amrex_port/CMakeLists.txt`、相关 `src/` 与测试 runner | 各模块先有 CPU 参考；最终关闭依赖 C1--C6 | 1/2/4 rank 和不同分块的 norm 一致性；CPU/GPU 紧容差；无意外 host copy；记录硬件、版本、命令和性能 | 进行中：2026-10-11 C7 正交 MPI/CPU-CUDA 数值子门通过，CPU 47/47、MPI 48/48、CUDA 38/38；分项性能、CUDA-aware MPI 和 MPI/GPU restart 尚缺 |
 | C8 | 物理曲线 case 与回归 | 建立可复现 curved-channel/legacy 曲线 case、输入 provenance、参考量与分阶段发布门；`MappedChannelReferenceCase.*`、`inputs/c8_*`、`tests/c8_*` | G1 case 依赖 C2/C5/C6；一般曲线声明依赖 C3/C4/C7 | C8-G1 已冻结正交 stretched-channel Poiseuille 解析解，三网格速度/残差/流量近二阶，压力 datum-free 误差与散度为零，并追溯 legacy profile/pressure-gradient 源码；一般曲线和 legacy 整机对照仍缺 | 进行中：C8-G1 已完成 |
 
 这些模块按“先隔离数值语义，再增加几何复杂度”的顺序推进。C5--C7 可在对应
@@ -105,9 +116,35 @@ C5.1/C5.2 随后只对 `analytic_orthogonal` 增加受限的 mapped physical BC 
 Dirichlet/Neumann projection；C2.3/C6 仍只接受该 separable-orthogonal 子集，不放开
 一般非正交消费者。
 
-下一接缝是按清单补齐 C7 的 MPI/后端对照，并取得可复演的 legacy 输入/网格/输出包；
-随后按 C3→C4 扩展到一般非正交并用一般 curved-channel C8 关闭能力声明。C8-G1 的完成
+2026-10-11 后的下一接缝是审查 C3 固定弱剪切的成本、权威速度同步和非正交物理 BC；
+C7 数值子门已补齐，profiling/I/O 仍开放。取得 legacy 输入/网格/输出包后，
+再按 C3→C4 扩展到一般非正交并用一般 curved-channel C8 关闭能力声明。C8-G1 的完成
 只证明 separable-orthogonal 物理 reference，不能提前写成“曲线坐标已支持”。
+
+### C3 第三增量：先处理 M2 压力与状态决策
+
+2026-10-11 长程真实推进及三档 dt 审计显示：固定网格 Ucat/Ucont 自收敛约一阶，
+累计 P 的去 datum 时间差反而增大，物理压力时间门 BLOCKED；细 dt 的 MPI/CPU-CUDA Phi
+全场门也未全部通过。受限接口 `state_contract=experimental_dual_state` 只接受现有
+Ucont 质量权威/Ucat 传输状态/P 累计修正语义，不允诺互逆、单一权威或物理压力。
+下一步须冻结预测步旧压力项、压力更新与 velocity constraint 的数学契约，补
+物理/reference 证据后再改离散；M4 分项成本、C4/19 点和非正交物理 BC 后置。
+本轮未修改 workspace/MLMG hierarchy，未支持 shear restart；详见
+[时间审计及 M2 决策](./AMReX_C3_时间审计与M2拒绝契约_20261011.md)。
+
+### P5-005 增量：拒绝静默忽略的时间系数
+
+2026-10-11 复核先保留压力时间与细 dt Phi 的 BLOCKED。初始已投影面状态仍有
+`DI(Ucat)=0.085266493`，第一步 Phi 在三档 dt 下约为 5.895/11.776/23.538；
+这涉及初态约束和 `DG`/`DIC` 接缝，直接替换 P 或重构速度会改变离散。
+既有 Phi 对照的体积加权差均值远小于其全场 RMS，也不支持简单 datum 修补。
+本增量因此只修复生产参数入口：非独立投影模式的
+`projection_time_coefficient` 必须为 1，不能接受另一个值后继续按 1 推进。
+四个确实消费 alpha 的投影契约保留可调接口；既有 public projector API 不变。
+CPU/MPI/CUDA 定向验证与复现见
+[P5-005 报告](./AMReX_P5-005_投影时间系数拒绝契约_20261011.md)。
+下一步先冻结一致初态、旧压力项与 P/Phi 更新的 residual/reference，再决定
+M2 的权威策略；Phi 误差来源及 M4 成本仍须独立定位，不能据本接口关闭 C3/C4 门。
 
 ## 1. 架构映射
 
@@ -875,3 +912,79 @@ test 只检查构建、布局、通信和制造场代数，可用精确或紧容
 | GPU/I/O/测试 | 输出变量名、现有基准意图 | `ParallelFor`、设备数据、plotfile/checkpoint、CMake 与回归测试 | 驻留/通信/重启/regrid 后 metric 与 IB mask 一致性 |
 
 验证顺序：均匀 Cartesian 制造解/Taylor–Green（空间时间阶）→ 通道/腔流（BC/投影）→ 静态 IBM（无穿透、力、通量）→ 曲线单层 → 移动 IBM/FSI → AMR/EB。每阶段比较 L2/L∞、质量误差、压力均值、力矩和 MPI 分块不变性；没有这些基准不得声称迁移保持科学结果。
+
+### 2026-10-11 Pressure/Phi reference 诊断增量
+
+新增最小压力 reference、独立串行 DG/DIC/diagonal/cross action 与同 RHS 重放，
+保持 `experimental_dual_state`、显式 Euler alpha=1、P 累计 correction 和原拒绝规则。
+初态 `DI(Ucat)=0.085266493` 与 `DG−DIC` 的约束缺陷一致；非恒定旧 P 扰动不改变
+真实一步的 Ucat/Phi。Box 布局、MPI4、CUDA 的短轨迹 Phi 原相对门仍 BLOCKED，
+但输入逐值相同 RHS 时差仅约 1e-16；把候选 RHS 交回 CPU 可恢复其 Phi 至同等精度。
+证据把本反例定位到状态/RHS 的舍入差经散度和 1/dt 放大，未发现需要换一般算子的依据。
+可选 MLMG trace 只观察既有残差/迭代数，默认无新增归约、容差或停止条件变更。
+这是诊断/契约进展，两个原门继续 BLOCKED；不改任何 P 级任务状态，
+53 项仍为 14 已完成、20 进行中、19 未开始。CPU 14/14、MPI 15/15、CUDA 14/14
+定向 CTest 与三后端单网格 C3 失败恢复契约通过；没有重复 480 步长测。
+详见 [Pressure/Phi reference 根因诊断](./AMReX_Pressure-Phi_reference根因诊断_20261011.md)。
+
+
+### 2026-10-11 M2 一致初态与失败事务诊断增量
+
+新增 test-only affine shear 离散 streamfunction 初态：cell 权威一次构造 Ucont=I(Ucat)，
+初态 DI/D 均约 6.62e-15，非零 DG multiplier 与独立 Fourier reference 通过；
+DIC source residual 约0.14645，even grid有8个checkerboard null modes，不能把DG当DIC。
+4/8/16步固定T=0.002的Ucat/三面差比近2，累计P约0.49999、末Phi约0.30083，仍BLOCKED。
+直接face重投影的flow字段幂等PASS但Phi被清零，全字段幂等BLOCKED；先I重建再投影不幂等。
+真实整步deferred exhaustion准确拒绝，current/history/epoch已改变，整步rollback BLOCKED。
+新affine CPUlayout16/MPI4/CUDA六transport字段对照PASS；CUDA全部诊断字段仍13项BLOCKED。
+这不是原stretched pressure/Phi门PASS：原门保留历史BLOCKED，本轮未重跑长矩阵。
+本轮生产源码保持起始hash；定向CTest CPU13/13、MPI14/14、CUDA13/13通过，
+数学决策strict driver准确exit=1并保留完整证据。当前主统计仍14/20/19（53项），
+M2/P5-005/M4/C3/C7进行中、C4未开始。
+详见 [M2一致初态与失败事务诊断](./AMReX_M2_一致初态与失败事务诊断_20261011.md)。
+
+
+### 2026-10-11 M2 opt-in 面守恒权威生产增量
+
+新增真实生产 `advance_one_step()` 分支，显式选择
+`state_contract=face_authoritative`、`pressure_contract=instantaneous_pressure`、
+`failure_contract=fatal`。仅支持非零 affine `analytic_shear`（stretch=0 0 0）、
+全周期、无物理 BC、现有 explicit Euler/component Laplacian；默认仍为
+`experimental_dual_state` + `accumulated_correction`，没有默认切换。
+新面 predictor 为 Ucont[n]+dt*I(advection+viscosity+force)，保持面权威；成功 DG
+投影后以现有六面归一化剪切重构 R 得 Ucat=R(Ucont)，不会先以 I(Ucat) 覆盖面状态。
+`instantaneous_pressure` 严格指该次 DG 投影的离散 face 约束乘子，P=Phi；其 RHS
+在显式 n 层评估，不能宣称发布于 n+1 的 P 已通过连续物理压力/时间层验收。
+旧累计输出为 P+=Phi correction history，旧 P 不消费于 predictor。
+
+投影面/cell 候选全部准备后才提交。真实 exhaustion 不提交 P/Ucat/投影修正，
+但面 predictor、history、epoch 可改变；整步仍 fatal，`failure_contract=rollback`
+准确拒绝。没有全 advance rollback、C4/SNES/BDF2/完整应力/IBM/FSI。
+固定 T=.002 的 CPU 4/8/16 步速度/面差比近2，P/Phi 离散乘子差比2.00143；
+限定时间子门通过不替代物理压力验收。layout16/MPI4/CUDA 完整337字段中
+首步 P/Phi 原 relative<=1e-12 门仍 BLOCKED，其余335字段 PASS；原 stretched
+压力/Phi门未重跑，保留 BLOCKED。主统计仍 **14 已完成、20 进行中、19 未开始**，
+M2/P5-005/M4/C3/C7 进行中，C4 未开始。实现、最终验证及边界见
+[面守恒权威生产增量报告](./AMReX_M2_面守恒权威生产增量_20261011.md)。
+
+### 2026-10-12 M2 优先诊断后的受限 M4 工作
+
+本轮先实际复现 CPU/MPI4/CUDA 首步压力门并测试局部 cross stencil 求值改动，
+没有安全关闭该门：配对差分使 MPI4 子门转 BLOCKED，显式 FMA 后 CPU/CUDA 仍
+BLOCKED，CUDA压力差仍大于基线。因此恢复原 stencil，并完成已列入 M4 的重复
+扫描/归约消除；仅当次 face-authoritative 的 Ucat norm 复用，无持久缓存或新支持范围。
+最终各后端全快照、旧路径126字段及关键诊断 exact 回归；C4/一般19点未开始。
+后续先审阅初始面误差经1/dt传播的精度与确定性成本；该范数改动没有证明整体加速，
+还需独立 kernel/halo/MLMG/reduction 计时，不转记 P8/P9 或完整 M4 已完成。
+
+### 2026-10-12 M2 压力增量的生产接口
+
+为已有 affine periodic face-authoritative slice 增加 incremental_pressure 配置，
+在 advance_one_step 中消费旧压力；它与旧 accumulated_correction 的“只保存历史”
+语义不同。使用现有 -N G_f/MLMG、面插值和重构，不需要 C4 一般19点或 SNES/BDF2。
+直接求小增量出现 cancellation floor 后，生产改求 Q=P_old+Phi，RHS=-N(B)/dt；
+Phi=Q-P_old，P_candidate=P_old+Phi，F_candidate=B-dt G_f(P_candidate)。
+这个变量移位等价于旧压力 predictor，Q/P 是显式 n 层 RHS 的面约束乘子，尚无
+连续物理压力的收敛和时间层声明。候选和历史的发布放在全部数值验证之后。
+回退只需切回 instantaneous_pressure 或默认 dual-state；没有格式/字段重排。
+下一步以压力参考和动量残差推进物理语义，保持历史压力精度门 BLOCKED。

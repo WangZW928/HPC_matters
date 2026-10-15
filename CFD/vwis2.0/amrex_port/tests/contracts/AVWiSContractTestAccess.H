@@ -58,6 +58,17 @@ public:
                                         amrex::Real viscosity);
     void run_p8_sampling_statistics_contract(std::string const& report_path,
                                              std::string const& plane_path);
+    void run_c3_temporal_contract(std::string const& path, amrex::Real dt,
+                                  amrex::Real viscosity, int steps);
+    void run_face_authority_contract(std::string const& path, amrex::Real dt,
+                                    amrex::Real viscosity, int steps);
+    void run_pressure_increment_contract(std::string const& path, amrex::Real dt,
+                                        amrex::Real viscosity, int steps);
+    void run_consistent_reference(std::string const& path, amrex::Real dt, amrex::Real viscosity, int steps);
+    void run_pressure_reference(std::string const& path, amrex::Real dt, amrex::Real viscosity);
+    void run_c3_shear_contract(std::string const& report_path, amrex::Real dt, amrex::Real viscosity);
+    void run_c7_backend_contract(std::string const& report_path,
+                                 amrex::Real dt, amrex::Real viscosity);
 
     void fill_ghost_cells() { m_solver.fill_ghost_cells(); }
     void fill_physical_ghost_cells() { m_solver.fill_physical_ghost_cells(); }

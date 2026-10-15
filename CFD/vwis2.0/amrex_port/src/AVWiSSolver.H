@@ -16,6 +16,7 @@
 #include <string>
 #include <array>
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 /** Physical staggering of a registered field; fields are never implicitly converted. */
@@ -35,6 +36,9 @@ struct ProjectionDiagnostics {
     amrex::Real max_divergence_after = 0.0;
     amrex::Real rhs_mean = 0.0;
     amrex::Real final_residual = 0.0;
+    amrex::Real full_relative_residual = 0.0;
+    int outer_iterations = 0;
+    int inner_iterations = 0;
     bool singular = false;
 };
 
@@ -136,10 +140,25 @@ public:
     void fill_physical_ghost_cells_impl(bool impose_boundary_flux);
     /** Required order: same-level/MPI/periodic halo, then physical ghosts/faces. */
     void apply_boundary_pipeline(char const* stage, bool emit_diagnostics = false);
-    /** Provisional explicit Euler predictor plus coordinate-matched projection; not legacy SNES. */
+    /** Explicit Euler predictor plus coordinate-matched projection. Opt-in
+     * face_authoritative evolves Ucont + dt*I(RHS), then reconstructs Ucat.
+     * spatial_body_force is an optional cell-centered acceleration at time n,
+     * added to the uniform body_force. Its layout must match this solver; only
+     * valid values are read, so no forcing ghosts are required. The caller owns
+     * the field and updates it before each step; it is not checkpointed.
+     * The incremental-pressure path validates candidates before publication;
+     * other paths retain fatal failure semantics without predictor rollback.
+     */
     void advance_one_step(
         amrex::Real dt, amrex::Real viscosity = 0.1,
-        amrex::Array<amrex::Real, AMREX_SPACEDIM> const& body_force = {});
+        amrex::Array<amrex::Real, AMREX_SPACEDIM> const& body_force = {},
+        amrex::MultiFab const* spatial_body_force = nullptr);
+    /** Projection diagnostics from the last successfully completed advance.
+     * Failed attempts do not publish a new report or advance time/step counters.
+     */
+    ProjectionDiagnostics const& last_step_projection() const noexcept {
+        return m_last_step_projection;
+    }
     /** Conservative explicit-step diagnostics; limits are guards, not a nonlinear stability proof. */
     TimeStepDiagnostics time_step_diagnostics(amrex::Real dt, amrex::Real viscosity) const;
     /** Recover Cartesian velocity by averaging adjacent face volume-flux densities. */
@@ -149,6 +168,7 @@ public:
     /** Solve the P4 Cartesian pressure correction and project integrated face fluxes. */
     ProjectionDiagnostics project_cartesian(amrex::Real dt, amrex::Real time_coefficient = 1.0);
     /** C2.2 periodic diagonal/separable mapped pressure projection. */
+    ProjectionDiagnostics project_mapped(amrex::Real dt, amrex::Real time_coefficient = 1.0);
     ProjectionDiagnostics project_orthogonal(amrex::Real dt, amrex::Real time_coefficient = 1.0);
     /** Conservative Cartesian -div(Ucont[d] * face_average(Ucat)) / cell volume. */
     void compute_cartesian_advection_rhs(amrex::MultiFab& rhs);
@@ -186,6 +206,21 @@ public:
     }
 
 private:
+    // Only the incremental-pressure opt-in allocates these candidates.
+    // Phi is pressure-scaled (alpha=1), P is the committed cumulative multiplier.
+    enum class PressureIncrementPhase { Ready, Predictor, CorrectionReady };
+    struct PressureIncrementWorkspace {
+        amrex::MultiFab phi, pressure;
+        PressureIncrementPhase phase = PressureIncrementPhase::Ready;
+    };
+    std::unique_ptr<PressureIncrementWorkspace> m_pressure_increment;
+    void advance_incremental_pressure(
+        amrex::Real dt, amrex::Real viscosity,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& force,
+        amrex::MultiFab const* spatial_body_force);
+    /** Coordinate-dispatched periodic pressure solve; publishes only candidates. */
+    DeferredProjectionResult solve_incremental_pressure(
+        amrex::MultiFab& pressure, amrex::MultiFab const& integrated_rhs);
     // Case setup/export must coordinate solver-owned fields. One internal
     // bridge avoids exposing raw MultiFabs or case-specific declarations here.
     friend class AVWiSCaseRunnerAccess;
@@ -224,6 +259,10 @@ private:
     // not checkpoint state or additional time layers.
     amrex::MultiFab m_advection_rhs;
     amrex::MultiFab m_viscous_rhs;
+    // Nonzero periodic shear and incremental diagonal solves allocate scratch. Immutable metric
+    // ownership/epoch prevents accidental cache reuse after geometry changes.
+    std::unique_ptr<DeferredProjectionWorkspace> m_deferred_workspace;
+    ProjectionDiagnostics m_last_step_projection;
 
     // MAC face IndexType: each field has one normal volume-flux component.
     amrex::Array<amrex::MultiFab, AMREX_SPACEDIM> m_ucont;

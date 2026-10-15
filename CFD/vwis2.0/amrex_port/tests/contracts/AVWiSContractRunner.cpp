@@ -2,6 +2,12 @@
 
 #include "AVWiSContractTestAccess.H"
 
+void AVWiSContractRunner::run_c7_backend_contract(
+    std::string const& report_path, amrex::Real dt, amrex::Real viscosity)
+{
+    AVWiSContractTestAccess(m_solver).run_c7_backend_contract(report_path, dt, viscosity);
+}
+
 void AVWiSContractRunner::run_runtime_contract_checks()
 {
     AVWiSContractTestAccess(m_solver).run_runtime_contract_checks();
@@ -80,4 +86,16 @@ void AVWiSContractRunner::run_p8_sampling_statistics_contract(
 {
     AVWiSContractTestAccess(m_solver).run_p8_sampling_statistics_contract(
         report_path, plane_path);
+}
+
+void AVWiSContractRunner::run_c3_shear_contract(
+    std::string const& path, amrex::Real dt, amrex::Real viscosity)
+{
+    AVWiSContractTestAccess(m_solver).run_c3_shear_contract(path,dt,viscosity);
+}
+
+void AVWiSContractRunner::run_c3_temporal_contract(
+    std::string const& path, amrex::Real dt, amrex::Real viscosity, int steps)
+{
+    AVWiSContractTestAccess(m_solver).run_c3_temporal_contract(path,dt,viscosity,steps);
 }

@@ -7,6 +7,7 @@
 #include <AMReX_Vector.H>
 
 #include <exception>
+#include <stdexcept>
 #include <string>
 
 namespace {
@@ -23,7 +24,23 @@ MappingOperatorConfig read_mapping_operator_config(amrex::ParmParse& pp)
     amrex::ParmParse projection_pp(root + ".projection");
     mapping_pp.query("type", config.mapping_type);
     projection_pp.query("operator", projection);
+    mapping_pp.query("epsilon", config.shear_epsilon);
+    projection_pp.query("max_iterations", config.deferred_max_iterations);
+    projection_pp.query("diagonal_max_iterations", config.diagonal_max_iterations);
     config.projection = parse_projection_operator_mode(projection);
+
+    // An explicit opt-in chooses face-authority evolution. Pressure selection
+    // names the discrete multiplier's time semantics, not physical validation.
+    pp.query("state_contract", config.state_contract);
+    pp.query("pressure_contract", config.pressure_contract);
+    pp.query("failure_contract", config.failure_contract);
+    if (config.mapping_type == "analytic_shear") {
+        if (config.state_contract != "experimental_dual_state" &&
+            config.state_contract != "face_authoritative")
+            throw std::runtime_error(
+                "M2 analytic_shear state_contract supports experimental_dual_state or face_authoritative; "
+                "time-converged physical pressure remain open");
+    }
 
     amrex::Vector<amrex::Real> scale(AMREX_SPACEDIM, 1.0);
     amrex::Vector<amrex::Real> stretch(AMREX_SPACEDIM, 0.0);
@@ -60,6 +77,10 @@ int main(int argc, char* argv[])
             {AMREX_D_DECL(1.0, 1.0, 1.0)});
         auto boundary = read_cartesian_boundary_config(is_periodic);
         auto mapping_operator = read_mapping_operator_config(pp);
+        if (mapping_operator.state_contract == "face_authoritative" &&
+            run.mode != RunMode::Solve && run.mode != RunMode::ContractC3Temporal &&
+            run.mode != RunMode::CaseMappedPressureWave)
+            throw std::runtime_error("M2 face_authoritative supports solve or contract_c3_temporal, or case_mapped_pressure_wave");
         AVWiSSolver solver(n_cell, max_grid_size, nghost,
                            physical_domain, is_periodic, boundary, mapping_operator);
         if (run.restart_file.empty()) solver.initialize();

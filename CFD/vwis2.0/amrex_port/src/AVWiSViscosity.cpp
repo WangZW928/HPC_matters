@@ -65,6 +65,9 @@ void AVWiSSolver::compute_viscous_rhs(
     if (m_mapping_operator.coordinates == CoordinateSystemMode::Mapped) {
         validate_mapping_operator_config(m_mapping_operator, m_metric_data, m_metric_epoch);
         auto const spacing = m_metric_data.logical_grid().spacing;
+        const bool cross_terms = m_mapping_operator.mapping_type == "analytic_shear" &&
+                                 m_mapping_operator.shear_epsilon != 0.0;
+        const amrex::GpuArray<amrex::Real,3> inverse_h{1.0/spacing[0],1.0/spacing[1],1.0/spacing[2]};
         const amrex::Box domain = m_geom.Domain();
         const auto lo = domain.smallEnd();
         const auto hi = domain.bigEnd();
@@ -101,24 +104,16 @@ void AVWiSSolver::compute_viscous_rhs(
             auto const sx = m_metric_data.face_area_vector_fc(0).const_array(mfi);
             auto const sy = m_metric_data.face_area_vector_fc(1).const_array(mfi);
             auto const sz = m_metric_data.face_area_vector_fc(2).const_array(mfi);
-            const amrex::Real ih0 = 1.0 / spacing[0];
-            const amrex::Real ih1 = 1.0 / spacing[1];
-            const amrex::Real ih2 = 1.0 / spacing[2];
             amrex::ParallelFor(
                 mfi.validbox(), AMREX_SPACEDIM,
                 [=] AMREX_GPU_DEVICE (int i, int j, int k, int comp) noexcept {
-                    amrex::Real flux_x_hi = qx(i+1,j,k,0) *
-                        (u(i+1,j,k,comp)-u(i,j,k,comp)) * ih0;
-                    amrex::Real flux_x_lo = qx(i,j,k,0) *
-                        (u(i,j,k,comp)-u(i-1,j,k,comp)) * ih0;
-                    amrex::Real flux_y_hi = qy(i,j+1,k,1) *
-                        (u(i,j+1,k,comp)-u(i,j,k,comp)) * ih1;
-                    amrex::Real flux_y_lo = qy(i,j,k,1) *
-                        (u(i,j,k,comp)-u(i,j-1,k,comp)) * ih1;
-                    amrex::Real flux_z_hi = qz(i,j,k+1,2) *
-                        (u(i,j,k+1,comp)-u(i,j,k,comp)) * ih2;
-                    amrex::Real flux_z_lo = qz(i,j,k,2) *
-                        (u(i,j,k,comp)-u(i,j,k-1,comp)) * ih2;
+                    const auto part = cross_terms ? MetricFluxPart::Full : MetricFluxPart::Diagonal;
+                    amrex::Real flux_x_hi = metric_face_gradient_value(u,qx,i+1,j,k,0,comp,inverse_h,part);
+                    amrex::Real flux_x_lo = metric_face_gradient_value(u,qx,i,j,k,0,comp,inverse_h,part);
+                    amrex::Real flux_y_hi = metric_face_gradient_value(u,qy,i,j+1,k,1,comp,inverse_h,part);
+                    amrex::Real flux_y_lo = metric_face_gradient_value(u,qy,i,j,k,1,comp,inverse_h,part);
+                    amrex::Real flux_z_hi = metric_face_gradient_value(u,qz,i,j,k+1,2,comp,inverse_h,part);
+                    amrex::Real flux_z_lo = metric_face_gradient_value(u,qz,i,j,k,2,comp,inverse_h,part);
 
                     // Mirror ghosts impose the wall value but yield only a
                     // first-order face derivative for curved profiles. On a

@@ -154,9 +154,44 @@ void AnalyticOrthogonalCoordinateMapping::fill_nodes(
     node_coordinates_nd.FillBoundary(amrex::Periodicity::NonPeriodic());
 }
 
-std::unique_ptr<CoordinateMapping> make_coordinate_mapping(
-    std::string const& type, AnalyticOrthogonalMappingParameters const& analytic_parameters)
+AnalyticShearCoordinateMapping::AnalyticShearCoordinateMapping(
+    AnalyticOrthogonalMappingParameters parameters, amrex::Real epsilon)
+    : m_base(parameters), m_epsilon(epsilon)
 {
+    if (!std::isfinite(epsilon) || std::abs(epsilon) > 0.25) {
+        throw std::invalid_argument("AVWiS analytic_shear requires finite abs(epsilon) <= 0.25");
+    }
+}
+
+void AnalyticShearCoordinateMapping::fill_nodes(
+    amrex::MultiFab& coordinates, LogicalGrid const& logical) const
+{
+    m_base.fill_nodes(coordinates, logical);
+    const amrex::Real epsilon = m_epsilon;
+    const amrex::Real ylo = logical.lower[1];
+    // Each FAB, including its ghost region, must be transformed exactly once.
+    // Tiling with fabbox() would apply this additive shear multiple times.
+    for (amrex::MFIter mfi(coordinates, false); mfi.isValid(); ++mfi) {
+        auto const xyz = coordinates.array(mfi);
+        amrex::ParallelFor(mfi.fabbox(), [=] AMREX_GPU_DEVICE (int i,int j,int k) noexcept {
+            xyz(i,j,k,0) += epsilon*(xyz(i,j,k,1)-ylo);
+        });
+    }
+    amrex::Gpu::streamSynchronize();
+    coordinates.OverrideSync(amrex::Periodicity::NonPeriodic());
+    coordinates.FillBoundary(amrex::Periodicity::NonPeriodic());
+}
+
+std::unique_ptr<CoordinateMapping> make_coordinate_mapping(
+    std::string const& type, AnalyticOrthogonalMappingParameters const& analytic_parameters,
+    amrex::Real shear_epsilon)
+{
+    if (type == "analytic_shear") {
+        return std::make_unique<AnalyticShearCoordinateMapping>(analytic_parameters, shear_epsilon);
+    }
+    if (shear_epsilon != 0.0) {
+        throw std::invalid_argument("AVWiS epsilon requires analytic_shear mapping");
+    }
     if (type == "identity") {
         for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
             if (analytic_parameters.scale[dir] != 1.0 ||

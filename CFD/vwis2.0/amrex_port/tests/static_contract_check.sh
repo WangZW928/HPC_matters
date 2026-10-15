@@ -211,3 +211,85 @@ rg -q 'quadratic_dirichlet_wall_derivative' "$port/src/AVWiSViscosity.cpp"
 rg -q 'benchmark_mapped_channel_reference' "$port/src/RunMode.cpp" "$port/inputs/c8_mapped_channel_16.in"
 rg -q 'steady_residual_l2' "$port/benchmarks/MappedChannelReferenceCase.cpp" "$port/tests/c8_mapped_channel_convergence.cmake"
 echo 'static P0-P8-003, cavity, and C8-G1 AMReX contract check: PASS'
+
+# C3 owns reusable scratch, while acceptance remains the physical full operator.
+rg -q 'struct DeferredProjectionWorkspace' "$port/src/AVWiSMappedOperators.H"
+rg -q 'workspace.metric_owner!=&metric' "$port/src/AVWiSDeferredProjection.cpp"
+rg -q 'full_relative_residual<=1.0e-11' "$port/src/AVWiSDeferredProjection.cpp"
+rg -q 'm_deferred_workspace=std::make_unique' "$port/src/AVWiSSolver.cpp"
+rg -q 'last_step_projection' "$port/src/AVWiSTime.cpp"
+rg -q 'multistep volume-weighted momentum conservation' "$port/tests/contracts/AVWiSC3ContractChecks.cpp"
+rg -q 'analytic_shear checkpoint/restart provenance is not implemented' "$port/src/AVWiSCheckpoint.cpp"
+if rg -q 'ParallelFor\(mfi.(validbox|fabbox)\(' "$port/src/AVWiSDeferredProjection.cpp"; then
+    echo 'C3 tiled deferred kernels must iterate disjoint tile boxes' >&2
+    exit 1
+fi
+echo 'static C3 workspace, full residual, multistep and rejection contracts: PASS'
+
+# M2 evidence keeps separate velocity and pressure acceptance gates.
+rg -q 'experimental_dual_state' "$port/src/main.cpp"
+rg -q 'time-converged physical pressure remain open' "$port/src/main.cpp"
+rg -q 'contract_c3_temporal' "$port/src/RunMode.cpp"
+rg -q 'm_solver.advance_one_step' "$port/tests/contracts/AVWiSC3TemporalChecks.cpp"
+rg -q 'history_error==0' "$port/tests/contracts/AVWiSC3TemporalChecks.cpp"
+rg -q 'pressure_time_gate' "$port/tests/c3_temporal_audit.py"
+rg -q 'require-pressure-convergence' "$port/tests/c3_temporal_audit.py"
+rg -q 'avwis_c3_temporal_mpi_audit' "$port/CMakeLists.txt"
+echo 'static M2 temporal audit and acceptance contracts: PASS'
+
+# Runtime alpha may be configured only where dispatch actually consumes it.
+rg -q 'config.projection_time_coefficient != 1.0' "$port/src/RunMode.cpp"
+rg -q 'P5-005 projection_time_coefficient must be 1 outside standalone projection contracts' "$port/src/RunMode.cpp"
+rg -q 'default_alpha_one_exact' "$port/tests/p5_time_coefficient_contract.py"
+rg -q 'avwis_p5_time_coefficient_mpi_contract' "$port/CMakeLists.txt"
+echo 'static P5-005 projection time coefficient scope: PASS'
+
+# Pressure reference observes the existing solver without changing its gates.
+rg -q 'DeferredProjectionTrace\* trace = nullptr' "$port/src/AVWiSMappedOperators.H"
+rg -q 'if \(trace\) trace->push_back' "$port/src/AVWiSDeferredProjection.cpp"
+rg -q 'pressure_reference_warmup' "$port/tests/contracts/AVWiSPressureReference.cpp"
+rg -q 'initial_DI_Ucat' "$port/tests/contracts/AVWiSPressureReference.cpp"
+rg -q 'old_P_velocity_Phi_exact' "$port/tests/pressure_phi_reference.py"
+rg -q 'frozen_rhs_exact' "$port/tests/pressure_phi_reference.py"
+rg -q 'original_fine_dt_backend_gate.*BLOCKED' "$port/tests/pressure_phi_reference.py"
+rg -q 'require-backend' "$port/tests/pressure_phi_reference.py"
+echo 'static pressure reference observation and separate acceptance gates: PASS'
+
+# Consistent initial reference is opt-in and cannot approve the open M2 gates.
+rg -q 'reference selectors are mutually exclusive' "$port/tests/contracts/AVWiSC3TemporalChecks.cpp"
+rg -q 'run_consistent_reference' "$port/tests/contracts/AVWiSPressureReference.cpp"
+rg -q 'including_ghost_max_abs' "$port/tests/contracts/AVWiSPressureReference.cpp"
+rg -q 'fatal; no entire-advance rollback' "$port/tests/contracts/AVWiSPressureReference.cpp"
+rg -q 'DIC_checkerboard_null_modes' "$port/tests/consistent_state_reference.py"
+rg -q 'original_pressure_temporal_gate.*BLOCKED' "$port/tests/consistent_state_reference.py"
+rg -q 'original_fine_dt_Phi_gate.*BLOCKED' "$port/tests/consistent_state_reference.py"
+rg -q 'require-decision' "$port/tests/consistent_state_reference.py"
+rg -q 'avwis_m2_consistent_reference_contract' "$port/CMakeLists.txt"
+echo 'static M2 consistent reference and fatal advance observation: PASS'
+
+# Opt-in face authority evolves acceleration flux, while the old path remains.
+rg -q 'state_contract = "experimental_dual_state"' "$port/src/AVWiSMappedOperators.H"
+rg -q 'pressure_contract = "accumulated_correction"' "$port/src/AVWiSMappedOperators.H"
+rg -q 'face_authoritative requires pressure_contract=instantaneous_pressure' "$port/src/AVWiSMappedOperators.cpp"
+rg -q 'face_authoritative currently requires nonzero affine analytic_shear' "$port/src/AVWiSMappedOperators.cpp"
+rg -q 'failure_contract supports only fatal; entire-advance rollback is not implemented' "$port/src/AVWiSMappedOperators.cpp"
+rg -q 'predictor_rate' "$port/src/AVWiSTime.cpp"
+rg -Fq 'Saxpy(m_ucont[d],dt,*rate_faces[d]' "$port/src/AVWiSTime.cpp"
+rg -Fq 'sync_metric_ucat_from_ucont(candidates' "$port/src/AVWiSProjection.cpp"
+rg -Fq 'Copy(m_p,m_phi,0,0,1,0)' "$port/src/AVWiSProjection.cpp"
+rg -q 'failed pressure/R/mask committed' "$port/tests/contracts/AVWiSFaceAuthorityChecks.cpp"
+rg -q 'entire_advance_rollback_gate.*BLOCKED' "$port/tests/face_authority_audit.py"
+rg -q 'avwis_m2_face_authority' "$port/CMakeLists.txt"
+echo 'static opt-in face-authority advance, pressure semantics, and fatal failure: PASS'
+
+# The opt-in MLMG RHS and deferred cross action consume signed net face flux
+# directly. Physical full residual and the default volume arithmetic stay intact.
+rg -q 'void compute_metric_net_flux' "$port/src/AVWiSMappedOperators.H" "$port/src/AVWiSMappedOperators.cpp"
+rg -Fq 'compute_metric_net_flux(fv,m_metric_data,m_metric_epoch,m_mapping_operator,m_projection_rhs)' "$port/src/AVWiSProjection.cpp"
+rg -Fq 'compute_metric_net_flux(fview,metric,epoch,config,action)' "$port/src/AVWiSDeferredProjection.cpp"
+rg -Fq 'reuse_velocity_norms = m_mapping_operator.state_contract == "face_authoritative"' "$port/src/AVWiSProjection.cpp"
+rg -Fq 'u=reuse_velocity_norms ? velocity_norms[c] : m_ucat.norm0(c,0,true)' "$port/src/AVWiSProjection.cpp"
+rg -Fq 'if (!reuse_velocity_norms) amrex::ParallelDescriptor::ReduceRealMax(u)' "$port/src/AVWiSProjection.cpp"
+echo 'static opt-in projection velocity norm reuse contract: PASS'
+rg -Fq 'compute_metric_divergence(fview,metric,epoch,config,residual)' "$port/src/AVWiSDeferredProjection.cpp"
+echo 'static opt-in direct integrated RHS and cross-action contract: PASS'

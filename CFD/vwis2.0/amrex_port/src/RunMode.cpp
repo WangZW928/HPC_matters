@@ -2,6 +2,7 @@
 
 #include "CartesianBenchmarkCase.H"
 #include "LidDrivenCavityCase.H"
+#include "MappedPressureWaveCase.H"
 #include "PhysicalChannelCase.H"
 #include "MappedChannelReferenceCase.H"
 #include "TaylorGreenMMSCase.H"
@@ -33,9 +34,9 @@ RunMode parse_run_mode(amrex::ParmParse& pp)
             "contract_p2, contract_p3, contract_p4, contract_p5_advection, contract_p5_viscous, "
             "contract_p5_time, contract_p5_orthogonal, contract_p5_mapped_boundary, "
             "contract_p5_orthogonal_time, contract_p5_mapped_boundary_c52, "
-            "contract_p8_restart, contract_p8_sampling, "
+            "contract_p8_restart, contract_p8_sampling, contract_c7_backend, contract_c3_shear, contract_c3_temporal, "
             "benchmark_cartesian, benchmark_cartesian_mms, benchmark_physical_channel, "
-            "benchmark_mapped_channel_reference, or case_lid_cavity");
+            "benchmark_mapped_channel_reference, case_lid_cavity, or case_mapped_pressure_wave");
     }
 
     static const std::unordered_map<std::string, RunMode> modes = {
@@ -54,11 +55,15 @@ RunMode parse_run_mode(amrex::ParmParse& pp)
         {"contract_p5_mapped_boundary_c52", RunMode::ContractP5MappedBoundaryC52},
         {"contract_p8_restart", RunMode::ContractP8Restart},
         {"contract_p8_sampling", RunMode::ContractP8Sampling},
+        {"contract_c7_backend", RunMode::ContractC7Backend},
+        {"contract_c3_shear", RunMode::ContractC3Shear},
+        {"contract_c3_temporal", RunMode::ContractC3Temporal},
         {"benchmark_cartesian", RunMode::BenchmarkCartesian},
         {"benchmark_cartesian_mms", RunMode::BenchmarkCartesianMMS},
         {"benchmark_physical_channel", RunMode::BenchmarkPhysicalChannel},
         {"benchmark_mapped_channel_reference", RunMode::BenchmarkMappedChannelReference},
         {"case_lid_cavity", RunMode::CaseLidCavity},
+        {"case_mapped_pressure_wave", RunMode::CaseMappedPressureWave},
     };
     const auto found = modes.find(name);
     if (found == modes.end()) {
@@ -104,6 +109,16 @@ char const* avwis_input_namespace()
 RunConfiguration read_run_configuration(amrex::ParmParse& pp)
 {
     RunConfiguration config{parse_run_mode(pp)};
+    std::string integrator = "explicit_euler";
+    std::string viscous_operator = "component_laplacian";
+    pp.query("time_integrator", integrator);
+    pp.query("viscous_operator", viscous_operator);
+    if (integrator != "explicit_euler")
+        throw std::runtime_error("P5-005 time_integrator supports only explicit_euler; "
+                                 "SNES/semi-implicit/BDF2 residual contracts remain open");
+    if (viscous_operator != "component_laplacian")
+        throw std::runtime_error("M6 viscous_operator supports only component_laplacian; "
+                                 "full stress divergence remains open");
     pp.query("dt", config.dt);
     pp.query("run_steps", config.run_steps);
     pp.query("restart_total_steps", config.restart_total_steps);
@@ -111,6 +126,18 @@ RunConfiguration read_run_configuration(amrex::ParmParse& pp)
     pp.query("viscosity", config.viscosity);
     pp.query("final_time", config.final_time);
     pp.query("projection_time_coefficient", config.projection_time_coefficient);
+    // Only these standalone projection contracts consume a configurable alpha.
+    // Every advance uses explicit Euler's alpha=1; accepting another value here
+    // would silently ignore a requested time scheme (e.g. BDF2's 3/2).
+    bool const configurable_projection =
+        config.mode == RunMode::ContractP4 ||
+        config.mode == RunMode::ContractP5Orthogonal ||
+        config.mode == RunMode::ContractP5MappedBoundary ||
+        config.mode == RunMode::ContractP5MappedBoundaryC52;
+    if (!configurable_projection && config.projection_time_coefficient != 1.0)
+        throw std::runtime_error(
+            "P5-005 projection_time_coefficient must be 1 outside standalone projection contracts; "
+            "explicit_euler fixes alpha=1, SNES/semi-implicit/BDF2 remain open");
     amrex::Vector<amrex::Real> body_force(
         config.body_force.begin(), config.body_force.end());
     pp.queryarr("body_force", body_force, 0, AMREX_SPACEDIM);
@@ -130,6 +157,35 @@ RunConfiguration read_run_configuration(amrex::ParmParse& pp)
 void dispatch_run_mode(AVWiSSolver& solver, RunConfiguration const& config)
 {
     switch (config.mode) {
+    case RunMode::CaseMappedPressureWave:
+        require_file(config.metadata_file, "mapped pressure wave requires avwis.metadata_file");
+        if (!config.restart_file.empty() || !config.checkpoint_file.empty())
+            throw std::runtime_error("mapped pressure wave initializes its analytic state; checkpoint/restart is not supported");
+        for (auto value : config.body_force)
+            if (value != 0)
+                throw std::runtime_error("mapped pressure wave supplies analytic forcing; uniform body_force must be zero");
+        run_mapped_pressure_wave_case(solver, config.dt, config.final_time,
+                                     config.viscosity, config.metadata_file, config.field_file);
+        return;
+    case RunMode::ContractC3Temporal:
+        require_file(config.metadata_file,"C3 temporal audit requires metadata_file");
+        AVWiSContractRunner(solver).run_c3_temporal_contract(
+            config.metadata_file,config.dt,config.viscosity,config.run_steps);
+        return;
+    case RunMode::ContractC3Shear:
+        {
+        require_file(config.metadata_file,"C3 shear contract requires metadata_file");
+        AVWiSContractRunner(solver).run_c3_shear_contract(config.metadata_file,config.dt,config.viscosity);
+        return;
+        }
+    case RunMode::ContractC7Backend:
+        {
+        require_file(config.metadata_file,
+                     "avwis.metadata_file is required for the C7 backend contract");
+        AVWiSContractRunner contracts(solver);
+        contracts.run_c7_backend_contract(config.metadata_file, config.dt, config.viscosity);
+        return;
+        }
     case RunMode::Solve:
         run_solve_loop(solver, config);
         return;

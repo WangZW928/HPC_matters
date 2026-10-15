@@ -1,0 +1,16 @@
+avwis.mode = contract_c7_backend
+avwis.coordinates = mapped
+avwis.mapping.type = analytic_orthogonal
+avwis.mapping.scale = 1.25 0.9 1.1
+avwis.mapping.stretch = 0.35 -0.2 0.15
+avwis.projection.operator = orthogonal_mlmg
+avwis.n_cell = 16 8 8
+avwis.max_grid_size = 8
+avwis.nghost = 2
+avwis.is_periodic = 1 1 1
+avwis.dt = 1.0e-4
+avwis.viscosity = 0.01
+avwisbcs.enabled = 1
+avwisbcs.geometry = mapped_orthogonal
+avwisbcs.lo = "" "" ""
+avwisbcs.hi = "" "" ""

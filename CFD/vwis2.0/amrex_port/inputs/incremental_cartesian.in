@@ -1,0 +1,16 @@
+avwis.mode = solve
+avwis.coordinates = cartesian
+avwis.mapping.type = identity
+avwis.projection.operator = cartesian_mlmg
+avwis.state_contract = face_authoritative
+avwis.pressure_contract = incremental_pressure
+avwis.n_cell = 16 16 4
+avwis.max_grid_size = 8
+avwis.nghost = 2
+avwis.is_periodic = 1 1 1
+avwisbcs.enabled = 0
+avwis.dt = 2.5e-4
+avwis.run_steps = 8
+avwis.viscosity = 0.01
+avwis.body_force = 0.01 -0.02 0.03
+avwis.metadata_file = incremental_cartesian.json

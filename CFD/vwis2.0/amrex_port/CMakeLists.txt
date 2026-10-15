@@ -51,7 +51,8 @@ set(AVWIS_METRIC_SOURCES
     src/AVWiSCoordinateMapping.cpp
     src/AVWiSMetricData.cpp
     src/AVWiSMetricAdapter.cpp
-    src/AVWiSMappedOperators.cpp)
+    src/AVWiSMappedOperators.cpp
+    src/AVWiSDeferredProjection.cpp)
 add_library(avwis_metric STATIC ${AVWIS_METRIC_SOURCES})
 target_include_directories(avwis_metric PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(avwis_metric PUBLIC AMReX::amrex)
@@ -75,12 +76,19 @@ set(AVWIS_TEST_MODE_SOURCES
     tests/contracts/AVWiSP8ContractChecks.cpp
     tests/contracts/AVWiSC2ContractChecks.cpp
     tests/contracts/AVWiSC5ContractChecks.cpp
+    tests/contracts/AVWiSC7ContractChecks.cpp
+    tests/contracts/AVWiSC3ContractChecks.cpp
+    tests/contracts/AVWiSC3TemporalChecks.cpp
+    tests/contracts/AVWiSPressureReference.cpp
+    tests/contracts/AVWiSFaceAuthorityChecks.cpp
+    tests/contracts/AVWiSPressureIncrementChecks.cpp
     tests/contracts/AVWiSContractRunner.cpp)
 set(AVWIS_CASE_SOURCES
     benchmarks/CartesianBenchmarkCase.cpp
     benchmarks/TaylorGreenMMSCase.cpp
     benchmarks/PhysicalChannelCase.cpp
     benchmarks/MappedChannelReferenceCase.cpp
+    cases/MappedPressureWaveCase.cpp
     cases/LidDrivenCavityCase.cpp)
 set(AVWIS_SOURCES
     ${AVWIS_PRODUCTION_SOURCES}
@@ -114,6 +122,98 @@ endif()
 
 include(CTest)
 if (BUILD_TESTING)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    add_test(NAME avwis_m2_pressure_increment
+             COMMAND ${Python3_EXECUTABLE} -B ${CMAKE_CURRENT_SOURCE_DIR}/tests/pressure_increment_audit.py
+                     --exe $<TARGET_FILE:avwis> --input ${CMAKE_CURRENT_SOURCE_DIR}/inputs/m2_pressure_increment.in
+                     --work ${CMAKE_CURRENT_BINARY_DIR}/m2_pressure_increment)
+    set_tests_properties(avwis_m2_pressure_increment PROPERTIES TIMEOUT 360)
+    if (AMReX_CUDA)
+        set(AVWIS_C7_BACKEND CUDA)
+        # Keep the same real 32/64/128 refinement and 256-step long trajectory
+        # on CUDA. Small MLMG solves require a larger wall-clock budget; this
+        # changes neither numerical gates nor production solver work limits.
+        set(AVWIS_C3_AUDIT_FLAGS --max-grid 16 --timeout 480)
+    else()
+        set(AVWIS_C7_BACKEND CPU)
+        set(AVWIS_C3_AUDIT_FLAGS)
+    endif()
+    add_test(NAME avwis_p5_time_coefficient_contract
+             COMMAND ${Python3_EXECUTABLE} -B ${CMAKE_CURRENT_SOURCE_DIR}/tests/p5_time_coefficient_contract.py
+                     --exe $<TARGET_FILE:avwis> --inputs ${CMAKE_CURRENT_SOURCE_DIR}/inputs
+                     --work ${CMAKE_CURRENT_BINARY_DIR}/p5_time_coefficient --backend ${AVWIS_C7_BACKEND})
+    set_tests_properties(avwis_p5_time_coefficient_contract PROPERTIES TIMEOUT 360)
+    add_test(NAME avwis_c3_shear_regression
+             COMMAND ${Python3_EXECUTABLE} -B ${CMAKE_CURRENT_SOURCE_DIR}/tests/c3_shear_regression.py
+                     --exe $<TARGET_FILE:avwis> --input ${CMAKE_CURRENT_SOURCE_DIR}/inputs/c3_shear_periodic.in
+                     --work ${CMAKE_CURRENT_BINARY_DIR}/c3_shear)
+    set_tests_properties(avwis_c3_shear_regression PROPERTIES TIMEOUT 600)
+    add_test(NAME avwis_m2_consistent_reference_contract
+             COMMAND ${Python3_EXECUTABLE} -B ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_consistent_state_reference.py)
+    add_test(NAME avwis_m2_consistent_reference
+             COMMAND ${Python3_EXECUTABLE} -B ${CMAKE_CURRENT_SOURCE_DIR}/tests/consistent_state_reference.py
+                     --exe $<TARGET_FILE:avwis> --input ${CMAKE_CURRENT_SOURCE_DIR}/inputs/c3_temporal.in
+                     --work ${CMAKE_CURRENT_BINARY_DIR}/m2_consistent_reference)
+    set_tests_properties(avwis_m2_consistent_reference PROPERTIES TIMEOUT 360)
+    add_test(NAME avwis_m2_face_authority
+             COMMAND ${Python3_EXECUTABLE} -B ${CMAKE_CURRENT_SOURCE_DIR}/tests/face_authority_audit.py
+                     --exe $<TARGET_FILE:avwis> --backend ${AVWIS_C7_BACKEND}
+                     --input ${CMAKE_CURRENT_SOURCE_DIR}/inputs/m2_face_authority.in
+                     --work ${CMAKE_CURRENT_BINARY_DIR}/m2_face_authority)
+    set_tests_properties(avwis_m2_face_authority PROPERTIES TIMEOUT 360)
+    add_test(NAME avwis_c3_temporal_comparator_contract
+             COMMAND ${Python3_EXECUTABLE} -B ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_c3_temporal_audit.py)
+    add_test(NAME avwis_c3_temporal_audit
+             COMMAND ${Python3_EXECUTABLE} -B ${CMAKE_CURRENT_SOURCE_DIR}/tests/c3_temporal_audit.py
+                     --exe $<TARGET_FILE:avwis> --input ${CMAKE_CURRENT_SOURCE_DIR}/inputs/c3_temporal.in
+                     --work ${CMAKE_CURRENT_BINARY_DIR}/c3_temporal --backend ${AVWIS_C7_BACKEND}
+                     ${AVWIS_C3_AUDIT_FLAGS})
+    set_tests_properties(avwis_c3_temporal_audit PROPERTIES TIMEOUT 1800)
+    add_test(NAME avwis_c7_comparator_contract
+             COMMAND ${Python3_EXECUTABLE} -B
+                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_c7_backend_compare.py)
+    add_test(NAME avwis_c7_layout_comparison
+             COMMAND ${Python3_EXECUTABLE} -B
+                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/c7_backend_compare.py
+                     --exe $<TARGET_FILE:avwis> --backend ${AVWIS_C7_BACKEND}
+                     --inputs ${CMAKE_CURRENT_SOURCE_DIR}/inputs
+                     --work ${CMAKE_CURRENT_BINARY_DIR}/c7_layout)
+    set_tests_properties(avwis_c7_layout_comparison PROPERTIES TIMEOUT 180)
+    if (AMReX_MPI)
+        find_package(MPI REQUIRED COMPONENTS C CXX)
+        set(AVWIS_C7_MPI_FLAGS)
+        foreach(flag IN LISTS MPIEXEC_PREFLAGS)
+            list(APPEND AVWIS_C7_MPI_FLAGS "--mpi-preflag=${flag}")
+        endforeach()
+        foreach(flag IN LISTS MPIEXEC_POSTFLAGS)
+            list(APPEND AVWIS_C7_MPI_FLAGS "--mpi-postflag=${flag}")
+        endforeach()
+        add_test(NAME avwis_p5_time_coefficient_mpi_contract
+                 COMMAND ${Python3_EXECUTABLE} -B ${CMAKE_CURRENT_SOURCE_DIR}/tests/p5_time_coefficient_contract.py
+                         --exe $<TARGET_FILE:avwis> --inputs ${CMAKE_CURRENT_SOURCE_DIR}/inputs
+                         --work ${CMAKE_CURRENT_BINARY_DIR}/p5_time_coefficient_mpi
+                         --backend ${AVWIS_C7_BACKEND} --mpi-exec ${MPIEXEC_EXECUTABLE} --ranks 4
+                         --mpi-numproc-flag=${MPIEXEC_NUMPROC_FLAG} ${AVWIS_C7_MPI_FLAGS})
+        set_tests_properties(avwis_p5_time_coefficient_mpi_contract PROPERTIES TIMEOUT 360 PROCESSORS 4)
+        add_test(NAME avwis_c7_mpi_comparison
+                 COMMAND ${Python3_EXECUTABLE} -B
+                         ${CMAKE_CURRENT_SOURCE_DIR}/tests/c7_backend_compare.py
+                         --exe $<TARGET_FILE:avwis> --backend ${AVWIS_C7_BACKEND}
+                         --inputs ${CMAKE_CURRENT_SOURCE_DIR}/inputs
+                         --work ${CMAKE_CURRENT_BINARY_DIR}/c7_mpi
+                         --mpi-exec ${MPIEXEC_EXECUTABLE}
+                         --mpi-numproc-flag=${MPIEXEC_NUMPROC_FLAG} ${AVWIS_C7_MPI_FLAGS})
+        set_tests_properties(avwis_c7_mpi_comparison PROPERTIES TIMEOUT 300 PROCESSORS 4)
+        add_test(NAME avwis_c3_temporal_mpi_audit
+                 COMMAND ${Python3_EXECUTABLE} -B ${CMAKE_CURRENT_SOURCE_DIR}/tests/c3_temporal_audit.py
+                         --exe $<TARGET_FILE:avwis> --input ${CMAKE_CURRENT_SOURCE_DIR}/inputs/c3_temporal.in
+                         --work ${CMAKE_CURRENT_BINARY_DIR}/c3_temporal_mpi
+                         --mpi-exec ${MPIEXEC_EXECUTABLE} --ranks 4 --max-grid 16 --tile "4 4 2"
+                         --mpi-numproc-flag=${MPIEXEC_NUMPROC_FLAG} ${AVWIS_C7_MPI_FLAGS}
+                         --reference ${CMAKE_CURRENT_BINARY_DIR}/c3_temporal/audit.json --observe-peer)
+        set_tests_properties(avwis_c3_temporal_mpi_audit PROPERTIES
+                             TIMEOUT 600 PROCESSORS 4 DEPENDS avwis_c3_temporal_audit)
+    endif()
     function(add_avwis_rejection_test test_name input_file expected_text)
         add_test(NAME ${test_name}
                  COMMAND ${CMAKE_COMMAND}
@@ -123,6 +223,22 @@ if (BUILD_TESTING)
                     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/expect_failure.cmake)
     endfunction()
 
+    add_avwis_rejection_test(avwis_c3_state_contract_rejected c3_reject_state_contract.in
+        "M2 analytic_shear state_contract supports experimental_dual_state or face_authoritative")
+    add_avwis_rejection_test(avwis_c3_pressure_contract_rejected c3_reject_pressure_contract.in
+        "time-converged physical pressure remain open")
+    add_avwis_rejection_test(avwis_c3_operator_rejected c3_reject_operator.in
+        "analytic_shear requires mapped/deferred_nonorthogonal")
+    add_avwis_rejection_test(avwis_c3_epsilon_rejected c3_reject_epsilon.in
+        "finite abs(epsilon) <= 0.25")
+    add_avwis_rejection_test(avwis_c3_boundary_rejected c3_reject_boundary.in
+        "requires avwisbcs.enabled=0")
+    add_avwis_rejection_test(avwis_c3_integrator_rejected c3_reject_integrator.in
+        "time_integrator supports only explicit_euler")
+    add_avwis_rejection_test(avwis_c3_stress_rejected c3_reject_stress.in
+        "viscous_operator supports only component_laplacian")
+    add_avwis_rejection_test(avwis_c3_checkpoint_rejected c3_reject_checkpoint.in
+        "analytic_shear checkpoint/restart provenance is not implemented")
     add_executable(avwis_metric_identity_contract
         tests/curvilinear/MetricIdentityContract.cpp)
     target_link_libraries(avwis_metric_identity_contract PRIVATE avwis_metric AMReX::amrex)

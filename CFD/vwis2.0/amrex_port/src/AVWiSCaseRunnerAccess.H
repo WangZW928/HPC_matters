@@ -11,6 +11,10 @@ class AVWiSSolver;
 /** Internal bridge for case setup/export that must coordinate solver-owned fields. */
 class AVWiSCaseRunnerAccess {
 public:
+    static void run_mapped_pressure_wave_case_impl(
+        AVWiSSolver& solver, amrex::Real dt, amrex::Real final_time,
+        amrex::Real viscosity, std::string const& report_path,
+        std::string const& field_path);
     static void run_cartesian_benchmark_impl(
         AVWiSSolver& solver, amrex::Real dt, int steps, amrex::Real viscosity,
         std::string const& report_path);

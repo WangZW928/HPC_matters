@@ -34,6 +34,11 @@ public:
                                         amrex::Real viscosity);
     void run_p8_sampling_statistics_contract(std::string const& report_path,
                                              std::string const& plane_path);
+    void run_c3_temporal_contract(std::string const& path, amrex::Real dt,
+                                  amrex::Real viscosity, int steps);
+    void run_c3_shear_contract(std::string const& report_path, amrex::Real dt, amrex::Real viscosity);
+    void run_c7_backend_contract(std::string const& report_path,
+                                 amrex::Real dt, amrex::Real viscosity);
 
 private:
     AVWiSSolver& m_solver;

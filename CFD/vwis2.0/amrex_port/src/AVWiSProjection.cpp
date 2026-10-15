@@ -86,6 +86,8 @@ AVWiSSolver::validate_singular_rhs_compatibility(amrex::MultiFab const& rhs) con
 ProjectionDiagnostics
 AVWiSSolver::project_cartesian(amrex::Real dt, amrex::Real time_coefficient)
 {
+    if (m_mapping_operator.pressure_contract == "incremental_pressure")
+        throw std::runtime_error("M2 incremental_pressure requires advance_one_step; standalone projection cannot commit a pressure increment");
     if (m_mapping_operator.coordinates != CoordinateSystemMode::Cartesian ||
         m_mapping_operator.projection != ProjectionOperatorMode::CartesianMLMG) {
         throw std::runtime_error(
@@ -220,12 +222,15 @@ AVWiSSolver::project_cartesian(amrex::Real dt, amrex::Real time_coefficient)
 ProjectionDiagnostics
 AVWiSSolver::project_orthogonal(amrex::Real dt, amrex::Real time_coefficient)
 {
+    if (m_mapping_operator.pressure_contract == "incremental_pressure")
+        throw std::runtime_error("M2 incremental_pressure requires advance_one_step; standalone projection cannot commit a pressure increment");
     if (!(dt > 0.0) || !(time_coefficient > 0.0)) {
         throw std::runtime_error("C2.2 orthogonal projection requires positive dt and time_coefficient");
     }
     validate_mapping_operator_config(m_mapping_operator, m_metric_data, m_metric_epoch);
     if (m_mapping_operator.coordinates != CoordinateSystemMode::Mapped ||
-        m_mapping_operator.projection != ProjectionOperatorMode::OrthogonalMLMG) {
+        (m_mapping_operator.projection != ProjectionOperatorMode::OrthogonalMLMG &&
+        !(m_mapping_operator.mapping_type == "analytic_shear" && m_mapping_operator.shear_epsilon == 0.0))) {
         throw std::runtime_error(
             "C2.2 orthogonal projection requires mapped coordinates and orthogonal_mlmg");
     }
@@ -422,5 +427,242 @@ AVWiSSolver::project_orthogonal(amrex::Real dt, amrex::Real time_coefficient)
                    << " residual=" << report.final_residual
                    << " max_div_before=" << report.max_divergence_before
                    << " max_div_after=" << report.max_divergence_after << "\n";
+    return report;
+}
+
+DeferredProjectionResult AVWiSSolver::solve_incremental_pressure(
+    amrex::MultiFab& pressure, amrex::MultiFab const& integrated_rhs)
+{
+    if (m_mapping_operator.mapping_type == "analytic_shear")
+        return solve_deferred_metric_poisson(pressure, integrated_rhs, m_metric_data,
+            m_metric_epoch, m_mapping_operator, m_geom, *m_deferred_workspace);
+
+    // Both diagonal operators solve A Q = rhs with A=-N G_f. The
+    // Cartesian MLPoisson convention is +Laplacian, so its RHS is -rhs/V;
+    // mapped MLABecLaplacian already represents the integrated negative action.
+    validate_mapping_operator_config(m_mapping_operator, m_metric_data, m_metric_epoch);
+    auto& work = *m_deferred_workspace;
+    auto const& volume = m_metric_data.cell_volume_cc();
+    auto rhs_sum = integrated_rhs.sum(0, true);
+    auto rhs_norm = integrated_rhs.norm0(0, 0, true);
+    amrex::ParallelDescriptor::ReduceRealSum(rhs_sum);
+    amrex::ParallelDescriptor::ReduceRealMax(rhs_norm);
+    auto const cells = static_cast<amrex::Real>(m_geom.Domain().numPts());
+    if (!std::isfinite(rhs_sum) || !std::isfinite(rhs_norm) ||
+        std::abs(rhs_sum) > 1.0e-12*cells*rhs_norm)
+        throw std::runtime_error("M2 incremental diagonal pressure incompatible integrated RHS; no mean repair");
+
+    amrex::MultiFab::Copy(work.physical_rhs, integrated_rhs, 0, 0, 1, 0);
+    amrex::MultiFab::Divide(work.physical_rhs, volume, 0, 0, 1, 0);
+    pressure.setVal(0);
+    work.bc.setVal(0);
+    DeferredProjectionResult result;
+    if (rhs_norm == 0) return result;
+
+    bool const cartesian = m_mapping_operator.coordinates == CoordinateSystemMode::Cartesian;
+    amrex::Array<amrex::LinOpBCType,3> periodic{
+        amrex::LinOpBCType::Periodic, amrex::LinOpBCType::Periodic, amrex::LinOpBCType::Periodic};
+    std::unique_ptr<amrex::MLCellLinOp> op;
+    if (cartesian) {
+        amrex::MultiFab::Copy(work.work_rhs, work.physical_rhs, 0, 0, 1, 0);
+        work.work_rhs.mult(-1, 0, 1, 0);
+        op = std::make_unique<amrex::MLPoisson>(
+            amrex::Vector<amrex::Geometry>{m_geom}, amrex::Vector<amrex::BoxArray>{m_ba},
+            amrex::Vector<amrex::DistributionMapping>{m_dm});
+    } else {
+        amrex::MultiFab::Copy(work.work_rhs, integrated_rhs, 0, 0, 1, 0);
+        amrex::Array<amrex::MultiFab const*,3> coefficients{};
+        auto const h = m_metric_data.logical_grid().spacing;
+        for (int d=0; d<3; ++d) {
+            amrex::MultiFab::Copy(work.b[d], m_metric_data.face_gradient_metric_fc(d), d, 0, 1, 0);
+            amrex::MultiFab::Multiply(work.b[d], m_metric_data.projection_beta_fc(d), 0, 0, 1, 0);
+            work.b[d].mult(h[d], 0, 1, 0);
+            work.b[d].OverrideSync(m_geom.periodicity());
+            coefficients[d] = &work.b[d];
+        }
+        auto diagonal = std::make_unique<amrex::MLABecLaplacian>(
+            amrex::Vector<amrex::Geometry>{m_geom}, amrex::Vector<amrex::BoxArray>{m_ba},
+            amrex::Vector<amrex::DistributionMapping>{m_dm});
+        diagonal->setScalars(0, 1);
+        diagonal->setACoeffs(0, 0);
+        diagonal->setBCoeffs(0, coefficients);
+        op = std::move(diagonal);
+    }
+    op->setMaxOrder(2);
+    op->setDomainBC(periodic, periodic);
+    op->setEnforceSingularSolvable(false);
+    op->setLevelBC(0, &work.bc);
+    amrex::MLMG mlmg(*op);
+    mlmg.setMaxIter(m_mapping_operator.diagonal_max_iterations);
+    mlmg.setMaxFmgIter(0);
+    mlmg.setVerbose(0);
+    mlmg.setBottomVerbose(0);
+    mlmg.setThrowException(true);
+    // A singular bottom Krylov solve can amplify roundoff in later steps.
+    // Use the same robust smoothing policy as the shear solve. Thin diagonal
+    // hierarchies also need more than 200 cycles; the configurable work budget
+    // changes neither the 1e-12 inner nor the 1e-11 full acceptance tolerance.
+    mlmg.setBottomSolver(amrex::MLMG::BottomSolver::smoother);
+    mlmg.setBottomSmooth(256);
+    try {
+        mlmg.solve({&pressure}, {&work.work_rhs}, 1.0e-12, 0);
+    } catch (std::exception const& error) {
+        throw std::runtime_error(std::string("M2 incremental diagonal solve failed: ") + error.what());
+    }
+    result.inner_iterations = mlmg.getNumIters();
+    result.iterations = 1;
+
+    amrex::MultiFab::Copy(work.weighted, pressure, 0, 0, 1, 0);
+    amrex::MultiFab::Multiply(work.weighted, volume, 0, 0, 1, 0);
+    auto weighted_sum = work.weighted.sum(0, true);
+    auto volume_sum = volume.sum(0, true);
+    amrex::ParallelDescriptor::ReduceRealSum(weighted_sum);
+    amrex::ParallelDescriptor::ReduceRealSum(volume_sum);
+    pressure.plus(-weighted_sum/volume_sum, 0, 1, 0);
+    pressure.FillBoundary(m_geom.periodicity());
+    // Candidate acceptance remains in advance_incremental_pressure: recheck
+    // the actual rounded P_old+Phi with the SAME explicit G_f and physical RHS
+    // used for face correction. MLMG's internal residual is not that gate.
+    return result;
+}
+
+ProjectionDiagnostics AVWiSSolver::project_mapped(amrex::Real dt, amrex::Real alpha)
+{
+    if (m_mapping_operator.pressure_contract == "incremental_pressure")
+        throw std::runtime_error("M2 incremental_pressure requires advance_one_step; standalone projection cannot commit a pressure increment");
+    if (m_mapping_operator.projection == ProjectionOperatorMode::OrthogonalMLMG ||
+        (m_mapping_operator.mapping_type=="analytic_shear" && m_mapping_operator.shear_epsilon==0.0))
+        return project_orthogonal(dt,alpha);
+    validate_mapping_operator_config(m_mapping_operator,m_metric_data,m_metric_epoch);
+    if (!std::isfinite(dt) || !std::isfinite(alpha) || dt<=0.0 || alpha<=0.0)
+        throw std::runtime_error("AVWiS mapped projection requires finite positive dt/alpha");
+    if (!m_deferred_workspace)
+        throw std::runtime_error("AVWiS deferred projection requires solver-owned workspace");
+    fill_ghost_cells();
+    amrex::Array<amrex::MultiFab const*,3> fv{&m_ucont[0],&m_ucont[1],&m_ucont[2]};
+    compute_metric_divergence(fv,m_metric_data,m_metric_epoch,m_mapping_operator,m_projection_rhs);
+    ProjectionDiagnostics report;
+    report.singular=true;
+    report.max_divergence_before=m_projection_rhs.norm0(0,0,true);
+    amrex::ParallelDescriptor::ReduceRealMax(report.max_divergence_before);
+    amrex::Real divergence_scale=1.0;
+    auto const h=m_metric_data.logical_grid().spacing;
+    bool const reuse_velocity_norms = m_mapping_operator.state_contract == "face_authoritative";
+    amrex::Array<amrex::Real,3> velocity_norms{};
+    if (reuse_velocity_norms) {
+        // Ucat is unchanged throughout this scale calculation. Its three
+        // component maxima are independent of logical direction: compute
+        // each once, saving six local scans and six global max reductions.
+        // Keep this cache local to the call, including retries after failure.
+        for (int c=0;c<3;++c) {
+            velocity_norms[c]=m_ucat.norm0(c,0,true);
+            amrex::ParallelDescriptor::ReduceRealMax(velocity_norms[c]);
+        }
+    }
+    for (int d=0;d<3;++d) for (int c=0;c<3;++c) {
+        amrex::Real u=reuse_velocity_norms ? velocity_norms[c] : m_ucat.norm0(c,0,true);
+        amrex::Real g=m_metric_data.grad_xi_cc().norm0(3*d+c,0,true);
+        if (!reuse_velocity_norms) amrex::ParallelDescriptor::ReduceRealMax(u);
+        amrex::ParallelDescriptor::ReduceRealMax(g);
+        divergence_scale+=u*g/h[d];
+    }
+    if (report.max_divergence_before <= 64.0*std::numeric_limits<amrex::Real>::epsilon()*divergence_scale) {
+        if (m_mapping_operator.state_contract == "face_authoritative") {
+            // A zero multiplier replaces the previous instantaneous value.
+            // Reconstruction is prepared before publishing pressure/cell state.
+            auto& reconstructed=m_deferred_workspace->reconstructed_cell;
+            sync_metric_ucat_from_ucont(fv,m_metric_data,m_metric_epoch,m_mapping_operator,reconstructed);
+            if (!reconstructed.is_finite(0,3,0))
+                throw std::runtime_error("M2 face-authoritative zero-multiplier reconstruction is nonfinite");
+            amrex::MultiFab::Copy(m_ucat,reconstructed,0,0,3,0);
+            m_p.setVal(0.0);
+            mark_valid_modified();
+        }
+        m_phi.setVal(0.0);
+        if (m_mapping_operator.state_contract == "face_authoritative") fill_ghost_cells();
+        report.max_divergence_after=report.max_divergence_before;
+        return report;
+    }
+    if (m_mapping_operator.state_contract == "face_authoritative") {
+        // MLMG consumes -alpha/dt times the authoritative net face flux.
+        // Form it directly, without rounding net/V and multiplying V back.
+        compute_metric_net_flux(fv,m_metric_data,m_metric_epoch,m_mapping_operator,m_projection_rhs);
+    } else {
+        amrex::MultiFab::Multiply(m_projection_rhs,m_metric_data.cell_volume_cc(),0,0,1,0);
+    }
+    m_projection_rhs.mult(-alpha/dt,0,1,0);
+    auto const result=solve_deferred_metric_poisson(m_phi,m_projection_rhs,m_metric_data,
+        m_metric_epoch,m_mapping_operator,m_geom,*m_deferred_workspace);
+    report.outer_iterations=result.iterations;
+    report.inner_iterations=result.inner_iterations;
+    report.full_relative_residual=result.full_relative_residual;
+    report.final_residual=result.full_max_residual;
+    if (m_mapping_operator.state_contract == "face_authoritative") {
+        // U* = U^n + dt I(RHS); DG Phi = D(U*)/dt. Phi is the
+        // instantaneous discrete face-constraint multiplier for this step.
+        // P=Phi is a semantic choice, not evidence of physical pressure MMS.
+        // Prepare projected faces and reconstructed cells before flow commit.
+        amrex::Array<amrex::MultiFab const*,3> candidates{};
+        for (int d=0;d<3;++d) {
+            compute_metric_face_gradient_flux(m_phi,d,m_metric_data,m_metric_epoch,
+                m_mapping_operator,m_phi_operator_flux[d]);
+            auto& candidate=m_deferred_workspace->face_candidate[d];
+            amrex::MultiFab::Copy(candidate,m_ucont[d],0,0,1,0);
+            amrex::MultiFab::Saxpy(candidate,-dt/alpha,m_phi_operator_flux[d],0,0,1,0);
+            candidate.OverrideSync(m_geom.periodicity());
+            candidate.FillBoundary(m_geom.periodicity());
+            candidates[d]=&candidate;
+        }
+        auto& reconstructed=m_deferred_workspace->reconstructed_cell;
+        sync_metric_ucat_from_ucont(candidates,m_metric_data,m_metric_epoch,
+            m_mapping_operator,reconstructed);
+        if (!reconstructed.is_finite(0,3,0) || !m_phi.is_finite(0,1,0))
+            throw std::runtime_error("M2 face-authoritative projection candidate is nonfinite");
+        compute_metric_divergence(candidates,m_metric_data,m_metric_epoch,
+            m_mapping_operator,m_projection_rhs);
+        report.max_divergence_after=m_projection_rhs.norm0(0,0,true);
+        amrex::ParallelDescriptor::ReduceRealMax(report.max_divergence_after);
+        if (!std::isfinite(report.max_divergence_after))
+            throw std::runtime_error("M2 face-authoritative projection candidate divergence is nonfinite");
+        // Runtime/MPI/device faults during copies are fatal. There is no
+        // whole-advance rollback: predictor faces/history already changed.
+        for (int d=0;d<3;++d)
+            amrex::MultiFab::Copy(m_ucont[d],*candidates[d],0,0,1,0);
+        amrex::MultiFab::Copy(m_ucat,reconstructed,0,0,3,0);
+        amrex::MultiFab::Copy(m_p,m_phi,0,0,1,0);
+        mark_valid_modified();fill_ghost_cells();
+        amrex::Print()<<"M2 face-authoritative projection: pressure=instantaneous_pressure iterations="
+            <<report.outer_iterations<<" full_relative_residual="<<report.full_relative_residual
+            <<" max_div_after="<<report.max_divergence_after<<"\n";
+        return report;
+    }
+    // Prepare every correction before writing flow state. Ucont is the mass
+    // authority; Ucat is the transported cell velocity with incremental cell
+    // gradient correction, NOT an inverse interpolation of projected Ucont.
+    // Solver/validation failures preserve Ucat/Ucont/P valid values and the
+    // valid epoch. Phi/halos/scratch are not rolled back; an entire advance is
+    // still fatal on failure (history/predictor rollback is not implemented).
+    auto& gradient=m_deferred_workspace->cell_gradient;
+    compute_metric_cell_gradient(m_phi,m_metric_data,m_metric_epoch,m_mapping_operator,gradient);
+    for (int d=0;d<3;++d)
+        compute_metric_face_gradient_flux(m_phi,d,m_metric_data,m_metric_epoch,
+            m_mapping_operator,m_phi_operator_flux[d]);
+    // No application-owned MultiFab allocation or operator validation remains.
+    // Fatal runtime/MPI/device errors (including communication allocation)
+    // are outside the recoverable numerical-failure contract.
+    for (int d=0;d<3;++d) {
+        amrex::MultiFab::Saxpy(m_ucont[d],-dt/alpha,m_phi_operator_flux[d],0,0,1,0);
+        m_ucont[d].OverrideSync(m_geom.periodicity());
+        m_ucont[d].FillBoundary(m_geom.periodicity());
+    }
+    amrex::MultiFab::Add(m_p,m_phi,0,0,1,0);
+    amrex::MultiFab::Saxpy(m_ucat,-dt/alpha,gradient,0,0,3,0);
+    mark_valid_modified();fill_ghost_cells();
+    compute_metric_divergence(fv,m_metric_data,m_metric_epoch,m_mapping_operator,m_projection_rhs);
+    report.max_divergence_after=m_projection_rhs.norm0(0,0,true);
+    amrex::ParallelDescriptor::ReduceRealMax(report.max_divergence_after);
+    amrex::Print()<<"C3 deferred projection: iterations="<<report.outer_iterations
+        <<" full_relative_residual="<<report.full_relative_residual
+        <<" max_div_after="<<report.max_divergence_after<<"\n";
     return report;
 }
